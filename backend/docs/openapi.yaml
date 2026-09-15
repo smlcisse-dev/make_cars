@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: Make Cars API
+  description: >
+    API REST unique consommée par la SPA web (Admin / Garagiste / Market Space)
+    et par l'application mobile Flutter (automobilistes). Voir /CLAUDE.md à la
+    racine du projet pour le contexte métier et les règles de gestion.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000/api
+    description: Développement local
+
+tags:
+  - name: Auth
+    description: Inscription, connexion, gestion des tokens (Laravel Sanctum).
+  - name: Admin
+    description: Endpoints réservés au dashboard Administrateur.
+  - name: Garage
+    description: Endpoints du dashboard Garagiste (compte Garagiste requis).
+  - name: MarketSpace
+    description: Endpoints du dashboard Market Space (compte Market Space requis).
+  - name: Mobile
+    description: Endpoints consommés par l'application mobile (automobilistes).
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum token
+      description: Token d'API Laravel Sanctum, envoyé en en-tête `Authorization: Bearer <token>`.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Vérifie que l'API est disponible.
+      tags: [Auth]
+      security: []
+      responses:
+        '200':
+          description: L'API répond correctement.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  app:
+                    type: string
+
+# Les endpoints métier (auth, garages, services, rendez-vous, devis, factures,
+# paiements, market space, avis, chat, notifications...) sont ajoutés ici au
+# fur et à mesure de leur implémentation, module par module.

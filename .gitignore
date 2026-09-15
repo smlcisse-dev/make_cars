@@ -1,0 +1,22 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Claude Code local session settings (machine-specific)
+.claude/settings.local.json
+
+# Frontend web (Vue 3 + TypeScript) — node_modules and env not yet created,
+# ignored in advance so they never get committed once the project exists.
+frontend-web/node_modules/
+frontend-web/dist/
+frontend-web/.env
+frontend-web/.env.local
+
+# Mobile (Flutter) — standard build/generated artifacts, ignored in advance.
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/*.iml
