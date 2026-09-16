@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Garage\AppointmentController;
 use App\Http\Controllers\Api\Garage\GarageImageController;
 use App\Http\Controllers\Api\Garage\OpeningHoursController;
 use App\Http\Controllers\Api\Garage\ProductController;
@@ -25,4 +26,10 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::put('services/{service}', [ServiceController::class, 'update']);
     Route::put('services/{service}/availability', [ServiceController::class, 'updateAvailability']);
     Route::delete('services/{service}', [ServiceController::class, 'destroy']);
+
+    Route::get('appointments', [AppointmentController::class, 'index']);
+    Route::get('appointments/{appointment}', [AppointmentController::class, 'show']);
+    Route::post('appointments/{appointment}/confirm', [AppointmentController::class, 'confirm']);
+    Route::post('appointments/{appointment}/reject', [AppointmentController::class, 'reject']);
+    Route::post('appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
 });

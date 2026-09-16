@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AppointmentController;
 use App\Http\Controllers\Api\Admin\GarageController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\RegistrationController;
@@ -28,4 +29,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('services/{service}', [ServiceController::class, 'show']);
     Route::post('services/{service}/approve', [ServiceController::class, 'approve']);
     Route::post('services/{service}/reject', [ServiceController::class, 'reject']);
+
+    Route::get('appointments', [AppointmentController::class, 'index']);
+    Route::get('appointments/{appointment}', [AppointmentController::class, 'show']);
 });

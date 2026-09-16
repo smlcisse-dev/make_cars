@@ -117,6 +117,18 @@ Résout le point ouvert « typologie précise des services » (§7) : un service
 - **Même mécanisme de validation admin que les produits** (règle 5) : `pending` à la création et à toute modification du contenu (nom, description, catégorie, prix, durée, image), visible côté mobile uniquement si `approved`.
 - **Disponibilité distincte de la validation admin** : un interrupteur actif/inactif, géré librement par le garagiste, permet de rendre un service temporairement indisponible sans le supprimer ni redéclencher de validation admin. Un service invisible côté mobile si validé mais inactif, ou si le compte du garage est non validé/suspendu.
 
+### Module Rendez-vous (ajout v0.7, 2026-09-16)
+
+Premier maillon de la chaîne RDV → devis → validation du devis par le client → prestation → paiement → facture (règle 10). Ce module ne couvre que la partie RDV jusqu'à confirmation ; devis/validation/paiement/facture sont des modules séparés à venir.
+
+- **Demande** : un automobiliste choisit un garage, propose une date/heure, et précise son besoin via un service du catalogue **et/ou** une description libre — au moins l'un des deux est obligatoire. Seul un garage validé et non suspendu peut être sollicité ; si un service précis est choisi, il doit appartenir à ce garage et être lui-même publié (`approved`, actif).
+- **Pas de créneaux prédéfinis en V1** : la date/heure est une simple proposition/confirmation en texte libre, pas un système de disponibilités structuré.
+- **Aucun paiement déclenché par la prise de RDV** (règle 10, rappel explicite) — le module Devis, à construire ensuite, est le premier point de la chaîne où un montant apparaît.
+- **Statuts** : `pending` (en attente) → `confirmed` (confirmé par le garagiste), `rejected` (refusé), ou `rescheduled` (contre-proposition du garagiste) ; `rescheduled` → `confirmed` (le client accepte la nouvelle date) ou `cancelled` (le client annule plutôt que de « refuser » la contre-proposition — ça referme la négociation sans état supplémentaire). `cancelled` est aussi accessible depuis `pending`/`confirmed` (annulation client). `completed` est prévu dans le modèle pour anticiper la suite de la chaîne (prestation terminée) mais n'est pas encore atteignable dans ce module — sa transition sera déclenchée par le futur module Devis/Prestation.
+- **Le garagiste agit uniquement depuis `pending`** : confirmer, refuser (motif optionnel, à la différence des rejets admin qui l'exigent), ou proposer une autre date. Pas de contre-proposition en chaîne dans cette V1 (un seul aller-retour).
+- **Anticipation du futur devis** : le module Devis référencera le RDV via une FK `appointment_id` sur son propre modèle (`Appointment` n'a rien à porter en anticipation — la relation se construit dans l'autre sens). Un devis ne pourra logiquement naître que d'un RDV `confirmed`, à valider au moment de construire ce module.
+- **Suspension du compte garage** : un RDV déjà créé n'est pas annulé automatiquement si le garage est suspendu entre-temps (l'historique est conservé, cf. suspension de compte) — mais un automobiliste ne peut plus en demander de nouveau tant que le garage reste suspendu.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
