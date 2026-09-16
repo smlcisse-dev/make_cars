@@ -11,7 +11,7 @@ Route::get('/health', function () {
 
 Route::prefix('auth')->group(base_path('routes/api/auth.php'));
 Route::prefix('admin')->group(base_path('routes/api/admin.php'));
+Route::prefix('garage')->group(base_path('routes/api/garage.php'));
+Route::prefix('mobile')->group(base_path('routes/api/mobile.php'));
 
-// Route::prefix('garage')->middleware(['auth:sanctum'])->group(base_path('routes/api/garage.php'));
 // Route::prefix('market-space')->middleware(['auth:sanctum'])->group(base_path('routes/api/market-space.php'));
-// Route::prefix('mobile')->middleware(['auth:sanctum'])->group(base_path('routes/api/mobile.php'));

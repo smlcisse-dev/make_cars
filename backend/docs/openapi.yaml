@@ -115,6 +115,38 @@ components:
         message:
           type: string
 
+    Garage:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        description: {type: string, nullable: true}
+        address: {type: string}
+        latitude: {type: number, format: float, nullable: true}
+        longitude: {type: number, format: float, nullable: true}
+        phone: {type: string, nullable: true}
+        is_publicly_visible:
+          type: boolean
+          description: Reflète la validation admin du compte Garagiste (CLAUDE.md §5 règle 4), pas un champ propre au garage.
+        opening_hours:
+          type: array
+          items:
+            type: object
+            properties:
+              day_of_week: {type: integer, minimum: 1, maximum: 7, description: "ISO-8601 : 1 = lundi ... 7 = dimanche"}
+              day_label: {type: string}
+              is_closed: {type: boolean}
+              opens_at: {type: string, nullable: true, example: "08:00"}
+              closes_at: {type: string, nullable: true, example: "18:00"}
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              url: {type: string}
+              position: {type: integer}
+
 security:
   - bearerAuth: []
 
@@ -329,6 +361,160 @@ paths:
         '422':
           description: Motif manquant.
 
-# Les endpoints métier suivants (garages, services, rendez-vous, devis,
-# factures, paiements, market space, avis, chat, notifications...) sont
-# ajoutés ici au fur et à mesure de leur implémentation, module par module.
+  /admin/garages:
+    get:
+      summary: Liste tous les garages, validés ou non (supervision admin).
+      tags: [Admin]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /admin/garages/{garage}:
+    get:
+      summary: Détail d'un garage (supervision admin).
+      tags: [Admin]
+      parameters:
+        - name: garage
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
+  /garage/profile:
+    get:
+      summary: >
+        Profil du garage du compte Garagiste authentifié. Créé automatiquement
+        à l'approbation du dossier KYC (voir /admin/registrations/{id}/approve) ;
+        404 tant que le compte n'est pas encore validé.
+      tags: [Garage]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Garage'
+        '404':
+          description: Profil pas encore créé (compte non validé).
+    put:
+      summary: Met à jour le profil du garage (nom, adresse, géoloc, téléphone).
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, address]
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+                address: {type: string}
+                latitude: {type: number, nullable: true}
+                longitude: {type: number, nullable: true}
+                phone: {type: string, nullable: true}
+      responses:
+        '200':
+          description: Profil mis à jour.
+
+  /garage/profile/opening-hours:
+    put:
+      summary: Remplace intégralement les horaires d'ouverture (7 jours requis).
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hours]
+              properties:
+                hours:
+                  type: array
+                  minItems: 7
+                  maxItems: 7
+                  items:
+                    type: object
+                    required: [day_of_week, is_closed]
+                    properties:
+                      day_of_week: {type: integer, minimum: 1, maximum: 7}
+                      is_closed: {type: boolean}
+                      opens_at: {type: string, nullable: true, example: "08:00"}
+                      closes_at: {type: string, nullable: true, example: "18:00"}
+      responses:
+        '200':
+          description: Horaires mis à jour.
+        '422':
+          description: Jour manquant, ou horaires incohérents (fermeture avant ouverture).
+
+  /garage/profile/images:
+    post:
+      summary: Ajoute une ou plusieurs photos du garage.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  items: {type: string, format: binary}
+      responses:
+        '201':
+          description: Photo(s) ajoutée(s).
+
+  /garage/profile/images/{image}:
+    delete:
+      summary: Supprime une photo du garage (doit appartenir au garage authentifié).
+      tags: [Garage]
+      parameters:
+        - name: image
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Photo supprimée.
+        '404':
+          description: Photo introuvable ou appartenant à un autre garage.
+
+  /mobile/garages:
+    get:
+      summary: >
+        Liste les garages visibles publiquement (compte validé uniquement).
+        Recherche géographique par proximité : module à part, non couvert ici
+        (voir CLAUDE.md §7).
+      tags: [Mobile]
+      security: []
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /mobile/garages/{garage}:
+    get:
+      summary: Détail public d'un garage.
+      tags: [Mobile]
+      security: []
+      parameters:
+        - name: garage
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Garage inexistant ou compte non validé.
+
+# Les endpoints métier suivants (produits/mini-boutique partagés Garage &
+# Market Space, services, rendez-vous, devis, factures, paiements, avis,
+# chat, notifications...) sont ajoutés ici au fur et à mesure de leur
+# implémentation, module par module.

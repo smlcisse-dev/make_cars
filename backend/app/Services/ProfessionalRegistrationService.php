@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProfessionalRegistrationService
 {
+    public function __construct(private readonly GarageService $garageService) {}
+
     /**
      * Justificatifs stockés sur un disque configurable (local en dev, bascule
      * vers Supabase Storage une fois les identifiants fournis — CLAUDE.md §4).
@@ -73,6 +75,13 @@ class ProfessionalRegistrationService
             'reviewed_by' => $admin->id,
             'reviewed_at' => now(),
         ]);
+
+        // Le profil Garage est le pendant "public" du dossier KYC pour un
+        // compte Garagiste ; il est pré-rempli ici puis complété par le
+        // garagiste (géoloc, horaires, photos — voir GarageService).
+        if ($registration->user->role === AccountType::Garagiste && ! $registration->user->garage) {
+            $this->garageService->createFromRegistration($registration);
+        }
 
         return $registration;
     }

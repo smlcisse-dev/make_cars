@@ -31,6 +31,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disque des médias publics
+    |--------------------------------------------------------------------------
+    |
+    | Disque public utilisé pour les photos affichées côté app mobile (profil
+    | garage, produits...). "public" par défaut ; bascule sur "supabase_public"
+    | (bucket public distinct du bucket KYC privé) une fois configuré.
+    |
+    */
+
+    'public_media_disk' => env('PUBLIC_MEDIA_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -75,7 +88,8 @@ return [
         ],
 
         // Supabase Storage expose une API compatible S3 (Project Settings >
-        // Storage > S3 Connection dans le dashboard Supabase).
+        // Storage > S3 Connection dans le dashboard Supabase). Bucket privé
+        // pour les justificatifs KYC.
         'supabase' => [
             'driver' => 's3',
             'key' => env('SUPABASE_STORAGE_KEY'),
@@ -84,6 +98,22 @@ return [
             'bucket' => env('SUPABASE_STORAGE_BUCKET'),
             'endpoint' => env('SUPABASE_STORAGE_ENDPOINT'),
             'use_path_style_endpoint' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Même compte Supabase, bucket public distinct pour les médias
+        // affichés côté app mobile (photos de garage, de produits...).
+        'supabase_public' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_STORAGE_KEY'),
+            'secret' => env('SUPABASE_STORAGE_SECRET'),
+            'region' => env('SUPABASE_STORAGE_REGION', 'eu-central-1'),
+            'bucket' => env('SUPABASE_PUBLIC_BUCKET'),
+            'endpoint' => env('SUPABASE_STORAGE_ENDPOINT'),
+            'url' => env('SUPABASE_PUBLIC_URL'),
+            'use_path_style_endpoint' => true,
+            'visibility' => 'public',
             'throw' => false,
             'report' => false,
         ],

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\GarageController;
 use App\Http\Controllers\Api\Admin\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,4 +11,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('registrations/{registration}/reject', [RegistrationController::class, 'reject']);
     Route::get('registrations/{registration}/documents/{document}', [RegistrationController::class, 'downloadDocument'])
         ->name('admin.registrations.documents.download');
+
+    Route::get('garages', [GarageController::class, 'index']);
+    Route::get('garages/{garage}', [GarageController::class, 'show']);
 });

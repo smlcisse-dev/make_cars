@@ -43,6 +43,14 @@ class User extends Authenticatable
         return $this->hasOne(ProfessionalRegistration::class);
     }
 
+    /**
+     * @return HasOne<Garage, $this>
+     */
+    public function garage(): HasOne
+    {
+        return $this->hasOne(Garage::class);
+    }
+
     public function isValidatedProfessional(): bool
     {
         if (! $this->role->requiresProfessionalValidation()) {
