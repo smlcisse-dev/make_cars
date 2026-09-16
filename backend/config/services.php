@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+     * Client ID OAuth 2.0 de type "Web" créé dans Google Cloud Console —
+     * sert d'audience (claim "aud") pour vérifier les ID tokens envoyés par
+     * l'app Flutter (CLAUDE.md §5, ajout v0.5). Pas de client secret : aucun
+     * échange de code d'autorisation côté serveur dans ce flux.
+     */
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+    ],
+
 ];

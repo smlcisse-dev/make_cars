@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('register/automobiliste', [RegisterController::class, 'automobiliste']);
 Route::post('register/professionnel', [RegisterController::class, 'professional']);
 Route::post('login', [SessionController::class, 'store']);
+Route::post('login/google', [SessionController::class, 'google']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('me', [SessionController::class, 'me']);

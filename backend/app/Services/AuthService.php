@@ -45,4 +45,38 @@ class AuthService
     {
         return $user->createToken($user->role->value);
     }
+
+    /**
+     * Connexion (ou création à la première connexion) via Google — réservée
+     * aux automobilistes ; les deux méthodes de connexion coexistent pour ce
+     * type de compte (CLAUDE.md §5, ajout v0.5).
+     *
+     * @param  array{sub: string, email: string, name: string}  $googleUser
+     */
+    public function loginWithGoogle(array $googleUser): User
+    {
+        $user = User::where('google_id', $googleUser['sub'])->first()
+            ?? User::where('email', $googleUser['email'])->first();
+
+        if ($user && $user->role !== AccountType::Automobiliste) {
+            throw ValidationException::withMessages([
+                'id_token' => ['Cet email est associé à un compte professionnel ; la connexion Google est réservée aux automobilistes.'],
+            ]);
+        }
+
+        if (! $user) {
+            return User::create([
+                'name' => $googleUser['name'],
+                'email' => $googleUser['email'],
+                'google_id' => $googleUser['sub'],
+                'role' => AccountType::Automobiliste,
+            ]);
+        }
+
+        if ($user->google_id !== $googleUser['sub']) {
+            $user->update(['google_id' => $googleUser['sub']]);
+        }
+
+        return $user;
+    }
 }

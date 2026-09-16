@@ -45,7 +45,7 @@ Le backend Laravel expose une **API REST unique**, consommée à la fois par l'a
 
 - **Backend** : Laravel, **API REST pure** (aucune vue Blade servie par le backend), documentée avec **OpenAPI/Swagger**. Consommée à la fois par le frontend web et l'app Flutter.
 - **Structure backend** : couche **Service** dédiée entre les Controllers et les Models pour séparer la logique métier (pattern Controller → Service → Model/Repository) — pas de logique métier directement dans les controllers.
-- **Authentification API** : **Laravel Sanctum** (tokens), utilisée par le frontend web et l'app mobile.
+- **Authentification API** : **Laravel Sanctum** (tokens), utilisée par le frontend web et l'app mobile. Émission de token identique quelle que soit la méthode de connexion (email/mot de passe ou Google — voir §5, ajout v0.5) : Sanctum n'est pas concerné par *comment* l'utilisateur a prouvé son identité, seulement par l'émission du token une fois l'identité établie.
 - **Frontend web** : SPA **découplée** en **Vue 3 + TypeScript**, un seul projet gérant les trois espaces (Admin / Garagiste / Market Space) via son propre routing/permissions internes. Communique uniquement via l'API REST, comme Flutter. Gère elle-même l'auth (stockage du token Sanctum) ; CORS à configurer côté Laravel.
 - **Application mobile** : Flutter (Android / iOS).
 - **Base de données** : PostgreSQL hébergée sur **Supabase**.
@@ -87,6 +87,15 @@ Un compte Garagiste peut vendre un petit catalogue de produits courants (huiles,
 - **Un devis/facture de prestation peut donc combiner deux natures de lignes** : des frais de service à prix fixe (aucun impact stock) et des pièces vendues via la mini-boutique (qui décrémentent le stock).
 - **Le Market Space garde son propre stock**, totalement distinct de celui d'un garage : une boutique Market Space a sa propre inscription, sa propre validation KYC et son propre inventaire, indépendamment de tout garage — y compris quand un garage détient les deux comptes (règle 2).
 
+### Authentification Automobiliste : email/mot de passe + Google (ajout v0.5, 2026-09-16)
+
+En complément de l'email/mot de passe existant, un automobiliste peut se connecter via **Google (OAuth2)**. Précisions à respecter dans toute implémentation :
+
+- **Réservé au compte Automobiliste** : seul ce type de compte peut utiliser la connexion Google. Les comptes Garagiste, Market Space et Admin restent exclusivement en email/mot de passe — pas de Google pour l'instant (accès dashboard web plus sensible, KYC déjà nominatif).
+- **Les deux méthodes coexistent** pour un automobiliste : un compte créé via Google doit pouvoir, à terme, définir un mot de passe (et inversement, un compte créé par email/mot de passe doit pouvoir lier son compte Google) — pas de méthode exclusive one-shot.
+- **Rattachement par email** : si l'email renvoyé par Google correspond à un compte automobiliste existant, la connexion Google s'y rattache (pas de doublon de compte). Si l'email correspond à un compte **professionnel** (Garagiste/Market Space/Admin), la connexion Google est refusée — elle ne doit jamais créer ou détourner un compte professionnel.
+- **Flux mobile natif, pas de redirection navigateur** : l'app Flutter effectue elle-même le Google Sign-In côté client (SDK natif) et transmet un jeton au backend pour vérification — cohérent avec l'architecture API REST pure (§4) : le backend ne sert aucune vue, donc pas de flux Socialite `redirect()/callback()` classique orienté navigateur.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -126,7 +135,7 @@ Un compte Garagiste peut vendre un petit catalogue de produits courants (huiles,
 - Choix de la solution de chat temps réel (Reverb, Pusher, Supabase Realtime).
 - Modalités de contestation d'un avis par un professionnel avant modération/suppression admin.
 - Cadre légal précis de partage des données agrégées avec l'administration béninoise (nature des données, fréquence, base légale RGPD/loi locale).
-- Méthodes d'authentification définitives côté automobiliste (email, téléphone, réseaux sociaux — à confirmer).
+- Authentification côté automobiliste par téléphone/SMS (email + Google désormais tranchés, voir §5 ajout v0.5).
 - Périmètre exact du catalogue « mini-boutique » d'un garage (catégories de produits autorisées, limite de nombre éventuelle) et seuil au-delà duquel un garage devrait plutôt ouvrir un compte Market Space à part entière.
 
 ## 8. Glossaire
