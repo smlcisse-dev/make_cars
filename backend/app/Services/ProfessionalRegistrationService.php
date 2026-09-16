@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class ProfessionalRegistrationService
 {
-    public function __construct(private readonly GarageService $garageService) {}
+    public function __construct(
+        private readonly GarageService $garageService,
+        private readonly MarketSpaceAccountService $marketSpaceAccountService,
+    ) {}
 
     /**
      * Justificatifs stockés sur un disque configurable (local en dev, bascule
@@ -76,11 +79,15 @@ class ProfessionalRegistrationService
             'reviewed_at' => now(),
         ]);
 
-        // Le profil Garage est le pendant "public" du dossier KYC pour un
-        // compte Garagiste ; il est pré-rempli ici puis complété par le
-        // garagiste (géoloc, horaires, photos — voir GarageService).
+        // Le profil Garage (ou Market Space) est le pendant "public" du
+        // dossier KYC ; il est pré-rempli ici puis complété par le
+        // professionnel (géoloc, horaires, photos — voir GarageService).
         if ($registration->user->role === AccountType::Garagiste && ! $registration->user->garage) {
             $this->garageService->createFromRegistration($registration);
+        }
+
+        if ($registration->user->role === AccountType::MarketSpace && ! $registration->user->marketSpaceAccount) {
+            $this->marketSpaceAccountService->createFromRegistration($registration);
         }
 
         return $registration;

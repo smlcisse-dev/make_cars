@@ -3,6 +3,7 @@
 namespace Tests\Feature\Mobile;
 
 use App\Models\Garage;
+use App\Models\Product;
 use App\Models\ProfessionalRegistration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,5 +44,18 @@ class GarageListingTest extends TestCase
         $response = $this->getJson("/api/mobile/garages/{$garage->id}");
 
         $response->assertOk()->assertJsonPath('data.id', $garage->id);
+    }
+
+    public function test_only_approved_mini_boutique_products_appear_on_the_garage_profile(): void
+    {
+        $garage = $this->approvedGarage();
+        $approved = Product::factory()->forGarage($garage)->approved()->create();
+        Product::factory()->forGarage($garage)->create();
+
+        $response = $this->getJson("/api/mobile/garages/{$garage->id}");
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data.products')
+            ->assertJsonPath('data.products.0.id', $approved->id);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Mobile;
 
+use App\Enums\ProductStatus;
 use App\Enums\RegistrationStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Resources\GarageResource;
@@ -25,10 +26,20 @@ class GarageController extends Controller
         return GarageResource::collection($garages);
     }
 
+    /**
+     * Les produits de la mini-boutique sont affichés sur le profil du garage,
+     * pas dans une liste Market Space distincte (CLAUDE.md §5, ajout v0.4).
+     */
     public function show(Garage $garage): GarageResource
     {
         abort_unless($garage->isPubliclyVisible(), 404);
 
-        return new GarageResource($garage->load(['openingHours', 'images']));
+        $garage->load([
+            'openingHours',
+            'images',
+            'products' => fn ($query) => $query->where('status', ProductStatus::Approved),
+        ]);
+
+        return new GarageResource($garage);
     }
 }

@@ -51,6 +51,14 @@ class User extends Authenticatable
         return $this->hasOne(Garage::class);
     }
 
+    /**
+     * @return HasOne<MarketSpaceAccount, $this>
+     */
+    public function marketSpaceAccount(): HasOne
+    {
+        return $this->hasOne(MarketSpaceAccount::class);
+    }
+
     public function isValidatedProfessional(): bool
     {
         if (! $this->role->requiresProfessionalValidation()) {

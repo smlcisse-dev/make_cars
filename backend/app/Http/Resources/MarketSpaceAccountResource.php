@@ -2,14 +2,14 @@
 
 namespace App\Http\Resources;
 
-use App\Models\Garage;
+use App\Models\MarketSpaceAccount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin Garage
+ * @mixin MarketSpaceAccount
  */
-class GarageResource extends JsonResource
+class MarketSpaceAccountResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -21,12 +21,8 @@ class GarageResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'address' => $this->address,
-            'latitude' => $this->latitude,
-            'longitude' => $this->longitude,
             'phone' => $this->phone,
             'is_publicly_visible' => $this->isPubliclyVisible(),
-            'opening_hours' => GarageOpeningHourResource::collection($this->whenLoaded('openingHours')),
-            'images' => GarageImageResource::collection($this->whenLoaded('images')),
             'products' => ProductResource::collection($this->whenLoaded('products')),
         ];
     }

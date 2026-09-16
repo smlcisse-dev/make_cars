@@ -75,6 +75,20 @@ class RegistrationApprovalTest extends TestCase
         $this->assertSame(AccountType::MarketSpace, $registration->user->fresh()->role);
     }
 
+    public function test_approving_a_market_space_registration_auto_creates_its_account(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+        $registration = ProfessionalRegistration::factory()->marketSpace()->create();
+
+        $this->postJson("/api/admin/registrations/{$registration->id}/approve")->assertOk();
+
+        $this->assertDatabaseHas('market_space_accounts', [
+            'user_id' => $registration->user_id,
+            'name' => $registration->structure_name,
+            'address' => $registration->address,
+        ]);
+    }
+
     public function test_an_admin_can_reject_a_pending_registration_with_a_reason(): void
     {
         Sanctum::actingAs(User::factory()->admin()->create());
