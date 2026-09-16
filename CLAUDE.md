@@ -73,6 +73,7 @@ Ces règles s'appliquent à toute l'application et doivent être respectées par
 10. La prise de rendez-vous ne déclenche **aucun paiement**. Séquence garage : RDV → devis demandé sur place → validation devis par le client → démarrage prestation → paiement total en fin de prestation → facture auto-générée.
 11. Séquence Market Space : commande → paiement immédiat sur la plateforme → facture auto-générée.
 12. Moyens de paiement : MTN Mobile Money, Moov Money, Celtiis Cash, carte bancaire.
+13. Un compte professionnel déjà validé (Garagiste ou Market Space) peut être **suspendu** par l'administrateur (fraude, plaintes répétées, pièces de mauvaise qualité signalées) — motif obligatoire, comme pour un rejet d'inscription. Un compte suspendu devient invisible côté application mobile (comme un compte non encore validé) mais conserve tout son historique (produits, services, avis) pour une éventuelle réactivation (voir « Suspension de compte professionnel » ci-dessous).
 
 ### Mini-boutique Garage vs Market Space (ajout v0.4, 2026-09-16)
 
@@ -96,6 +97,26 @@ En complément de l'email/mot de passe existant, un automobiliste peut se connec
 - **Rattachement par email** : si l'email renvoyé par Google correspond à un compte automobiliste existant, la connexion Google s'y rattache (pas de doublon de compte). Si l'email correspond à un compte **professionnel** (Garagiste/Market Space/Admin), la connexion Google est refusée — elle ne doit jamais créer ou détourner un compte professionnel.
 - **Flux mobile natif, pas de redirection navigateur** : l'app Flutter effectue elle-même le Google Sign-In côté client (SDK natif) et transmet un jeton au backend pour vérification — cohérent avec l'architecture API REST pure (§4) : le backend ne sert aucune vue, donc pas de flux Socialite `redirect()/callback()` classique orienté navigateur.
 
+### Suspension de compte professionnel (ajout v0.6, 2026-09-16)
+
+Un compte Garagiste ou Market Space déjà validé peut être suspendu par l'administrateur, puis réactivé. Précisions à respecter dans toute implémentation :
+
+- **Distinct du rejet d'inscription** : le rejet s'applique à un dossier KYC pas encore validé (statut `pending` → `rejected`, définitif sauf nouvelle inscription). La suspension s'applique à un compte déjà `approved` : le statut d'inscription reste `approved` pendant la suspension — c'est un état superposé, réversible, pas une remise en cause du dossier KYC.
+- **Motif obligatoire** : comme pour un rejet d'inscription (règle 4/§5), la suspension exige un motif texte — traçabilité pour litiges et audit (§6).
+- **Réactivation** : l'administrateur peut lever la suspension à tout moment, sans motif requis. Le compte redevient immédiatement visible côté mobile, sans reconstruire quoi que ce soit — c'est pourquoi rien n'est supprimé à la suspension.
+- **Effet unique : la visibilité mobile.** Un compte suspendu disparaît de l'app mobile exactement comme un compte non encore validé (recherche, fiche garage/boutique, mini-boutique et produits Market Space, services de réparation). Rien d'autre n'est modifié par la suspension elle-même : ni les données du garage/de la boutique, ni ses produits/services, ni les avis déjà laissés — tout est conservé pour permettre une reprise normale à la réactivation.
+- **Accès dashboard non traité par cette règle** : la suspension ne coupe pas explicitement l'accès du professionnel à son propre dashboard (connexion, consultation) — seule la visibilité publique côté mobile est concernée. Un éventuel blocage d'accès dashboard pendant la suspension serait une extension ultérieure, à valider avant implémentation.
+
+### Catalogue des services de réparation (ajout v0.6, 2026-09-16)
+
+Résout le point ouvert « typologie précise des services » (§7) : un service de réparation proposé par un garage suit les règles suivantes.
+
+- **Catégorie fixe, pas de texte libre** : un garagiste choisit une catégorie dans une liste prédéfinie par la plateforme (Entretien courant, Freinage & suspension, Pneumatiques, Électricité & électronique, Climatisation & refroidissement, Carrosserie, Diagnostic & contrôle, Autre/Divers) — il ne peut pas en créer une nouvelle. Toute évolution de cette liste est un changement de code (déploiement), pas une action d'administration courante.
+- **Prix fixe unique, pas de variation par véhicule** : un service a un seul prix. Un garagiste qui veut différencier par type de véhicule crée plusieurs services distincts (ex. « Vidange citadine » / « Vidange 4x4 ») plutôt qu'une grille tarifaire sur un même service.
+- **Toujours rattaché à un Garage, jamais au Market Space** : contrairement au produit (§ mini-boutique), un service de réparation n'est jamais polymorphe — le Market Space ne fait pas de réparation, seulement de la vente de pièces.
+- **Même mécanisme de validation admin que les produits** (règle 5) : `pending` à la création et à toute modification du contenu (nom, description, catégorie, prix, durée, image), visible côté mobile uniquement si `approved`.
+- **Disponibilité distincte de la validation admin** : un interrupteur actif/inactif, géré librement par le garagiste, permet de rendre un service temporairement indisponible sans le supprimer ni redéclencher de validation admin. Un service invisible côté mobile si validé mais inactif, ou si le compte du garage est non validé/suspendu.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -106,6 +127,7 @@ En complément de l'email/mot de passe existant, un automobiliste peut se connec
 | Créer/modifier service garage | Oui | Oui (soumis validation) | Non | Non |
 | Créer/modifier produit (mini-boutique ou Market Space) | Oui | Oui (soumis validation) | Oui (soumis validation) | Non |
 | Valider service/produit/compte | Oui | Non | Non | Non |
+| Suspendre/réactiver un compte déjà validé | Oui | Non | Non | Non |
 | Gestion stock/inventaire (unique par garage / par boutique) | Oui (lecture) | Oui | Oui | Non |
 | Génération devis/factures | Oui (lecture) | Oui | Émission (factures) | Consultation |
 | Paiement en ligne | — | Réception | Réception | Émission |
@@ -129,7 +151,6 @@ En complément de l'email/mot de passe existant, un automobiliste peut se connec
 
 À garder en tête — ne pas figer de choix définitif dans le code sur ces points sans validation métier :
 
-- Typologie précise des services proposables par les garages.
 - Choix du prestataire de cartographie (Google Maps / Mapbox / OpenStreetMap).
 - Choix de l'agrégateur de paiement (Kkiapay, FedaPay, ou autre).
 - Choix de la solution de chat temps réel (Reverb, Pusher, Supabase Realtime).

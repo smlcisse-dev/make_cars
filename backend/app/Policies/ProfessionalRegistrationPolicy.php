@@ -33,4 +33,22 @@ class ProfessionalRegistrationPolicy
         return $user->role === AccountType::Admin
             && $professionalRegistration->status === RegistrationStatus::Pending;
     }
+
+    /**
+     * Suspend an already-approved, not-yet-suspended account — admin only.
+     */
+    public function suspend(User $user, ProfessionalRegistration $professionalRegistration): bool
+    {
+        return $user->role === AccountType::Admin
+            && $professionalRegistration->status === RegistrationStatus::Approved
+            && ! $professionalRegistration->isSuspended();
+    }
+
+    /**
+     * Reactivate a currently-suspended account — admin only.
+     */
+    public function reactivate(User $user, ProfessionalRegistration $professionalRegistration): bool
+    {
+        return $user->role === AccountType::Admin && $professionalRegistration->isSuspended();
+    }
 }

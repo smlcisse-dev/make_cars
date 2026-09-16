@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['structure_name', 'address', 'business_registration_number', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])]
+#[Fillable(['structure_name', 'address', 'business_registration_number', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'suspension_reason', 'suspended_by', 'suspended_at'])]
 class ProfessionalRegistration extends Model
 {
     /** @use HasFactory<ProfessionalRegistrationFactory> */
@@ -24,6 +24,7 @@ class ProfessionalRegistration extends Model
         return [
             'status' => RegistrationStatus::class,
             'reviewed_at' => 'datetime',
+            'suspended_at' => 'datetime',
         ];
     }
 
@@ -49,5 +50,23 @@ class ProfessionalRegistration extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(RegistrationDocument::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function suspendedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'suspended_by');
+    }
+
+    /**
+     * Un compte suspendu reste "Approved" (le dossier KYC n'est pas remis en
+     * cause) mais devient invisible côté mobile le temps de la suspension —
+     * distinct d'un rejet, réversible via reactivate() (CLAUDE.md §5, ajout v0.6).
+     */
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
     }
 }

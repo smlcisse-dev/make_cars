@@ -104,4 +104,32 @@ class ProfessionalRegistrationService
 
         return $registration;
     }
+
+    /**
+     * Suspend un compte déjà validé (fraude, plaintes répétées, pièces de
+     * mauvaise qualité) : le statut d'inscription reste Approved — seule la
+     * visibilité mobile est coupée, l'historique (produits, services, avis)
+     * est conservé pour une éventuelle réactivation (CLAUDE.md §5, ajout v0.6).
+     */
+    public function suspend(ProfessionalRegistration $registration, User $admin, string $reason): ProfessionalRegistration
+    {
+        $registration->update([
+            'suspension_reason' => $reason,
+            'suspended_by' => $admin->id,
+            'suspended_at' => now(),
+        ]);
+
+        return $registration;
+    }
+
+    public function reactivate(ProfessionalRegistration $registration): ProfessionalRegistration
+    {
+        $registration->update([
+            'suspension_reason' => null,
+            'suspended_by' => null,
+            'suspended_at' => null,
+        ]);
+
+        return $registration;
+    }
 }

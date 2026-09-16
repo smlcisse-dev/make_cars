@@ -65,6 +65,8 @@ class User extends Authenticatable
             return false;
         }
 
-        return $this->professionalRegistration?->status === RegistrationStatus::Approved;
+        $registration = $this->professionalRegistration;
+
+        return $registration?->status === RegistrationStatus::Approved && ! $registration->isSuspended();
     }
 }

@@ -63,6 +63,14 @@ class Garage extends Model
     }
 
     /**
+     * @return HasMany<RepairService, $this>
+     */
+    public function services(): HasMany
+    {
+        return $this->hasMany(RepairService::class);
+    }
+
+    /**
      * Un garage n'est visible publiquement (app mobile) que si son compte
      * Garagiste a été validé par un administrateur (CLAUDE.md §5, règle 4).
      */

@@ -28,6 +28,7 @@ class GarageResource extends JsonResource
             'opening_hours' => GarageOpeningHourResource::collection($this->whenLoaded('openingHours')),
             'images' => GarageImageResource::collection($this->whenLoaded('images')),
             'products' => ProductResource::collection($this->whenLoaded('products')),
+            'services' => ServiceResource::collection($this->whenLoaded('services')),
         ];
     }
 }

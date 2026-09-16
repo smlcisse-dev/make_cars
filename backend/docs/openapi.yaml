@@ -5,7 +5,7 @@ info:
     API REST unique consommée par la SPA web (Admin / Garagiste / Market Space)
     et par l'application mobile Flutter (automobilistes). Voir /CLAUDE.md à la
     racine du projet pour le contexte métier et les règles de gestion.
-  version: 0.1.0
+  version: 0.2.0
 
 servers:
   - url: http://localhost:8000/api
@@ -101,6 +101,19 @@ components:
         created_at:
           type: string
           format: date-time
+        is_suspended:
+          type: boolean
+          description: >
+            Compte déjà approuvé mais suspendu par un admin (fraude, plaintes,
+            pièces de mauvaise qualité) — invisible côté mobile tant que suspendu,
+            réversible (CLAUDE.md §5, ajout v0.6). N'affecte pas "status" ci-dessus.
+        suspension_reason:
+          type: string
+          nullable: true
+        suspended_at:
+          type: string
+          format: date-time
+          nullable: true
 
     AuthPayload:
       type: object
@@ -146,6 +159,79 @@ components:
               id: {type: integer}
               url: {type: string}
               position: {type: integer}
+        products:
+          type: array
+          items: {$ref: '#/components/schemas/Product'}
+          description: Mini-boutique du garage — uniquement les produits "approved" hors dashboard Garagiste (CLAUDE.md §5, ajout v0.4).
+        services:
+          type: array
+          items: {$ref: '#/components/schemas/Service'}
+          description: Uniquement les services "approved" et actifs hors dashboard Garagiste (CLAUDE.md §5, ajout v0.6).
+
+    MarketSpaceAccount:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        description: {type: string, nullable: true}
+        address: {type: string}
+        phone: {type: string, nullable: true}
+        is_publicly_visible:
+          type: boolean
+          description: Reflète la validation admin ET l'absence de suspension du compte Market Space (CLAUDE.md §5 règle 4, ajout v0.6).
+        products:
+          type: array
+          items: {$ref: '#/components/schemas/Product'}
+
+    Product:
+      type: object
+      description: >
+        Un seul vendeur par produit : mini-boutique Garage OU Market Space,
+        jamais les deux (relation polymorphe côté backend — CLAUDE.md §5, ajout v0.4).
+      properties:
+        id: {type: integer}
+        sellable_type: {type: string, enum: [garage, market_space]}
+        sellable_id: {type: integer}
+        name: {type: string}
+        description: {type: string, nullable: true}
+        sku: {type: string, nullable: true}
+        price: {type: string, description: "Décimal sérialisé en chaîne, ex. \"15000.00\"."}
+        stock_quantity: {type: integer}
+        status: {type: string, enum: [pending, approved, rejected]}
+        rejection_reason: {type: string, nullable: true}
+        is_publicly_visible:
+          type: boolean
+          description: "status == approved ET compte vendeur validé/non suspendu."
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+
+    Service:
+      type: object
+      description: >
+        Service de réparation, toujours rattaché à un Garage (jamais au Market
+        Space), prix fixe unique — CLAUDE.md §5, ajout v0.6.
+      properties:
+        id: {type: integer}
+        garage_id: {type: integer}
+        name: {type: string}
+        description: {type: string}
+        category:
+          type: string
+          enum: [entretien_courant, freinage_suspension, pneumatiques, electricite_electronique, climatisation_refroidissement, carrosserie, diagnostic_controle, autre_divers]
+        category_label: {type: string}
+        price: {type: string, description: "Décimal sérialisé en chaîne, ex. \"15000.00\"."}
+        duration_minutes: {type: integer}
+        image_url: {type: string, nullable: true}
+        is_active:
+          type: boolean
+          description: Disponibilité gérée par le garagiste, distincte de "status" (validation admin) — CLAUDE.md §5, ajout v0.6.
+        status: {type: string, enum: [pending, approved, rejected]}
+        rejection_reason: {type: string, nullable: true}
+        is_publicly_visible:
+          type: boolean
+          description: "status == approved ET is_active == true ET garage validé/non suspendu."
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
 
 security:
   - bearerAuth: []
@@ -270,6 +356,37 @@ paths:
         '422':
           description: Identifiants invalides.
 
+  /auth/login/google:
+    post:
+      summary: >
+        Connexion Google — réservée aux automobilistes (CLAUDE.md §5, ajout
+        v0.5). Flux mobile natif : l'app Flutter fait le Google Sign-In
+        elle-même et transmet l'ID token ici, pas de redirection navigateur.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token:
+                  type: string
+                  description: ID token (JWT) renvoyé par le SDK Google Sign-In côté app.
+      responses:
+        '200':
+          description: Connexion réussie (compte automobiliste créé au besoin).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPayload'
+        '422':
+          description: >
+            Jeton invalide/expiré/mal destiné, email non vérifié, ou email
+            déjà utilisé par un compte professionnel (jamais rattaché à Google).
+
   /auth/me:
     get:
       summary: Profil de l'utilisateur authentifié.
@@ -322,6 +439,27 @@ paths:
         '403':
           description: Non autorisé (ni admin, ni propriétaire du dossier).
 
+  /admin/registrations/{registration}/documents/{document}:
+    get:
+      summary: Télécharge un justificatif KYC (registre de commerce ou photo du local).
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: document
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du justificatif.
+        '403':
+          description: Non autorisé (ni admin, ni propriétaire du dossier).
+        '404':
+          description: Document introuvable ou n'appartenant pas à ce dossier.
+
   /admin/registrations/{registration}/approve:
     post:
       summary: Valide un dossier en attente (CLAUDE.md §5, règle 4).
@@ -361,6 +499,50 @@ paths:
         '422':
           description: Motif manquant.
 
+  /admin/registrations/{registration}/suspend:
+    post:
+      summary: >
+        Suspend un compte déjà validé (fraude, plaintes, pièces de mauvaise
+        qualité), motif obligatoire — CLAUDE.md §5, ajout v0.6. Le statut
+        d'inscription reste "approved" ; seule la visibilité mobile est coupée.
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string}
+      responses:
+        '200':
+          description: Compte suspendu.
+        '403':
+          description: Réservé aux administrateurs, compte pas encore validé, ou déjà suspendu.
+        '422':
+          description: Motif manquant.
+
+  /admin/registrations/{registration}/reactivate:
+    post:
+      summary: Réactive un compte suspendu (aucun motif requis) — CLAUDE.md §5, ajout v0.6.
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Compte réactivé.
+        '403':
+          description: Réservé aux administrateurs, ou compte pas suspendu.
+
   /admin/garages:
     get:
       summary: Liste tous les garages, validés ou non (supervision admin).
@@ -381,6 +563,138 @@ paths:
       responses:
         '200':
           description: OK
+
+  /admin/products:
+    get:
+      summary: Liste les produits (mini-boutique Garage ou Market Space), tous statuts.
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, approved, rejected]}
+      responses:
+        '200':
+          description: Liste paginée.
+        '403':
+          description: Réservé aux administrateurs.
+
+  /admin/products/{product}:
+    get:
+      summary: Détail d'un produit (supervision admin).
+      tags: [Admin]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
+  /admin/products/{product}/approve:
+    post:
+      summary: Valide un produit en attente (CLAUDE.md §5, règle 5).
+      tags: [Admin]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Produit validé.
+        '403':
+          description: Réservé aux administrateurs, ou produit déjà traité.
+
+  /admin/products/{product}/reject:
+    post:
+      summary: Rejette un produit en attente, avec motif obligatoire.
+      tags: [Admin]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string}
+      responses:
+        '200':
+          description: Produit rejeté.
+        '422':
+          description: Motif manquant.
+
+  /admin/services:
+    get:
+      summary: Liste les services de réparation, tous garages et statuts confondus.
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, approved, rejected]}
+      responses:
+        '200':
+          description: Liste paginée.
+        '403':
+          description: Réservé aux administrateurs.
+
+  /admin/services/{service}:
+    get:
+      summary: Détail d'un service (supervision admin).
+      tags: [Admin]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
+  /admin/services/{service}/approve:
+    post:
+      summary: Valide un service en attente (CLAUDE.md §5, règle 5).
+      tags: [Admin]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Service validé.
+        '403':
+          description: Réservé aux administrateurs, ou service déjà traité.
+
+  /admin/services/{service}/reject:
+    post:
+      summary: Rejette un service en attente, avec motif obligatoire.
+      tags: [Admin]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string}
+      responses:
+        '200':
+          description: Service rejeté.
+        '422':
+          description: Motif manquant.
 
   /garage/profile:
     get:
@@ -486,6 +800,278 @@ paths:
         '404':
           description: Photo introuvable ou appartenant à un autre garage.
 
+  /garage/products:
+    get:
+      summary: Catalogue de la mini-boutique du garage authentifié (tous statuts).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée.
+    post:
+      summary: Ajoute un produit à la mini-boutique — en attente de validation admin (CLAUDE.md §5, règle 5).
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price, stock_quantity]
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+                sku: {type: string, nullable: true}
+                price: {type: number}
+                stock_quantity: {type: integer}
+      responses:
+        '201':
+          description: Produit créé, statut "pending".
+
+  /garage/products/{product}:
+    put:
+      summary: Met à jour un produit de la mini-boutique — repasse en "pending" (CLAUDE.md §5, règle 5).
+      tags: [Garage]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price]
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+                sku: {type: string, nullable: true}
+                price: {type: number}
+      responses:
+        '200':
+          description: Produit mis à jour.
+        '404':
+          description: Produit introuvable ou appartenant à un autre garage.
+    delete:
+      summary: Supprime un produit de la mini-boutique.
+      tags: [Garage]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Produit supprimé.
+
+  /garage/products/{product}/stock:
+    put:
+      summary: >
+        Corrige la quantité en stock d'un produit — ne touche pas au statut de
+        validation admin (correction de quantité, pas remise en cause du produit).
+      tags: [Garage]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stock_quantity]
+              properties:
+                stock_quantity: {type: integer}
+      responses:
+        '200':
+          description: Stock mis à jour.
+
+  /garage/services:
+    get:
+      summary: Catalogue des services de réparation du garage authentifié (tous statuts).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée.
+    post:
+      summary: Ajoute un service de réparation — en attente de validation admin (CLAUDE.md §5, règle 5).
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, description, category, price, duration_minutes]
+              properties:
+                name: {type: string}
+                description: {type: string, maxLength: 500}
+                category:
+                  type: string
+                  enum: [entretien_courant, freinage_suspension, pneumatiques, electricite_electronique, climatisation_refroidissement, carrosserie, diagnostic_controle, autre_divers]
+                price: {type: number}
+                duration_minutes: {type: integer}
+                image: {type: string, format: binary}
+      responses:
+        '201':
+          description: Service créé, statut "pending".
+
+  /garage/services/{service}:
+    put:
+      summary: Met à jour un service (contenu) — repasse en "pending" (CLAUDE.md §5, règle 5).
+      tags: [Garage]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, description, category, price, duration_minutes]
+              properties:
+                name: {type: string}
+                description: {type: string, maxLength: 500}
+                category:
+                  type: string
+                  enum: [entretien_courant, freinage_suspension, pneumatiques, electricite_electronique, climatisation_refroidissement, carrosserie, diagnostic_controle, autre_divers]
+                price: {type: number}
+                duration_minutes: {type: integer}
+                image: {type: string, format: binary}
+      responses:
+        '200':
+          description: Service mis à jour.
+        '404':
+          description: Service introuvable ou appartenant à un autre garage.
+    delete:
+      summary: Supprime un service.
+      tags: [Garage]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Service supprimé.
+
+  /garage/services/{service}/availability:
+    put:
+      summary: >
+        Active/désactive la disponibilité du service — ne touche pas au statut
+        de validation admin (CLAUDE.md §5, ajout v0.6).
+      tags: [Garage]
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active: {type: boolean}
+      responses:
+        '200':
+          description: Disponibilité mise à jour.
+
+  /market-space/products:
+    get:
+      summary: Catalogue du compte Market Space authentifié (tous statuts).
+      tags: [MarketSpace]
+      responses:
+        '200':
+          description: Liste paginée.
+    post:
+      summary: Ajoute un produit — en attente de validation admin (CLAUDE.md §5, règle 5).
+      tags: [MarketSpace]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price, stock_quantity]
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+                sku: {type: string, nullable: true}
+                price: {type: number}
+                stock_quantity: {type: integer}
+      responses:
+        '201':
+          description: Produit créé, statut "pending".
+
+  /market-space/products/{product}:
+    put:
+      summary: Met à jour un produit — repasse en "pending" (CLAUDE.md §5, règle 5).
+      tags: [MarketSpace]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price]
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+                sku: {type: string, nullable: true}
+                price: {type: number}
+      responses:
+        '200':
+          description: Produit mis à jour.
+        '404':
+          description: Produit introuvable ou appartenant à un autre compte Market Space.
+    delete:
+      summary: Supprime un produit.
+      tags: [MarketSpace]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Produit supprimé.
+
+  /market-space/products/{product}/stock:
+    put:
+      summary: Corrige la quantité en stock — ne touche pas au statut de validation admin.
+      tags: [MarketSpace]
+      parameters:
+        - name: product
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stock_quantity]
+              properties:
+                stock_quantity: {type: integer}
+      responses:
+        '200':
+          description: Stock mis à jour.
+
   /mobile/garages:
     get:
       summary: >
@@ -500,7 +1086,10 @@ paths:
 
   /mobile/garages/{garage}:
     get:
-      summary: Détail public d'un garage.
+      summary: >
+        Détail public d'un garage, avec sa mini-boutique ("products", produits
+        "approved" uniquement) et ses services ("services", "approved" ET actifs
+        uniquement) — CLAUDE.md §5, ajouts v0.4 et v0.6.
       tags: [Mobile]
       security: []
       parameters:
@@ -512,9 +1101,33 @@ paths:
         '200':
           description: OK
         '404':
-          description: Garage inexistant ou compte non validé.
+          description: Garage inexistant, compte non validé, ou suspendu (CLAUDE.md §5, ajout v0.6).
 
-# Les endpoints métier suivants (produits/mini-boutique partagés Garage &
-# Market Space, services, rendez-vous, devis, factures, paiements, avis,
-# chat, notifications...) sont ajoutés ici au fur et à mesure de leur
+  /mobile/market-space-accounts:
+    get:
+      summary: Liste les boutiques Market Space visibles publiquement (compte validé, non suspendu).
+      tags: [Mobile]
+      security: []
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /mobile/market-space-accounts/{marketSpaceAccount}:
+    get:
+      summary: Détail public d'une boutique Market Space, avec son catalogue approuvé.
+      tags: [Mobile]
+      security: []
+      parameters:
+        - name: marketSpaceAccount
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Boutique inexistante, compte non validé, ou suspendu (CLAUDE.md §5, ajout v0.6).
+
+# Les endpoints métier suivants (rendez-vous, devis, factures, paiements,
+# avis, chat, notifications...) sont ajoutés ici au fur et à mesure de leur
 # implémentation, module par module.

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Mobile;
 
 use App\Enums\ProductStatus;
 use App\Enums\RegistrationStatus;
+use App\Enums\RepairServiceStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Resources\GarageResource;
 use App\Models\Garage;
@@ -19,7 +20,7 @@ class GarageController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $garages = Garage::query()
-            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved))
+            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
             ->with(['openingHours', 'images'])
             ->paginate();
 
@@ -38,6 +39,7 @@ class GarageController extends Controller
             'openingHours',
             'images',
             'products' => fn ($query) => $query->where('status', ProductStatus::Approved),
+            'services' => fn ($query) => $query->where('status', RepairServiceStatus::Approved)->where('is_active', true),
         ]);
 
         return new GarageResource($garage);

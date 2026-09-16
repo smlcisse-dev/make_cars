@@ -24,6 +24,9 @@ class ProfessionalRegistrationResource extends JsonResource
             'status' => $this->status->value,
             'rejection_reason' => $this->rejection_reason,
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
+            'is_suspended' => $this->isSuspended(),
+            'suspension_reason' => $this->suspension_reason,
+            'suspended_at' => $this->suspended_at?->toIso8601String(),
             'documents' => RegistrationDocumentResource::collection($this->whenLoaded('documents')),
             'created_at' => $this->created_at->toIso8601String(),
         ];

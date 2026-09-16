@@ -20,6 +20,13 @@ class MarketSpaceListingTest extends TestCase
         return MarketSpaceAccount::factory()->for($registration->user)->create();
     }
 
+    private function suspendedAccount(): MarketSpaceAccount
+    {
+        $registration = ProfessionalRegistration::factory()->marketSpace()->suspended()->create();
+
+        return MarketSpaceAccount::factory()->for($registration->user)->create();
+    }
+
     public function test_the_mobile_app_only_lists_market_space_accounts_with_an_approved_registration(): void
     {
         $this->approvedAccount();
@@ -48,5 +55,22 @@ class MarketSpaceListingTest extends TestCase
         $response->assertOk()
             ->assertJsonCount(1, 'data.products')
             ->assertJsonPath('data.products.0.id', $approved->id);
+    }
+
+    public function test_a_suspended_market_space_account_disappears_from_the_public_listing(): void
+    {
+        $this->approvedAccount();
+        $this->suspendedAccount();
+
+        $response = $this->getJson('/api/mobile/market-space-accounts');
+
+        $response->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_a_suspended_market_space_account_is_not_publicly_viewable(): void
+    {
+        $account = $this->suspendedAccount();
+
+        $this->getJson("/api/mobile/market-space-accounts/{$account->id}")->assertNotFound();
     }
 }

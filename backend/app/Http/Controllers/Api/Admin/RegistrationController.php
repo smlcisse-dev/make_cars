@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Controller;
 use App\Http\Requests\Admin\RejectRegistrationRequest;
+use App\Http\Requests\Admin\SuspendRegistrationRequest;
 use App\Http\Resources\ProfessionalRegistrationResource;
 use App\Models\ProfessionalRegistration;
 use App\Models\RegistrationDocument;
@@ -58,6 +59,26 @@ class RegistrationController extends Controller
         $registration = $this->registrationService->reject($registration, $request->user(), $request->string('reason')->toString());
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Inscription rejetée.');
+    }
+
+    /**
+     * Suspend un compte déjà validé (fraude, plaintes, pièces de mauvaise
+     * qualité) — motif obligatoire, comme un rejet (CLAUDE.md §5, ajout v0.6).
+     */
+    public function suspend(SuspendRegistrationRequest $request, ProfessionalRegistration $registration): JsonResponse
+    {
+        $registration = $this->registrationService->suspend($registration, $request->user(), $request->string('reason')->toString());
+
+        return $this->success(new ProfessionalRegistrationResource($registration), 'Compte suspendu.');
+    }
+
+    public function reactivate(Request $request, ProfessionalRegistration $registration): JsonResponse
+    {
+        Gate::authorize('reactivate', $registration);
+
+        $registration = $this->registrationService->reactivate($registration);
+
+        return $this->success(new ProfessionalRegistrationResource($registration), 'Compte réactivé.');
     }
 
     public function downloadDocument(ProfessionalRegistration $registration, RegistrationDocument $document): StreamedResponse

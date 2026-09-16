@@ -18,7 +18,7 @@ class MarketSpaceController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $accounts = MarketSpaceAccount::query()
-            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved))
+            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
             ->with(['products' => fn ($query) => $query->where('status', ProductStatus::Approved)])
             ->paginate();
 

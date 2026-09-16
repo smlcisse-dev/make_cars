@@ -38,6 +38,18 @@ class ProfessionalRegistrationFactory extends Factory
         ]);
     }
 
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => RegistrationStatus::Approved,
+            'reviewed_by' => User::factory()->admin(),
+            'reviewed_at' => now(),
+            'suspension_reason' => fake()->sentence(),
+            'suspended_by' => User::factory()->admin(),
+            'suspended_at' => now(),
+        ]);
+    }
+
     public function rejected(): static
     {
         return $this->state(fn (array $attributes) => [
