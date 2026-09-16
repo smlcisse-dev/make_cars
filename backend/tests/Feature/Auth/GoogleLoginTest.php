@@ -146,4 +146,22 @@ class GoogleLoginTest extends TestCase
 
         $response->assertUnprocessable()->assertJsonValidationErrors('id_token');
     }
+
+    public function test_google_login_is_refused_with_an_expired_token(): void
+    {
+        $response = $this->postJson('/api/auth/login/google', [
+            'id_token' => $this->googleIdToken(['iat' => time() - 7200, 'exp' => time() - 3600]),
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('id_token');
+    }
+
+    public function test_google_login_is_refused_when_the_issuer_is_not_google(): void
+    {
+        $response = $this->postJson('/api/auth/login/google', [
+            'id_token' => $this->googleIdToken(['iss' => 'https://not-google.example.com']),
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('id_token');
+    }
 }
