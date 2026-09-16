@@ -200,3 +200,7 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 - **Validation admin** : approbation obligatoire par l'administrateur avant visibilité publique d'un compte/service/produit.
 - **KYC** : vérification d'identité/légitimité d'un professionnel via justificatifs, préalable à la validation du compte.
 - **Automobiliste** : utilisateur final de l'app mobile.
+
+## 9. Consignes opérationnelles pour l'assistant (Claude Code)
+
+- **Push automatique après chaque commit** (ajout 2026-09-16) : dès qu'un commit est créé sur ce dépôt (par l'utilisateur ou par l'assistant à sa demande) sur la branche `main`, l'assistant le pousse **immédiatement et automatiquement** vers `origin/main`, sans redemander confirmation à chaque fois — autorisation permanente donnée par l'utilisateur, qui prévaut sur la prudence par défaut de l'assistant concernant les actions affectant l'état partagé (push). Cette règle ne s'applique qu'au push d'un commit déjà créé sur `main` vers `origin/main` ; elle ne couvre pas les opérations destructrices (`push --force`, suppression de branche distante, réécriture d'historique, etc.), qui restent soumises à confirmation explicite au cas par cas.
