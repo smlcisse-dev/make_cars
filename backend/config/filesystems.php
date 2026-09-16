@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disque des justificatifs KYC
+    |--------------------------------------------------------------------------
+    |
+    | Disque privé utilisé pour les justificatifs d'inscription professionnelle
+    | (registre de commerce, photos du local — CLAUDE.md §5 règle 4). "local"
+    | par défaut en attendant les identifiants Supabase Storage ; bascule sur
+    | "supabase" en changeant uniquement cette variable d'environnement.
+    |
+    */
+
+    'kyc_documents_disk' => env('KYC_DOCUMENTS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -56,6 +70,20 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Supabase Storage expose une API compatible S3 (Project Settings >
+        // Storage > S3 Connection dans le dashboard Supabase).
+        'supabase' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_STORAGE_KEY'),
+            'secret' => env('SUPABASE_STORAGE_SECRET'),
+            'region' => env('SUPABASE_STORAGE_REGION', 'eu-central-1'),
+            'bucket' => env('SUPABASE_STORAGE_BUCKET'),
+            'endpoint' => env('SUPABASE_STORAGE_ENDPOINT'),
+            'use_path_style_endpoint' => true,
             'throw' => false,
             'report' => false,
         ],

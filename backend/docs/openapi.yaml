@@ -29,7 +29,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: Sanctum token
-      description: Token d'API Laravel Sanctum, envoyé en en-tête `Authorization: Bearer <token>`.
+      description: "Token d'API Laravel Sanctum, envoyé en en-tête Authorization: Bearer <token>."
 
   schemas:
     Error:
@@ -43,6 +43,77 @@ components:
             type: array
             items:
               type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [automobiliste, garagiste, market_space, admin]
+        role_label:
+          type: string
+        professional_registration:
+          $ref: '#/components/schemas/ProfessionalRegistration'
+
+    ProfessionalRegistration:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        structure_name:
+          type: string
+        address:
+          type: string
+        business_registration_number:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        rejection_reason:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              type:
+                type: string
+                enum: [business_registration, premises_photo]
+              download_url:
+                type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AuthPayload:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+        message:
+          type: string
 
 security:
   - bearerAuth: []
@@ -67,6 +138,197 @@ paths:
                   app:
                     type: string
 
-# Les endpoints métier (auth, garages, services, rendez-vous, devis, factures,
-# paiements, market space, avis, chat, notifications...) sont ajoutés ici au
-# fur et à mesure de leur implémentation, module par module.
+  /auth/register/automobiliste:
+    post:
+      summary: Inscription d'un automobiliste (aucune validation admin requise).
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name: {type: string}
+                email: {type: string}
+                phone: {type: string, nullable: true}
+                password: {type: string}
+                password_confirmation: {type: string}
+      responses:
+        '201':
+          description: Compte créé, token émis.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPayload'
+        '422':
+          description: Erreur de validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/register/professionnel:
+    post:
+      summary: >
+        Inscription d'un compte Garagiste ou Market Space avec justificatifs.
+        Le compte est créé immédiatement (token émis) mais reste en attente de
+        validation admin — aucun service/produit ne sera publiable tant que le
+        statut n'est pas "approved" (CLAUDE.md §5, règle 4).
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name, email, password, password_confirmation, account_type
+                - structure_name, address, business_registration_number
+                - business_registration_document, premises_photos
+              properties:
+                name: {type: string}
+                email: {type: string}
+                phone: {type: string, nullable: true}
+                password: {type: string}
+                password_confirmation: {type: string}
+                account_type: {type: string, enum: [garagiste, market_space]}
+                structure_name: {type: string}
+                address: {type: string}
+                business_registration_number: {type: string}
+                business_registration_document: {type: string, format: binary}
+                premises_photos:
+                  type: array
+                  items: {type: string, format: binary}
+      responses:
+        '201':
+          description: Dossier créé, en attente de validation admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPayload'
+        '422':
+          description: Erreur de validation.
+
+  /auth/login:
+    post:
+      summary: Connexion (tout type de compte).
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string}
+                password: {type: string}
+      responses:
+        '200':
+          description: Connexion réussie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPayload'
+        '422':
+          description: Identifiants invalides.
+
+  /auth/me:
+    get:
+      summary: Profil de l'utilisateur authentifié.
+      tags: [Auth]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /auth/logout:
+    post:
+      summary: Révoque le token courant.
+      tags: [Auth]
+      responses:
+        '200':
+          description: Déconnexion réussie.
+
+  /admin/registrations:
+    get:
+      summary: Liste les dossiers d'inscription professionnelle (admin uniquement).
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, approved, rejected]}
+      responses:
+        '200':
+          description: Liste paginée (enveloppe standard Laravel data/links/meta).
+        '403':
+          description: Réservé aux administrateurs.
+
+  /admin/registrations/{registration}:
+    get:
+      summary: Détail d'un dossier d'inscription.
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '403':
+          description: Non autorisé (ni admin, ni propriétaire du dossier).
+
+  /admin/registrations/{registration}/approve:
+    post:
+      summary: Valide un dossier en attente (CLAUDE.md §5, règle 4).
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Dossier validé.
+        '403':
+          description: Réservé aux administrateurs, ou dossier déjà traité.
+
+  /admin/registrations/{registration}/reject:
+    post:
+      summary: Rejette un dossier en attente, avec motif obligatoire.
+      tags: [Admin]
+      parameters:
+        - name: registration
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string}
+      responses:
+        '200':
+          description: Dossier rejeté.
+        '422':
+          description: Motif manquant.
+
+# Les endpoints métier suivants (garages, services, rendez-vous, devis,
+# factures, paiements, market space, avis, chat, notifications...) sont
+# ajoutés ici au fur et à mesure de leur implémentation, module par module.
