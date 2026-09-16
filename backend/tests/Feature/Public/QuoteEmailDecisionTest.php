@@ -11,6 +11,7 @@ use App\Models\Quote;
 use App\Models\QuoteVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Attachment;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -58,7 +59,16 @@ class QuoteEmailDecisionTest extends TestCase
 
         $this->postJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}/send")->assertOk();
 
-        Mail::assertSent(QuoteDecisionMail::class, fn ($mail) => $mail->hasTo('express@example.com'));
+        Mail::assertSent(QuoteDecisionMail::class, function ($mail) use ($version) {
+            $version = $version->fresh();
+
+            return $mail->hasTo('express@example.com')
+                && $mail->hasAttachment(
+                    Attachment::fromStorageDisk($version->pdf_disk, $version->pdf_path)
+                        ->as("devis-{$version->quote_id}-v{$version->version}.pdf")
+                        ->withMime('application/pdf')
+                );
+        });
     }
 
     public function test_sending_a_quote_to_a_regular_client_does_not_dispatch_an_email(): void
