@@ -79,6 +79,14 @@ class Garage extends Model
     }
 
     /**
+     * @return HasMany<Conversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    /**
      * Un garage n'est visible publiquement (app mobile) que si son compte
      * Garagiste a été validé par un administrateur (CLAUDE.md §5, règle 4).
      */

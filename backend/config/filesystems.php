@@ -44,6 +44,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disque des documents privés (chat, devis/factures)
+    |--------------------------------------------------------------------------
+    |
+    | Disque privé pour du contenu propre à une relation précise (pièces
+    | jointes du chat, PDF de devis/facture) — jamais d'URL publique, toujours
+    | téléchargé via un endpoint authentifié qui vérifie l'appartenance
+    | (mêmes principes que kyc_documents_disk, mais sans rapport avec le KYC :
+    | clé distincte pour ne pas mélanger deux natures de documents dans un
+    | même bucket). "local" par défaut ; bascule sur "supabase" une fois
+    | configuré (peut réutiliser le même bucket privé que le KYC via des
+    | préfixes de chemin différents, ou un bucket dédié — au choix en prod).
+    |
+    */
+
+    'private_media_disk' => env('PRIVATE_MEDIA_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

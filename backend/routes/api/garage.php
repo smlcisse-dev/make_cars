@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\Garage\AppointmentController;
+use App\Http\Controllers\Api\Garage\ConversationController;
 use App\Http\Controllers\Api\Garage\GarageImageController;
 use App\Http\Controllers\Api\Garage\OpeningHoursController;
 use App\Http\Controllers\Api\Garage\ProductController;
 use App\Http\Controllers\Api\Garage\ProfileController;
+use App\Http\Controllers\Api\Garage\QuoteController;
 use App\Http\Controllers\Api\Garage\ServiceController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,4 +34,19 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::post('appointments/{appointment}/confirm', [AppointmentController::class, 'confirm']);
     Route::post('appointments/{appointment}/reject', [AppointmentController::class, 'reject']);
     Route::post('appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
+
+    Route::post('appointments/{appointment}/quote', [QuoteController::class, 'store']);
+    Route::get('appointments/{appointment}/quote', [QuoteController::class, 'show']);
+    Route::put('quotes/{quote}/versions/{version}', [QuoteController::class, 'updateVersion']);
+    Route::post('quotes/{quote}/versions/{version}/send', [QuoteController::class, 'send']);
+    Route::get('quotes/{quote}/versions/{version}/pdf', [QuoteController::class, 'downloadPdf']);
+    Route::post('quotes/{quote}/versions', [QuoteController::class, 'storeNextVersion']);
+    Route::post('quotes/{quote}/start', [QuoteController::class, 'start']);
+    Route::post('quotes/{quote}/mark-paid', [QuoteController::class, 'markPaid']);
+    Route::post('quotes/{quote}/abandon', [QuoteController::class, 'abandon']);
+
+    Route::get('conversations', [ConversationController::class, 'index']);
+    Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
+    Route::post('conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
+    Route::get('conversations/{conversation}/messages/{message}/image', [ConversationController::class, 'downloadImage']);
 });

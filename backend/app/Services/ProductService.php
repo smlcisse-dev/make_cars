@@ -57,6 +57,20 @@ class ProductService
         return $product;
     }
 
+    /**
+     * Unique point de décrément du stock (CLAUDE.md §5 ajout v0.4, règle
+     * "un seul mécanisme de décrément de stock") : appelé par le module
+     * Devis à l'acceptation d'un devis contenant des lignes de pièces
+     * (CLAUDE.md §5, ajout v0.8), que la vente soit isolée ou intégrée à
+     * une prestation.
+     */
+    public function decrementStock(Product $product, int $quantity): Product
+    {
+        $product->decrement('stock_quantity', $quantity);
+
+        return $product->refresh();
+    }
+
     public function delete(Product $product): void
     {
         $product->delete();

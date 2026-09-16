@@ -70,6 +70,16 @@ class User extends Authenticatable
         return $this->hasMany(Appointment::class);
     }
 
+    /**
+     * Conversations avec des garages (CLAUDE.md §5, ajout v0.8).
+     *
+     * @return HasMany<Conversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
     public function isValidatedProfessional(): bool
     {
         if (! $this->role->requiresProfessionalValidation()) {

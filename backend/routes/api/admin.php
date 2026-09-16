@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AppointmentController;
+use App\Http\Controllers\Api\Admin\ConversationController;
 use App\Http\Controllers\Api\Admin\GarageController;
 use App\Http\Controllers\Api\Admin\ProductController;
+use App\Http\Controllers\Api\Admin\QuoteController;
 use App\Http\Controllers\Api\Admin\RegistrationController;
 use App\Http\Controllers\Api\Admin\ServiceController;
 use Illuminate\Support\Facades\Route;
@@ -32,4 +34,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     Route::get('appointments', [AppointmentController::class, 'index']);
     Route::get('appointments/{appointment}', [AppointmentController::class, 'show']);
+
+    Route::get('quotes', [QuoteController::class, 'index']);
+    Route::get('quotes/{quote}', [QuoteController::class, 'show']);
+
+    Route::get('conversations', [ConversationController::class, 'index']);
+    Route::get('conversations/{conversation}', [ConversationController::class, 'show']);
 });

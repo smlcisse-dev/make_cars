@@ -1,0 +1,312 @@
+<?php
+
+namespace Tests\Feature\Garage;
+
+use App\Enums\AppointmentStatus;
+use App\Enums\QuoteStatus;
+use App\Models\Appointment;
+use App\Models\Garage;
+use App\Models\Message;
+use App\Models\Product;
+use App\Models\ProfessionalRegistration;
+use App\Models\Quote;
+use App\Models\QuoteVersion;
+use App\Models\RepairService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class QuoteTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function approvedGarage(): Garage
+    {
+        $registration = ProfessionalRegistration::factory()->approved()->create();
+
+        return Garage::factory()->for($registration->user)->create();
+    }
+
+    private function confirmedAppointment(Garage $garage): Appointment
+    {
+        return Appointment::factory()->forGarage($garage)->confirmed()->create();
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
+
+    public function test_a_garagiste_can_create_a_draft_quote_with_mixed_lines(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $service = RepairService::factory()->forGarage($garage)->approved()->create(['price' => 15000]);
+        $product = Product::factory()->forGarage($garage)->approved()->create(['price' => 5000, 'stock_quantity' => 10]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [
+                ['type' => 'diagnosis_fee', 'label' => 'Diagnostic', 'unit_price' => 2000, 'quantity' => 1],
+                ['type' => 'service', 'repair_service_id' => $service->id, 'quantity' => 1],
+                ['type' => 'product', 'product_id' => $product->id, 'quantity' => 2],
+            ],
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.status', QuoteStatus::Draft->value);
+        $this->assertDatabaseHas('quotes', ['appointment_id' => $appointment->id, 'status' => QuoteStatus::Draft->value]);
+        $this->assertDatabaseCount('quote_lines', 3);
+        $this->assertDatabaseHas('quote_lines', ['type' => 'product', 'unit_price' => 5000, 'quantity' => 2, 'line_total' => 10000]);
+    }
+
+    public function test_line_price_is_pulled_from_the_catalog_not_client_supplied(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $service = RepairService::factory()->forGarage($garage)->approved()->create(['price' => 15000]);
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [
+                ['type' => 'service', 'repair_service_id' => $service->id, 'quantity' => 1, 'unit_price' => 1],
+            ],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('quote_lines', ['repair_service_id' => $service->id, 'unit_price' => 15000]);
+    }
+
+    public function test_quoting_more_than_available_stock_is_rejected(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $product = Product::factory()->forGarage($garage)->approved()->create(['stock_quantity' => 1]);
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [
+                ['type' => 'product', 'product_id' => $product->id, 'quantity' => 5],
+            ],
+        ])->assertUnprocessable();
+    }
+
+    public function test_creating_a_quote_requires_a_confirmed_appointment(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = Appointment::factory()->forGarage($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1000, 'quantity' => 1]],
+        ])->assertForbidden();
+    }
+
+    public function test_only_one_quote_per_appointment(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        Quote::factory()->forAppointment($appointment)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1000, 'quantity' => 1]],
+        ])->assertForbidden();
+    }
+
+    public function test_a_garagiste_can_edit_draft_lines_before_sending(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}", [
+            'lines' => [['type' => 'diagnosis_fee', 'label' => 'Diag', 'unit_price' => 3000, 'quantity' => 1]],
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('quote_lines', ['quote_version_id' => $version->id, 'unit_price' => 3000]);
+    }
+
+    public function test_a_garagiste_can_send_a_draft_version_which_notifies_the_client_via_chat(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->create();
+        $version->lines()->create([
+            'type' => 'diagnosis_fee', 'label' => 'Diagnostic', 'unit_price' => 2000, 'quantity' => 1, 'line_total' => 2000,
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}/send");
+
+        $response->assertOk()->assertJsonPath('data.is_sent', true);
+        $this->assertSame(QuoteStatus::Sent, $quote->fresh()->status);
+        $this->assertNotNull($version->fresh()->pdf_path);
+        $this->assertDatabaseHas('messages', [
+            'attachment_type' => Message::ATTACHMENT_QUOTE_PDF,
+            'quote_version_id' => $version->id,
+            'sender_id' => null,
+        ]);
+        $this->assertDatabaseHas('conversations', ['garage_id' => $garage->id, 'user_id' => $appointment->user_id]);
+    }
+
+    public function test_sending_an_already_sent_version_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->sent()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}/send")->assertForbidden();
+    }
+
+    public function test_editing_lines_after_sending_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->sent()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->putJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}", [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1, 'quantity' => 1]],
+        ])->assertForbidden();
+    }
+
+    public function test_a_garagiste_can_renegotiate_after_a_rejection(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create(['status' => QuoteStatus::Rejected]);
+        QuoteVersion::factory()->forQuote($quote, 1)->sent()->rejected()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/quotes/{$quote->id}/versions", [
+            'lines' => [['type' => 'diagnosis_fee', 'label' => 'Diag', 'unit_price' => 1500, 'quantity' => 1]],
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.version', 2);
+    }
+
+    public function test_renegotiating_without_a_prior_rejection_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        QuoteVersion::factory()->forQuote($quote, 1)->sent()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/versions", [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1, 'quantity' => 1]],
+        ])->assertForbidden();
+    }
+
+    public function test_a_garagiste_can_start_the_prestation_after_acceptance(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->accepted()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/start")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuoteStatus::InProgress->value);
+    }
+
+    public function test_starting_without_acceptance_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/start")->assertForbidden();
+    }
+
+    public function test_marking_paid_generates_an_invoice_and_completes_the_appointment_with_service(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create(['status' => QuoteStatus::InProgress]);
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->sent()->accepted()->create();
+        $version->lines()->create([
+            'type' => 'diagnosis_fee', 'label' => 'Diagnostic', 'unit_price' => 2000, 'quantity' => 1, 'line_total' => 2000,
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/quotes/{$quote->id}/mark-paid");
+
+        $response->assertOk()->assertJsonPath('data.status', QuoteStatus::Invoiced->value);
+        $this->assertSame(AppointmentStatus::Completed, $appointment->fresh()->status);
+        $this->assertTrue($appointment->fresh()->wasCompletedWithService());
+        $this->assertDatabaseHas('quote_versions', ['quote_id' => $quote->id, 'version' => 2, 'document_type' => 'invoice']);
+        $this->assertDatabaseHas('quote_lines', ['quote_version_id' => $quote->versions()->where('version', 2)->first()->id, 'unit_price' => 2000]);
+    }
+
+    public function test_marking_paid_without_being_in_progress_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->accepted()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/mark-paid")->assertForbidden();
+    }
+
+    public function test_a_garagiste_can_abandon_after_a_rejection_completing_the_appointment_without_service(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create(['status' => QuoteStatus::Rejected]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/quotes/{$quote->id}/abandon");
+
+        $response->assertOk()->assertJsonPath('data.status', QuoteStatus::Abandoned->value);
+        $this->assertSame(AppointmentStatus::Completed, $appointment->fresh()->status);
+        $this->assertFalse($appointment->fresh()->wasCompletedWithService());
+    }
+
+    public function test_abandoning_without_a_rejection_is_forbidden(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/quotes/{$quote->id}/abandon")->assertForbidden();
+    }
+
+    public function test_a_garagiste_can_download_the_pdf_of_a_sent_version(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->sent()->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->create([
+            'pdf_disk' => 'local',
+            'pdf_path' => 'quotes/test.pdf',
+            'sent_at' => now(),
+        ]);
+        Storage::disk('local')->put('quotes/test.pdf', '%PDF-1.7 fake');
+        Sanctum::actingAs($garage->user);
+
+        $this->get("/api/garage/quotes/{$quote->id}/versions/{$version->id}/pdf")->assertOk();
+    }
+
+    public function test_a_garagiste_cannot_manage_another_garages_quote(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        $quote = Quote::factory()->forAppointment($appointment)->create();
+        $otherGarage = $this->approvedGarage();
+        Sanctum::actingAs($otherGarage->user);
+
+        $this->getJson("/api/garage/appointments/{$appointment->id}/quote")->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/start")->assertNotFound();
+    }
+}

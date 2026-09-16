@@ -5,7 +5,7 @@ info:
     API REST unique consommée par la SPA web (Admin / Garagiste / Market Space)
     et par l'application mobile Flutter (automobilistes). Voir /CLAUDE.md à la
     racine du projet pour le contexte métier et les règles de gestion.
-  version: 0.2.0
+  version: 0.3.0
 
 servers:
   - url: http://localhost:8000/api
@@ -262,13 +262,102 @@ components:
         status:
           type: string
           enum: [pending, confirmed, rejected, rescheduled, cancelled, completed]
-          description: "\"completed\" n'est pas encore atteignable via ce module (futur module Devis/Prestation)."
+          description: "\"completed\" est déclenché par le module Devis (mark-paid ou abandon — CLAUDE.md §5, ajout v0.8), dans les deux cas de clôture."
         rejection_reason: {type: string, nullable: true}
         garage: {$ref: '#/components/schemas/Garage'}
         repair_service: {$ref: '#/components/schemas/Service'}
         user: {$ref: '#/components/schemas/User'}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
+
+    QuoteLine:
+      type: object
+      description: >
+        Libellé et prix figés au moment de l'ajout (snapshot) — jamais
+        recalculés depuis le catalogue après coup (CLAUDE.md §5, ajout v0.8).
+      properties:
+        id: {type: integer}
+        type: {type: string, enum: [diagnosis_fee, service, product]}
+        repair_service_id: {type: integer, nullable: true}
+        product_id: {type: integer, nullable: true}
+        label: {type: string}
+        unit_price: {type: string, description: "Décimal sérialisé en chaîne."}
+        quantity: {type: integer}
+        line_total: {type: string, description: "Décimal sérialisé en chaîne."}
+
+    QuoteVersion:
+      type: object
+      description: >
+        Instantané figé d'un tour de négociation — chaque version a son
+        propre PDF, jamais réécrit (CLAUDE.md §5, ajout v0.8).
+      properties:
+        id: {type: integer}
+        quote_id: {type: integer}
+        version: {type: integer}
+        document_type: {type: string, enum: [quote, invoice]}
+        is_sent: {type: boolean, description: "false = brouillon, encore modifiable."}
+        sent_at: {type: string, format: date-time, nullable: true}
+        decision: {type: string, enum: [accepted, rejected], nullable: true}
+        decided_at: {type: string, format: date-time, nullable: true}
+        total: {type: string, description: "Somme des lignes, décimal sérialisé en chaîne."}
+        lines:
+          type: array
+          items: {$ref: '#/components/schemas/QuoteLine'}
+        created_at: {type: string, format: date-time}
+
+    Quote:
+      type: object
+      description: >
+        Deuxième maillon de la chaîne RDV → devis → validation → prestation
+        → paiement → facture (CLAUDE.md §5 règle 10, ajout v0.8). Un seul
+        Quote par Appointment ; la renégociation crée des QuoteVersion.
+      properties:
+        id: {type: integer}
+        appointment_id: {type: integer}
+        status:
+          type: string
+          enum: [draft, sent, accepted, rejected, negotiating, in_progress, invoiced, abandoned]
+        paid_at: {type: string, format: date-time, nullable: true}
+        versions:
+          type: array
+          items: {$ref: '#/components/schemas/QuoteVersion'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+
+    Message:
+      type: object
+      properties:
+        id: {type: integer}
+        conversation_id: {type: integer}
+        is_system:
+          type: boolean
+          description: "true pour un message posté automatiquement (devis/facture générés) — sender est alors null."
+        sender: {$ref: '#/components/schemas/User'}
+        body: {type: string, nullable: true}
+        has_image: {type: boolean}
+        attachment_type:
+          type: string
+          nullable: true
+          enum: [quote_pdf]
+          description: Message système avec devis/facture en pièce jointe (téléchargée via l'endpoint devis, pas dupliquée).
+        quote_version_id: {type: integer, nullable: true}
+        created_at: {type: string, format: date-time}
+
+    Conversation:
+      type: object
+      description: >
+        Tous les échanges entre UN garage et UN automobiliste, indépendamment
+        de tout RDV précis — un seul canal par paire (CLAUDE.md §5, ajout v0.8).
+      properties:
+        id: {type: integer}
+        garage_id: {type: integer}
+        user_id: {type: integer}
+        last_message_at: {type: string, format: date-time, nullable: true}
+        garage: {$ref: '#/components/schemas/Garage'}
+        user: {$ref: '#/components/schemas/User'}
+        messages:
+          type: array
+          items: {$ref: '#/components/schemas/Message'}
 
 security:
   - bearerAuth: []
@@ -766,6 +855,52 @@ paths:
         '200':
           description: OK
 
+  /admin/quotes:
+    get:
+      summary: Liste tous les devis/factures, tous garages et statuts confondus — supervision en lecture seule (CLAUDE.md §5 règle 8, ajout v0.8).
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [draft, sent, accepted, rejected, negotiating, in_progress, invoiced, abandoned]}
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /admin/quotes/{quote}:
+    get:
+      summary: Détail d'un devis (supervision admin), avec toutes ses versions et lignes.
+      tags: [Admin]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
+  /admin/conversations:
+    get:
+      summary: Liste toutes les conversations — supervision en lecture seule (CLAUDE.md §5 règle 8, ajout v0.8).
+      tags: [Admin]
+      responses:
+        '200':
+          description: Liste paginée, triée par dernier message.
+
+  /admin/conversations/{conversation}:
+    get:
+      summary: Détail d'une conversation (supervision admin), avec tous ses messages.
+      tags: [Admin]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
   /garage/profile:
     get:
       summary: >
@@ -1149,6 +1284,275 @@ paths:
         '422':
           description: Date manquante ou dans le passé.
 
+  /garage/appointments/{appointment}/quote:
+    post:
+      summary: >
+        Crée un devis en brouillon pour un RDV confirmé (diagnostic effectué
+        sur place) — un seul devis par RDV (CLAUDE.md §5, ajout v0.8).
+      tags: [Garage]
+      parameters:
+        - name: appointment
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [type, quantity]
+                    properties:
+                      type: {type: string, enum: [diagnosis_fee, service, product]}
+                      repair_service_id: {type: integer, description: "Requis si type=service."}
+                      product_id: {type: integer, description: "Requis si type=product."}
+                      label: {type: string, description: "Requis si type=diagnosis_fee (sinon repris du catalogue)."}
+                      unit_price: {type: number, description: "Requis si type=diagnosis_fee (sinon repris du catalogue, jamais accepté du client pour service/product)."}
+                      quantity: {type: integer, minimum: 1}
+      responses:
+        '201':
+          description: Devis créé en brouillon.
+        '403':
+          description: RDV pas confirmé, ou devis déjà existant pour ce RDV.
+        '422':
+          description: Ligne invalide, ou stock insuffisant pour une ligne produit.
+    get:
+      summary: Consulte le devis d'un RDV (garagiste propriétaire).
+      tags: [Garage]
+      parameters:
+        - name: appointment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Pas de devis pour ce RDV, ou RDV appartenant à un autre garage.
+
+  /garage/quotes/{quote}/versions/{version}:
+    put:
+      summary: Modifie les lignes d'une version encore en brouillon (pas envoyée) — CLAUDE.md §5, ajout v0.8.
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  items: {type: object}
+      responses:
+        '200':
+          description: Brouillon mis à jour.
+        '403':
+          description: Cette version a déjà été envoyée.
+
+  /garage/quotes/{quote}/versions/{version}/send:
+    post:
+      summary: >
+        Génère le PDF, envoie la version au client et poste un message
+        système avec le PDF en pièce jointe dans la conversation
+        garage/client (CLAUDE.md §5, ajout v0.8).
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Devis envoyé.
+        '403':
+          description: Cette version a déjà été envoyée.
+
+  /garage/quotes/{quote}/versions/{version}/pdf:
+    get:
+      summary: Télécharge le PDF d'une version déjà envoyée.
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du PDF.
+        '404':
+          description: PDF pas encore généré, ou devis appartenant à un autre garage.
+
+  /garage/quotes/{quote}/versions:
+    post:
+      summary: >
+        Renégociation après un refus : nouvelle version brouillon, à envoyer
+        séparément via /send (CLAUDE.md §5, ajout v0.8).
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  items: {type: object}
+      responses:
+        '201':
+          description: Nouvelle version créée en brouillon.
+        '403':
+          description: Le devis précédent n'a pas été refusé.
+
+  /garage/quotes/{quote}/start:
+    post:
+      summary: Démarre la prestation après acceptation du devis par le client.
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Prestation démarrée.
+        '403':
+          description: Le devis n'a pas été validé par le client.
+
+  /garage/quotes/{quote}/mark-paid:
+    post:
+      summary: >
+        Paiement manuel V1 (espèces ou autre — pas encore d'agrégateur en
+        ligne, CLAUDE.md §7) : génère la facture (nouveau PDF, même contenu,
+        mention "Facture") et clôture le RDV avec prestation réalisée.
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Paiement enregistré, facture générée.
+        '403':
+          description: La prestation n'est pas en cours.
+
+  /garage/quotes/{quote}/abandon:
+    post:
+      summary: >
+        Négociation infructueuse : clôture le RDV sans prestation ni facture
+        (CLAUDE.md §5, ajout v0.8) — distinct d'une clôture avec prestation
+        réalisée (cf. Appointment.wasCompletedWithService côté modèle).
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: RDV clôturé sans suite.
+        '403':
+          description: Le devis n'a pas été refusé.
+
+  /garage/conversations:
+    get:
+      summary: >
+        Liste les conversations déjà initiées par des automobilistes avec ce
+        garage — pas de création côté garage (CLAUDE.md §5, ajout v0.8).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée, triée par dernier message.
+
+  /garage/conversations/{conversation}/messages:
+    get:
+      summary: Liste les messages d'une conversation du garage authentifié.
+      tags: [Garage]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Liste paginée.
+        '404':
+          description: Conversation appartenant à un autre garage.
+    post:
+      summary: Répond dans une conversation — texte et/ou image.
+      tags: [Garage]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                body: {type: string, nullable: true, maxLength: 2000}
+                image: {type: string, format: binary, nullable: true}
+      responses:
+        '201':
+          description: Message envoyé.
+        '422':
+          description: Ni texte ni image fournis.
+
+  /garage/conversations/{conversation}/messages/{message}/image:
+    get:
+      summary: Télécharge la pièce jointe image d'un message.
+      tags: [Garage]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: message
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Message sans image, ou conversation appartenant à un autre garage.
+
   /market-space/products:
     get:
       summary: Catalogue du compte Market Space authentifié (tous statuts).
@@ -1373,6 +1777,165 @@ paths:
         '403':
           description: Aucune contre-proposition en attente sur ce RDV.
 
-# Les endpoints métier suivants (devis, factures, paiements, avis, chat,
-# notifications...) sont ajoutés ici au fur et à mesure de leur
-# implémentation, module par module.
+  /mobile/appointments/{appointment}/quote:
+    get:
+      summary: Consulte le devis de son propre RDV.
+      tags: [Mobile]
+      parameters:
+        - name: appointment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Pas de devis pour ce RDV, ou RDV appartenant à un autre automobiliste.
+
+  /mobile/quotes/{quote}/versions/{version}/accept:
+    post:
+      summary: >
+        Accepte la version courante d'un devis — action digitale explicite,
+        jamais déduite du chat (CLAUDE.md §5, ajout v0.8). Décrémente le
+        stock des lignes de pièces.
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Devis accepté.
+        '403':
+          description: Version pas envoyée, plus la version courante, ou devis plus en attente de décision.
+
+  /mobile/quotes/{quote}/versions/{version}/reject:
+    post:
+      summary: Refuse la version courante d'un devis.
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Devis refusé.
+        '403':
+          description: Version pas envoyée, plus la version courante, ou devis plus en attente de décision.
+
+  /mobile/quotes/{quote}/versions/{version}/pdf:
+    get:
+      summary: Télécharge le PDF d'une version de son propre devis.
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du PDF.
+        '404':
+          description: PDF pas encore généré, ou devis appartenant à un autre automobiliste.
+
+  /mobile/conversations:
+    get:
+      summary: Liste les conversations de l'automobiliste authentifié.
+      tags: [Mobile]
+      responses:
+        '200':
+          description: Liste paginée, triée par dernier message.
+    post:
+      summary: >
+        Démarre (ou récupère) la conversation avec un garage — possible à
+        tout moment, y compris sans RDV existant (panne d'urgence).
+        Idempotent : un seul canal par paire garage/automobiliste
+        (CLAUDE.md §5, ajout v0.8).
+      tags: [Mobile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [garage_id]
+              properties:
+                garage_id: {type: integer}
+      responses:
+        '201':
+          description: Conversation prête (créée ou déjà existante).
+        '404':
+          description: Garage introuvable/non validé.
+
+  /mobile/conversations/{conversation}/messages:
+    get:
+      summary: Liste les messages d'une conversation de l'automobiliste authentifié.
+      tags: [Mobile]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Liste paginée.
+        '404':
+          description: Conversation appartenant à un autre automobiliste.
+    post:
+      summary: Envoie un message — texte et/ou image.
+      tags: [Mobile]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                body: {type: string, nullable: true, maxLength: 2000}
+                image: {type: string, format: binary, nullable: true}
+      responses:
+        '201':
+          description: Message envoyé.
+        '422':
+          description: Ni texte ni image fournis.
+
+  /mobile/conversations/{conversation}/messages/{message}/image:
+    get:
+      summary: Télécharge la pièce jointe image d'un message.
+      tags: [Mobile]
+      parameters:
+        - name: conversation
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: message
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Message sans image, ou conversation appartenant à un autre automobiliste.
+
+# Les endpoints métier suivants (paiements en ligne, avis, notifications...)
+# sont ajoutés ici au fur et à mesure de leur implémentation, module par module.
