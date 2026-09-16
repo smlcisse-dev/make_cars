@@ -15,7 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'phone', 'role', 'password', 'google_id'])]
+#[Fillable(['name', 'email', 'phone', 'role', 'password', 'google_id', 'is_express'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -33,6 +33,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => AccountType::class,
+            'is_express' => 'boolean',
         ];
     }
 
@@ -89,5 +90,26 @@ class User extends Authenticatable
         $registration = $this->professionalRegistration;
 
         return $registration?->status === RegistrationStatus::Approved && ! $registration->isSuspended();
+    }
+
+    /**
+     * Commandes passées par cet automobiliste (CLAUDE.md §5, ajout v0.9).
+     *
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Devis reçus par cet automobiliste, avec ou sans RDV associé
+     * (CLAUDE.md §5, ajout v0.9).
+     *
+     * @return HasMany<Quote, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
     }
 }

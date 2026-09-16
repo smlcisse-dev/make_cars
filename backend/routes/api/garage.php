@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\Garage\AppointmentController;
+use App\Http\Controllers\Api\Garage\ClientController;
 use App\Http\Controllers\Api\Garage\ConversationController;
 use App\Http\Controllers\Api\Garage\GarageImageController;
 use App\Http\Controllers\Api\Garage\OpeningHoursController;
+use App\Http\Controllers\Api\Garage\OrderController;
 use App\Http\Controllers\Api\Garage\ProductController;
 use App\Http\Controllers\Api\Garage\ProfileController;
 use App\Http\Controllers\Api\Garage\QuoteController;
@@ -35,8 +37,11 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::post('appointments/{appointment}/reject', [AppointmentController::class, 'reject']);
     Route::post('appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
 
-    Route::post('appointments/{appointment}/quote', [QuoteController::class, 'store']);
-    Route::get('appointments/{appointment}/quote', [QuoteController::class, 'show']);
+    Route::post('appointments/{appointment}/quote', [QuoteController::class, 'storeForAppointment']);
+    Route::get('appointments/{appointment}/quote', [QuoteController::class, 'showForAppointment']);
+    Route::get('quotes', [QuoteController::class, 'index']);
+    Route::post('quotes', [QuoteController::class, 'store']);
+    Route::get('quotes/{quote}', [QuoteController::class, 'show']);
     Route::put('quotes/{quote}/versions/{version}', [QuoteController::class, 'updateVersion']);
     Route::post('quotes/{quote}/versions/{version}/send', [QuoteController::class, 'send']);
     Route::get('quotes/{quote}/versions/{version}/pdf', [QuoteController::class, 'downloadPdf']);
@@ -44,6 +49,13 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::post('quotes/{quote}/start', [QuoteController::class, 'start']);
     Route::post('quotes/{quote}/mark-paid', [QuoteController::class, 'markPaid']);
     Route::post('quotes/{quote}/abandon', [QuoteController::class, 'abandon']);
+
+    Route::post('clients/express', [ClientController::class, 'storeExpress']);
+
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::post('orders/{order}/mark-paid', [OrderController::class, 'markPaid']);
+    Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
 
     Route::get('conversations', [ConversationController::class, 'index']);
     Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);

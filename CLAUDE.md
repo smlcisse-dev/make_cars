@@ -126,15 +126,15 @@ Premier maillon de la chaîne RDV → devis → validation du devis par le clien
 - **Aucun paiement déclenché par la prise de RDV** (règle 10, rappel explicite) — le module Devis, à construire ensuite, est le premier point de la chaîne où un montant apparaît.
 - **Statuts** : `pending` (en attente) → `confirmed` (confirmé par le garagiste), `rejected` (refusé), ou `rescheduled` (contre-proposition du garagiste) ; `rescheduled` → `confirmed` (le client accepte la nouvelle date) ou `cancelled` (le client annule plutôt que de « refuser » la contre-proposition — ça referme la négociation sans état supplémentaire). `cancelled` est aussi accessible depuis `pending`/`confirmed` (annulation client). `completed` est prévu dans le modèle pour anticiper la suite de la chaîne (prestation terminée) mais n'est pas encore atteignable dans ce module — sa transition sera déclenchée par le futur module Devis/Prestation.
 - **Le garagiste agit uniquement depuis `pending`** : confirmer, refuser (motif optionnel, à la différence des rejets admin qui l'exigent), ou proposer une autre date. Pas de contre-proposition en chaîne dans cette V1 (un seul aller-retour).
-- **Anticipation du futur devis** : le module Devis référencera le RDV via une FK `appointment_id` sur son propre modèle (`Appointment` n'a rien à porter en anticipation — la relation se construit dans l'autre sens). Un devis ne pourra logiquement naître que d'un RDV `confirmed`, à valider au moment de construire ce module.
+- **Anticipation du futur devis** : le module Devis référence le RDV via une FK `appointment_id` optionnelle sur son propre modèle (`Appointment` n'a rien à porter en anticipation — la relation se construit dans l'autre sens). *Mise à jour v0.9 : le RDV confirmé n'est plus une condition obligatoire pour créer un devis — voir « Module Commande, RDV optionnel pour le devis, et compte express » ci-dessous.*
 - **Suspension du compte garage** : un RDV déjà créé n'est pas annulé automatiquement si le garage est suspendu entre-temps (l'historique est conservé, cf. suspension de compte) — mais un automobiliste ne peut plus en demander de nouveau tant que le garage reste suspendu.
 
 ### Module Devis/Facture (ajout v0.8, 2026-09-16)
 
-Deuxième maillon de la chaîne RDV → devis → validation → prestation → paiement → facture (règle 10). Un devis est créé par le garagiste après un RDV `confirmed` (diagnostic effectué sur place) — un seul devis par RDV, la renégociation crée de nouvelles versions au sein de ce même devis, jamais un nouveau devis.
+Deuxième maillon de la chaîne RDV → devis → validation → prestation → paiement → facture (règle 10). Un devis est créé par le garagiste pour un Garage + un Client — un seul devis par RDV quand ce RDV existe, la renégociation crée de nouvelles versions au sein de ce même devis, jamais un nouveau devis. *Mise à jour v0.9 : le RDV n'est plus une condition obligatoire pour créer un devis, voir plus bas.*
 
 - **Lignes d'un devis** : frais de diagnostic (optionnel, prix libre saisi par le garagiste — pas de catalogue), lignes de service (catalogue Services du garage) et lignes de pièces (mini-boutique du garage). Le prix et le libellé d'une ligne service/produit ne sont **jamais** acceptés depuis le client : ils sont relus depuis le catalogue au moment de l'ajout de la ligne et figés (snapshot) — un devis déjà envoyé ne doit jamais changer de contenu si le catalogue évolue ensuite. Vendre plus de pièces que le stock disponible est refusé dès la constitution du devis.
-- **Document PDF réel** (dompdf, rendu d'une vue Blade interne jamais servie en HTTP — cohérent avec l'API REST pure du §4) : l'en-tête (garage, client) est lu depuis les relations `Appointment→Garage`/`Appointment→User` en direct au moment de la génération, **jamais dupliqué en base**. Les lignes, elles, sont un instantané figé (voir ci-dessus) — un document financier ne doit pas changer rétroactivement.
+- **Document PDF réel** (dompdf, rendu d'une vue Blade interne jamais servie en HTTP — cohérent avec l'API REST pure du §4) : l'en-tête (garage, client) est lu depuis les relations `Quote→Garage`/`Quote→User` en direct au moment de la génération (mise à jour v0.9 : directement sur le devis, plus besoin de passer par le RDV), **jamais dupliqué en base**. Les lignes, elles, sont un instantané figé (voir ci-dessus) — un document financier ne doit pas changer rétroactivement.
 - **Statuts** : `draft` (brouillon, lignes modifiables) → `sent` (envoyé, PDF généré, notifié via le chat) → `accepted` (validé par le client, décrémente le stock des lignes de pièces) ou `rejected` (refusé) → si refusé, le garagiste peut créer une nouvelle version (`negotiating` une fois cette version envoyée) → `accepted` ou `rejected` à nouveau. Depuis `accepted` : `in_progress` (prestation démarrée) → `invoiced` (payé, facture générée). Depuis `rejected` : `abandoned` (négociation infructueuse, clôture sans prestation ni facture) au lieu de renégocier.
 - **Validation = action digitale explicite, jamais le chat** : le client dispose d'un endpoint « Accepter » et d'un endpoint « Refuser », rattachés précisément à la version du devis concernée (pas juste « le dernier devis reçu ») — toute décision est tracée (`decided_by`, `decided_at`). Le chat ne sert qu'à transmettre le PDF et notifier, jamais à interpréter une validation.
 - **Paiement manuel V1** : en l'absence d'agrégateur de paiement en ligne (§7), le garagiste marque lui-même la prestation comme payée (couvre aussi le paiement en espèces sur place). Ça transforme automatiquement le devis accepté en facture : même contenu (lignes copiées), nouveau PDF avec la mention « Facture », renvoyé via le chat. Ce mécanisme sera étendu par un vrai module de paiement en ligne plus tard, sans changer cette logique de transition.
@@ -145,9 +145,37 @@ Deuxième maillon de la chaîne RDV → devis → validation → prestation → 
 Une conversation regroupe **tous** les échanges entre un garage et un automobiliste donnés, indépendamment de tout RDV précis — un automobiliste peut contacter un garage à tout moment, y compris sans RDV (panne d'urgence). Un seul canal par paire (contrainte unique `garage_id`+`user_id`), jamais de messagerie de groupe, jamais de contact entre automobilistes ou entre garages. **Portée de cet ajout : uniquement la paire Garage ↔ Automobiliste** — la ligne « Chat » de la matrice ci-dessous anticipe un Market Space ↔ Automobiliste qui reste à construire.
 
 - **Messages texte et/ou image** (photo véhicule/tableau de bord/voyants pour diagnostic à distance) — au moins l'un des deux requis par message.
-- **Message système automatique** à chaque génération de devis/facture (`sent()`/`markPaid()` du module Devis) : posté sans intervention humaine (`sender_id` null), avec le PDF en pièce jointe référencée (pas de copie du fichier — le téléchargement passe par l'endpoint devis, gated par l'appartenance au RDV).
+- **Message système automatique** à chaque génération de devis/facture (`sent()`/`markPaid()` du module Devis) ou de facture de commande (`markPaid()` du module Commande, ajout v0.9) : posté sans intervention humaine (`sender_id` null), avec le PDF en pièce jointe référencée (pas de copie du fichier — le téléchargement passe par l'endpoint dédié, gated par l'appartenance au devis/à la commande).
 - **Stockage des images** : disque privé dédié (`private_media_disk`, distinct du disque KYC) — jamais d'URL publique, toujours un téléchargement authentifié qui vérifie l'appartenance à la conversation, même mécanisme que pour les justificatifs KYC.
 - **Pas de conversation initiée côté garagiste dans cette V1** : le garagiste voit et répond aux conversations déjà ouvertes par des automobilistes ; il n'y a pas d'action « démarrer une conversation avec tel client » côté dashboard Garagiste (pas de liste de clients à cibler dans le périmètre actuel).
+
+### Module Commande, RDV optionnel pour le devis, et compte express (ajout v0.9, 2026-09-17)
+
+**Rappel de mission** : l'objectif du projet est de vulgariser et d'assainir le secteur de la mécanique au Bénin et en Afrique de l'Ouest en rendant chaque prestation traçable et évaluable (avis clients), pour créer une concurrence saine et pousser les garages à bien travailler (§1). C'est pourquoi même un client « walk-in » sans app doit être digitalisé — c'est la donnée qui fait la valeur de la plateforme. Cette section introduit trois évolutions liées entre elles pour couvrir ce cas.
+
+**Module Commande (achat isolé de pièces/produits)** — troisième maillon indépendant, parallèle à la chaîne RDV → devis (règle 11) :
+
+- Un automobiliste peut acheter directement une pièce/produit sans devis, depuis la mini-boutique d'un Garage ou depuis un Market Space, dès lors qu'**aucune prestation de service n'est associée** — le prix est déjà fixé et connu au catalogue. Dès qu'une prestation de réparation/diagnostic est nécessaire, c'est toujours un devis (voir plus bas), jamais une commande.
+- Modèle `Order`/`OrderLine`, même principe de mutualisation que `Product` (§5, ajout v0.4) : relation polymorphe `sellable` vers `Garage` ou `MarketSpaceAccount`, mêmes services de commande/paiement pour les deux. Toutes les lignes d'une commande doivent provenir du même vendeur (pas de panier mixte Garage + Market Space).
+- **Séquence stricte** (règle 11) : commande → paiement immédiat → facture auto-générée. Pas de négociation, pas de statut « en attente de validation client » — contrairement au devis, le prix est fixé au catalogue au moment de l'achat.
+- **Paiement manuel V1** (même mécanisme que le devis, §7) : le vendeur (garagiste ou compte Market Space) marque lui-même la commande comme payée. Ça décrémente le stock (même mécanisme unique de décrément que pour les devis, §5 ajout v0.4) et génère la facture PDF (dompdf, même mécanisme que le devis : en-tête vendeur/client lu en direct, jamais dupliqué).
+- **Chat** : notification système uniquement pour une commande de mini-boutique Garage (le Market Space n'a pas encore de chat, portée limitée de l'ajout v0.8). Pas de notification pour une commande Market Space en V1.
+
+**RDV optionnel pour le devis** — correction d'une règle trop stricte posée en v0.7/v0.8 :
+
+- La vraie règle : dès qu'il y a une prestation de service (réparation, diagnostic) à réaliser, un devis est toujours nécessaire, **avec ou sans RDV préalable** — que le client ait pris RDV via l'app, ou qu'il se présente directement au garage sans RDV (panne, urgence). Le RDV reste utile comme moyen de planification quand c'est possible, mais n'est plus une condition technique obligatoire pour créer un devis.
+- **Structure retenue** : `Quote` référence désormais directement `garage_id` et `user_id` (colonnes obligatoires) ; `appointment_id` devient une FK **nullable**, lien de traçabilité optionnel plutôt qu'une condition (contrainte unique conservée : un RDV donné n'a jamais plus d'un devis). Quand un devis naît d'un RDV, celui-ci doit rester `confirmed` et appartenir au même garage/client (cohérence conservée) ; sans RDV, le garagiste doit fournir un `client_id` valide (compte automobiliste existant ou compte « express », voir plus bas).
+- **Aucun affaiblissement de la validation client** : tout devis reste soumis à une validation explicite et digitale du client (accepter/refuser) avant démarrage de la prestation — cette règle s'applique identiquement avec ou sans RDV, et même pour un client « compte express » (via le mécanisme email ci-dessous).
+- Un achat isolé de pièce/produit **sans aucune prestation** ne passe jamais par un devis : toujours via le module Commande ci-dessus.
+
+**Création de compte « express » par le garagiste** (client présent physiquement, sans app ni compte) :
+
+- Le garagiste renseigne nom, email et téléphone pour créer un compte automobiliste minimal (`is_express = true`). Colonne `email` de `users` rendue **nullable en base** (ouvre la voie à de futurs flux sans email, §7), mais **obligatoire dans la validation métier de ce flux précis** ; l'inscription classique automobiliste n'est pas concernée par cet assouplissement.
+- **Rattachement plutôt que doublon** : si l'email ou le téléphone correspond à un compte automobiliste déjà existant, le garagiste est rattaché à ce compte. Si l'email/téléphone correspond à un compte **professionnel** (Garagiste/Market Space/Admin), la création est refusée — même logique de protection que pour la connexion Google (§5, ajout v0.5) : ce mécanisme ne doit jamais créer ou détourner un compte professionnel.
+- **Validation par email pour ce client sans app** : quand un devis est envoyé à un client « compte express », en plus du message système dans le chat, un email est envoyé (Laravel Mail, driver SMTP — Mailtrap en dev, tout fournisseur SMTP en prod par simple changement de `.env`, aucune dépendance Composer supplémentaire) avec des liens signés (`URL::temporarySignedRoute`, 7 jours, action unique par version) permettant d'accepter/refuser directement depuis la boîte mail. Cette décision reste une action digitale explicite et tracée (`decided_by`, `decided_at`), exactement comme depuis l'app — seul le canal diffère.
+- **Réponse JSON brute pour l'instant** : faute de frontend Vue existant, ces routes publiques (`/api/quotes/{quote}/versions/{version}/email-decision/accept|reject`, protégées par signature+expiration, pas de Sanctum) renvoient une réponse JSON brute plutôt qu'une page de confirmation — cohérent avec l'API REST pure (§4). Une page de confirmation conviviale pourra être ajoutée par le futur frontend Vue en appelant ces mêmes endpoints, sans aucun changement côté backend.
+- Le garagiste peut aussi télécharger le PDF du devis/de la facture directement depuis son dashboard pour le remettre en main propre, en complément de l'email.
+- **Point ouvert (§7)** : le mécanisme permettant à un client de « réclamer » plus tard son compte express (téléchargement de l'app, définition d'un mot de passe, finalisation de l'inscription) n'est pas construit — seul le champ `is_express` existe pour l'anticiper.
 
 ### Matrice des droits d'accès (résumé)
 
@@ -161,7 +189,9 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 | Valider service/produit/compte | Oui | Non | Non | Non |
 | Suspendre/réactiver un compte déjà validé | Oui | Non | Non | Non |
 | Gestion stock/inventaire (unique par garage / par boutique) | Oui (lecture) | Oui | Oui | Non |
-| Génération devis/factures | Oui (lecture) | Oui | Émission (factures) | Consultation |
+| Génération devis/factures | Oui (lecture) | Oui (avec ou sans RDV) | Non concerné | Consultation |
+| Achat isolé de pièce/produit (sans devis) | Oui (lecture) | Émission (factures, mini-boutique) | Émission (factures) | Commande + paiement |
+| Créer un compte client « express » (sans app) | Non | Oui | Non | Non concerné |
 | Paiement en ligne | — | Réception | Réception | Émission |
 | Prise de rendez-vous | Oui (lecture) | Gestion agenda | Non concerné | Prise de RDV |
 | Chat avec l'automobiliste | Non | Oui | Oui | Oui |
@@ -190,6 +220,8 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 - Cadre légal précis de partage des données agrégées avec l'administration béninoise (nature des données, fréquence, base légale RGPD/loi locale).
 - Authentification côté automobiliste par téléphone/SMS (email + Google désormais tranchés, voir §5 ajout v0.5).
 - Périmètre exact du catalogue « mini-boutique » d'un garage (catégories de produits autorisées, limite de nombre éventuelle) et seuil au-delà duquel un garage devrait plutôt ouvrir un compte Market Space à part entière.
+- Mécanisme de « réclamation » d'un compte automobiliste « express » par son propriétaire réel (téléchargement de l'app, définition d'un mot de passe, finalisation de l'inscription) — non construit, voir §5 ajout v0.9.
+- Page de confirmation conviviale pour le lien de décision par email d'un devis (actuellement réponse JSON brute, faute de frontend Vue existant) — à intégrer au futur SPA sans changement backend, voir §5 ajout v0.9.
 
 ## 8. Glossaire
 
@@ -200,6 +232,8 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 - **Validation admin** : approbation obligatoire par l'administrateur avant visibilité publique d'un compte/service/produit.
 - **KYC** : vérification d'identité/légitimité d'un professionnel via justificatifs, préalable à la validation du compte.
 - **Automobiliste** : utilisateur final de l'app mobile.
+- **Commande** : achat isolé d'une ou plusieurs pièces/produits, sans prestation associée, payé immédiatement (§5, ajout v0.9) — distinct d'un devis, qui implique toujours une prestation de service.
+- **Compte express** : compte automobiliste minimal créé par un garagiste pour un client walk-in sans app (§5, ajout v0.9), pas encore « réclamé » par son propriétaire réel.
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 

@@ -12,6 +12,7 @@ use App\Models\ProfessionalRegistration;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
 use App\Models\RepairService;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -308,5 +309,62 @@ class QuoteTest extends TestCase
 
         $this->getJson("/api/garage/appointments/{$appointment->id}/quote")->assertNotFound();
         $this->postJson("/api/garage/quotes/{$quote->id}/start")->assertNotFound();
+    }
+
+    /**
+     * Un devis est nécessaire dès qu'il y a une prestation, avec ou sans RDV
+     * préalable (CLAUDE.md §5, ajout v0.9) : un client walk-in sans RDV.
+     */
+    public function test_a_garagiste_can_create_a_quote_directly_without_an_appointment(): void
+    {
+        $garage = $this->approvedGarage();
+        $client = User::factory()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson('/api/garage/quotes', [
+            'client_id' => $client->id,
+            'lines' => [
+                ['type' => 'diagnosis_fee', 'label' => 'Diagnostic', 'unit_price' => 2000, 'quantity' => 1],
+            ],
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.appointment_id', null);
+        $this->assertDatabaseHas('quotes', [
+            'garage_id' => $garage->id,
+            'user_id' => $client->id,
+            'appointment_id' => null,
+        ]);
+    }
+
+    public function test_creating_a_direct_quote_without_a_client_id_is_rejected(): void
+    {
+        $garage = $this->approvedGarage();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson('/api/garage/quotes', [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1000, 'quantity' => 1]],
+        ])->assertUnprocessable();
+    }
+
+    public function test_creating_a_direct_quote_for_a_non_automobiliste_client_is_rejected(): void
+    {
+        $garage = $this->approvedGarage();
+        $professional = User::factory()->garagiste()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson('/api/garage/quotes', [
+            'client_id' => $professional->id,
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1000, 'quantity' => 1]],
+        ])->assertNotFound();
+    }
+
+    public function test_a_garagiste_can_list_and_view_a_walk_in_quote_without_an_appointment(): void
+    {
+        $garage = $this->approvedGarage();
+        $quote = Quote::factory()->forGarage($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/quotes')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson("/api/garage/quotes/{$quote->id}")->assertOk()->assertJsonPath('data.id', $quote->id);
     }
 }

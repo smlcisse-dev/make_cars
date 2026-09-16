@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Mobile\AppointmentController;
 use App\Http\Controllers\Api\Mobile\ConversationController;
 use App\Http\Controllers\Api\Mobile\GarageController;
 use App\Http\Controllers\Api\Mobile\MarketSpaceController;
+use App\Http\Controllers\Api\Mobile\OrderController;
 use App\Http\Controllers\Api\Mobile\QuoteController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,10 +21,18 @@ Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::post('appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
     Route::post('appointments/{appointment}/accept-reschedule', [AppointmentController::class, 'acceptReschedule']);
 
-    Route::get('appointments/{appointment}/quote', [QuoteController::class, 'show']);
+    Route::get('quotes', [QuoteController::class, 'index']);
+    Route::get('quotes/{quote}', [QuoteController::class, 'show']);
+    Route::get('appointments/{appointment}/quote', [QuoteController::class, 'showForAppointment']);
     Route::post('quotes/{quote}/versions/{version}/accept', [QuoteController::class, 'accept']);
     Route::post('quotes/{quote}/versions/{version}/reject', [QuoteController::class, 'reject']);
     Route::get('quotes/{quote}/versions/{version}/pdf', [QuoteController::class, 'downloadPdf']);
+
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::post('orders', [OrderController::class, 'store']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
+    Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
 
     Route::get('conversations', [ConversationController::class, 'index']);
     Route::post('conversations', [ConversationController::class, 'store']);

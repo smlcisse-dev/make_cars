@@ -53,6 +53,11 @@ components:
           type: string
         email:
           type: string
+          nullable: true
+          description: >
+            Nullable en base pour de futurs flux sans email (CLAUDE.md §7),
+            mais toujours obligatoire pour l'inscription classique et pour la
+            création d'un compte "express" (ajout v0.9).
         phone:
           type: string
           nullable: true
@@ -61,6 +66,12 @@ components:
           enum: [automobiliste, garagiste, market_space, admin]
         role_label:
           type: string
+        is_express:
+          type: boolean
+          description: >
+            Compte automobiliste créé par un garagiste pour un client
+            walk-in sans app, pas encore "réclamé" par son propriétaire réel
+            (CLAUDE.md §5, ajout v0.9 ; §7 point ouvert).
         professional_registration:
           $ref: '#/components/schemas/ProfessionalRegistration'
 
@@ -308,19 +319,62 @@ components:
     Quote:
       type: object
       description: >
-        Deuxième maillon de la chaîne RDV → devis → validation → prestation
-        → paiement → facture (CLAUDE.md §5 règle 10, ajout v0.8). Un seul
-        Quote par Appointment ; la renégociation crée des QuoteVersion.
+        Un devis est nécessaire dès qu'il y a une prestation, avec ou sans
+        RDV préalable (CLAUDE.md §5 règle 10, ajout v0.9) : garage_id/user_id
+        référencent directement le garage et le client, appointment_id n'est
+        plus qu'un lien de traçabilité optionnel. Un seul Quote par
+        Appointment quand ce lien existe ; la renégociation crée des
+        QuoteVersion.
       properties:
         id: {type: integer}
-        appointment_id: {type: integer}
+        garage_id: {type: integer}
+        user_id: {type: integer, description: "Client (automobiliste), éventuellement un compte \"express\" — CLAUDE.md §5, ajout v0.9."}
+        appointment_id: {type: integer, nullable: true}
         status:
           type: string
           enum: [draft, sent, accepted, rejected, negotiating, in_progress, invoiced, abandoned]
         paid_at: {type: string, format: date-time, nullable: true}
+        garage: {$ref: '#/components/schemas/Garage'}
+        client: {$ref: '#/components/schemas/User'}
         versions:
           type: array
           items: {$ref: '#/components/schemas/QuoteVersion'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+
+    OrderLine:
+      type: object
+      description: >
+        Toujours un produit au prix déjà fixé au catalogue — un achat isolé
+        n'a par définition aucune ligne de service (CLAUDE.md §5, ajout v0.9).
+      properties:
+        id: {type: integer}
+        product_id: {type: integer}
+        label: {type: string}
+        unit_price: {type: string, description: "Décimal sérialisé en chaîne."}
+        quantity: {type: integer}
+        line_total: {type: string, description: "Décimal sérialisé en chaîne."}
+
+    Order:
+      type: object
+      description: >
+        Achat isolé de pièces/produits, sans aucune prestation associée
+        (CLAUDE.md §5, règle 11 et ajout v0.9) : commande → paiement
+        immédiat → facture, jamais de devis ni de négociation. Relation
+        polymorphe "sellable" mutualisée avec Product (mini-boutique Garage
+        ou Market Space).
+      properties:
+        id: {type: integer}
+        sellable_type: {type: string, enum: [garage, market_space]}
+        sellable_id: {type: integer}
+        user_id: {type: integer}
+        status: {type: string, enum: [pending, paid, cancelled]}
+        paid_at: {type: string, format: date-time, nullable: true}
+        total: {type: string, description: "Somme des lignes, décimal sérialisé en chaîne."}
+        lines:
+          type: array
+          items: {$ref: '#/components/schemas/OrderLine'}
+        client: {$ref: '#/components/schemas/User'}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
 
@@ -338,9 +392,10 @@ components:
         attachment_type:
           type: string
           nullable: true
-          enum: [quote_pdf]
-          description: Message système avec devis/facture en pièce jointe (téléchargée via l'endpoint devis, pas dupliquée).
+          enum: [quote_pdf, order_pdf]
+          description: Message système avec devis/facture (ou facture de commande — CLAUDE.md §5, ajout v0.9) en pièce jointe (téléchargée via l'endpoint dédié, pas dupliquée).
         quote_version_id: {type: integer, nullable: true}
+        order_id: {type: integer, nullable: true}
         created_at: {type: string, format: date-time}
 
     Conversation:
@@ -381,6 +436,66 @@ paths:
                     example: ok
                   app:
                     type: string
+
+  /quotes/{quote}/versions/{version}/email-decision/accept:
+    get:
+      summary: >
+        Accepte un devis via le lien signé reçu par email par un client
+        "compte express" sans app (CLAUDE.md §5, ajout v0.9). Route publique
+        protégée par signature+expiration (pas de Sanctum) : à usage limité,
+        7 jours, une seule décision possible par version.
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: signature
+          in: query
+          required: true
+          schema: {type: string}
+        - name: expires
+          in: query
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Devis accepté. Réponse JSON brute (API REST pure — CLAUDE.md §4) ; une page de confirmation sera ajoutée par le futur frontend Vue, sans changement côté backend.
+        '403':
+          description: Signature invalide/expirée, ou version pas envoyée/plus la version courante/devis plus en attente de décision.
+
+  /quotes/{quote}/versions/{version}/email-decision/reject:
+    get:
+      summary: Refuse un devis via le lien signé reçu par email (mêmes garde-fous que l'acceptation).
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: version
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: signature
+          in: query
+          required: true
+          schema: {type: string}
+        - name: expires
+          in: query
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Devis refusé.
+        '403':
+          description: Signature invalide/expirée, ou version pas envoyée/plus la version courante/devis plus en attente de décision.
 
   /auth/register/automobiliste:
     post:
@@ -880,6 +995,31 @@ paths:
         '200':
           description: OK
 
+  /admin/orders:
+    get:
+      summary: Liste toutes les commandes, tous vendeurs et statuts confondus — supervision en lecture seule (CLAUDE.md §5 règle 8, ajout v0.9).
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, paid, cancelled]}
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /admin/orders/{order}:
+    get:
+      summary: Détail d'une commande (supervision admin), avec ses lignes.
+      tags: [Admin]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
   /admin/conversations:
     get:
       summary: Liste toutes les conversations — supervision en lecture seule (CLAUDE.md §5 règle 8, ajout v0.8).
@@ -1284,11 +1424,99 @@ paths:
         '422':
           description: Date manquante ou dans le passé.
 
+  /garage/quotes:
+    get:
+      summary: Liste tous les devis du garage, avec ou sans RDV associé (CLAUDE.md §5, ajout v0.9).
+      tags: [Garage]
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: >
+        Crée un devis en brouillon directement pour un client, sans RDV
+        (CLAUDE.md §5, ajout v0.9) : un devis est nécessaire dès qu'il y a une
+        prestation, que le client se soit présenté avec ou sans RDV
+        préalable. `client_id` peut être un automobiliste existant ou un
+        compte "express" créé au préalable via /garage/clients/express.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, lines]
+              properties:
+                client_id: {type: integer, description: "Doit être un compte automobiliste existant."}
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [type, quantity]
+                    properties:
+                      type: {type: string, enum: [diagnosis_fee, service, product]}
+                      repair_service_id: {type: integer, description: "Requis si type=service."}
+                      product_id: {type: integer, description: "Requis si type=product."}
+                      label: {type: string, description: "Requis si type=diagnosis_fee (sinon repris du catalogue)."}
+                      unit_price: {type: number, description: "Requis si type=diagnosis_fee (sinon repris du catalogue, jamais accepté du client pour service/product)."}
+                      quantity: {type: integer, minimum: 1}
+      responses:
+        '201':
+          description: Devis créé en brouillon.
+        '404':
+          description: client_id introuvable ou n'est pas un compte automobiliste.
+        '422':
+          description: client_id manquant, ligne invalide, ou stock insuffisant pour une ligne produit.
+
+  /garage/quotes/{quote}:
+    get:
+      summary: Consulte un devis du garage par son id, avec ou sans RDV associé (CLAUDE.md §5, ajout v0.9).
+      tags: [Garage]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Devis appartenant à un autre garage.
+
+  /garage/clients/express:
+    post:
+      summary: >
+        Crée (ou rattache à un compte automobiliste existant, par email ou
+        téléphone) un compte client "express" pour un client walk-in sans app
+        (CLAUDE.md §5, ajout v0.9) — préalable typique à un devis sans RDV.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, phone]
+              properties:
+                name: {type: string}
+                email: {type: string, format: email}
+                phone: {type: string}
+      responses:
+        '201':
+          description: Nouveau compte "express" créé.
+        '200':
+          description: Rattaché à un compte automobiliste existant (email ou téléphone correspondant).
+        '422':
+          description: L'email ou le téléphone correspond à un compte professionnel — refusé.
+
   /garage/appointments/{appointment}/quote:
     post:
       summary: >
-        Crée un devis en brouillon pour un RDV confirmé (diagnostic effectué
-        sur place) — un seul devis par RDV (CLAUDE.md §5, ajout v0.8).
+        Crée un devis en brouillon depuis un RDV confirmé (diagnostic
+        effectué sur place) — chemin conservé pour la traçabilité, le RDV
+        n'étant plus une condition obligatoire pour créer un devis
+        (CLAUDE.md §5, ajout v0.9). Un seul devis par RDV.
       tags: [Garage]
       parameters:
         - name: appointment
@@ -1487,6 +1715,62 @@ paths:
         '403':
           description: Le devis n'a pas été refusé.
 
+  /garage/orders:
+    get:
+      summary: Liste les commandes isolées de la mini-boutique, sans prestation associée (CLAUDE.md §5, ajout v0.9).
+      tags: [Garage]
+      responses:
+        '200':
+          description: OK
+
+  /garage/orders/{order}:
+    get:
+      summary: Consulte une commande de la mini-boutique.
+      tags: [Garage]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Commande appartenant à un autre vendeur.
+
+  /garage/orders/{order}/mark-paid:
+    post:
+      summary: >
+        Paiement manuel V1 (espèces ou autre — CLAUDE.md §7) : décrémente le
+        stock (même mécanisme unique que le module Devis — CLAUDE.md §5,
+        ajout v0.4), génère la facture et notifie via le chat.
+      tags: [Garage]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Paiement enregistré, facture générée.
+        '403':
+          description: Cette commande n'est plus en attente de paiement.
+
+  /garage/orders/{order}/pdf:
+    get:
+      summary: Télécharge la facture PDF d'une commande payée.
+      tags: [Garage]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du PDF.
+        '404':
+          description: Facture pas encore générée, ou commande appartenant à un autre vendeur.
+
   /garage/conversations:
     get:
       summary: >
@@ -1640,6 +1924,62 @@ paths:
         '200':
           description: Stock mis à jour.
 
+  /market-space/orders:
+    get:
+      summary: Liste les commandes du Market Space, stock distinct de celui d'un garage (CLAUDE.md §5, ajout v0.9).
+      tags: [MarketSpace]
+      responses:
+        '200':
+          description: OK
+
+  /market-space/orders/{order}:
+    get:
+      summary: Consulte une commande du Market Space.
+      tags: [MarketSpace]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Commande appartenant à un autre vendeur.
+
+  /market-space/orders/{order}/mark-paid:
+    post:
+      summary: >
+        Paiement manuel V1 (CLAUDE.md §7) : décrémente le stock et génère la
+        facture. Pas de notification chat pour cette paire (non construite —
+        CLAUDE.md §5, ajout v0.8).
+      tags: [MarketSpace]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Paiement enregistré, facture générée.
+        '403':
+          description: Cette commande n'est plus en attente de paiement.
+
+  /market-space/orders/{order}/pdf:
+    get:
+      summary: Télécharge la facture PDF d'une commande payée.
+      tags: [MarketSpace]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du PDF.
+        '404':
+          description: Facture pas encore générée, ou commande appartenant à un autre vendeur.
+
   /mobile/garages:
     get:
       summary: >
@@ -1777,6 +2117,29 @@ paths:
         '403':
           description: Aucune contre-proposition en attente sur ce RDV.
 
+  /mobile/quotes:
+    get:
+      summary: Liste tous ses devis, avec ou sans RDV associé (CLAUDE.md §5, ajout v0.9).
+      tags: [Mobile]
+      responses:
+        '200':
+          description: OK
+
+  /mobile/quotes/{quote}:
+    get:
+      summary: Consulte un de ses devis par son id, avec ou sans RDV associé (CLAUDE.md §5, ajout v0.9).
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Devis appartenant à un autre automobiliste.
+
   /mobile/appointments/{appointment}/quote:
     get:
       summary: Consulte le devis de son propre RDV.
@@ -1851,6 +2214,90 @@ paths:
           description: Fichier binaire du PDF.
         '404':
           description: PDF pas encore généré, ou devis appartenant à un autre automobiliste.
+
+  /mobile/orders:
+    get:
+      summary: Liste ses propres commandes.
+      tags: [Mobile]
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: >
+        Achat isolé de pièces/produits, sans prestation associée (CLAUDE.md
+        §5, règle 11 et ajout v0.9) : commande → paiement immédiat →
+        facture. Toutes les lignes doivent provenir du même vendeur (Garage
+        ou Market Space), déduit automatiquement des produits.
+      tags: [Mobile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: {type: integer}
+                      quantity: {type: integer, minimum: 1}
+      responses:
+        '201':
+          description: Commande créée, en attente de paiement.
+        '404':
+          description: Produit introuvable, non approuvé, ou boutique non visible publiquement.
+        '422':
+          description: Lignes provenant de vendeurs différents, ou stock insuffisant.
+
+  /mobile/orders/{order}:
+    get:
+      summary: Consulte une de ses commandes.
+      tags: [Mobile]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Commande appartenant à un autre automobiliste.
+
+  /mobile/orders/{order}/cancel:
+    post:
+      summary: Annule une commande tant qu'elle n'est pas payée.
+      tags: [Mobile]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Commande annulée.
+        '403':
+          description: Cette commande ne peut plus être annulée.
+
+  /mobile/orders/{order}/pdf:
+    get:
+      summary: Télécharge la facture PDF d'une commande payée.
+      tags: [Mobile]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire du PDF.
+        '404':
+          description: Facture pas encore générée, ou commande appartenant à un autre automobiliste.
 
   /mobile/conversations:
     get:

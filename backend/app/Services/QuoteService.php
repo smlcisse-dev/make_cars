@@ -17,11 +17,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Deuxième maillon de la chaîne RDV → devis → validation → prestation →
- * paiement → facture (CLAUDE.md §5 règle 10, ajout v0.8). Les garde-fous
- * d'état (quel statut autorise quelle action) vivent dans les contrôleurs,
- * pas ici — cette classe applique les transitions, elle ne les autorise pas
- * (même répartition que les modules précédents).
+ * Un devis est nécessaire dès qu'il y a une prestation de service à
+ * réaliser, avec ou sans RDV préalable (CLAUDE.md §5 règle 10, ajout v0.9) :
+ * cette classe crée le devis directement pour un Garage + un Client, le RDV
+ * n'étant plus qu'un lien de traçabilité optionnel. Les garde-fous d'état
+ * (quel statut autorise quelle action) vivent dans les contrôleurs, pas ici
+ * — cette classe applique les transitions, elle ne les autorise pas (même
+ * répartition que les modules précédents).
  */
 class QuoteService
 {
@@ -29,16 +31,19 @@ class QuoteService
         private readonly QuotePdfService $pdfService,
         private readonly ChatService $chatService,
         private readonly ProductService $productService,
+        private readonly QuoteEmailDecisionService $emailDecisionService,
     ) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $linesData
      */
-    public function createDraft(Appointment $appointment, array $linesData): Quote
+    public function createDraft(Garage $garage, User $client, ?Appointment $appointment, array $linesData): Quote
     {
-        return DB::transaction(function () use ($appointment, $linesData) {
+        return DB::transaction(function () use ($garage, $client, $appointment, $linesData) {
             $quote = Quote::create([
-                'appointment_id' => $appointment->id,
+                'garage_id' => $garage->id,
+                'user_id' => $client->id,
+                'appointment_id' => $appointment?->id,
                 'status' => QuoteStatus::Draft,
             ]);
 
@@ -74,15 +79,16 @@ class QuoteService
         $quote = $version->quote;
         $quote->update(['status' => $version->version === 1 ? QuoteStatus::Sent : QuoteStatus::Negotiating]);
 
-        $appointment = $quote->appointment;
         $this->chatService->postQuoteVersionMessage(
-            $appointment->garage,
-            $appointment->user,
+            $quote->garage,
+            $quote->user,
             $version,
             $version->version === 1
-                ? 'Nouveau devis envoyé pour votre rendez-vous.'
+                ? 'Nouveau devis envoyé.'
                 : "Nouvelle proposition de devis (version {$version->version}) suite à votre refus."
         );
+
+        $this->emailDecisionService->notifyIfExpressClient($quote, $version);
 
         return $version->fresh();
     }
@@ -120,7 +126,7 @@ class QuoteService
      */
     private function attachLines(QuoteVersion $version, array $linesData): void
     {
-        $garage = $version->quote->appointment->garage;
+        $garage = $version->quote->garage;
 
         foreach ($linesData as $lineData) {
             $version->lines()->create($this->resolveLine($garage, $lineData));
@@ -255,17 +261,16 @@ class QuoteService
             }
 
             $quote->update(['status' => QuoteStatus::Invoiced, 'paid_at' => now()]);
-            $quote->appointment->update(['status' => AppointmentStatus::Completed]);
+            $quote->appointment?->update(['status' => AppointmentStatus::Completed]);
 
             $this->pdfService->generate($invoiceVersion);
             $invoiceVersion->update(['sent_at' => now()]);
 
-            $appointment = $quote->appointment;
             $this->chatService->postQuoteVersionMessage(
-                $appointment->garage,
-                $appointment->user,
+                $quote->garage,
+                $quote->user,
                 $invoiceVersion,
-                'Facture disponible pour votre rendez-vous.'
+                'Facture disponible.'
             );
 
             return $quote->fresh();
@@ -273,15 +278,31 @@ class QuoteService
     }
 
     /**
-     * Négociation infructueuse : le garagiste clôture le RDV sans prestation
-     * ni facture (CLAUDE.md §5, ajout v0.8) — distinct d'un RDV terminé avec
-     * prestation réalisée (cf. Appointment::wasCompletedWithService()).
+     * Négociation infructueuse : le garagiste clôture le RDV (s'il y en a un)
+     * sans prestation ni facture (CLAUDE.md §5, ajout v0.8) — distinct d'un
+     * RDV terminé avec prestation réalisée (cf.
+     * Appointment::wasCompletedWithService()).
      */
     public function abandon(Quote $quote): Quote
     {
         $quote->update(['status' => QuoteStatus::Abandoned]);
-        $quote->appointment->update(['status' => AppointmentStatus::Completed]);
+        $quote->appointment?->update(['status' => AppointmentStatus::Completed]);
 
         return $quote->fresh();
+    }
+
+    /**
+     * Garde-fou partagé entre la décision via l'app (Mobile) et la décision
+     * par email pour un client "compte express" (CLAUDE.md §5, ajout v0.9) :
+     * seule la version la plus récente, déjà envoyée et pas encore décidée,
+     * peut être acceptée/refusée.
+     */
+    public function assertVersionIsDecidable(Quote $quote, QuoteVersion $version): void
+    {
+        abort_unless($version->quote_id === $quote->id, 404);
+        $current = $quote->currentVersion()->first();
+        abort_unless($current && $current->id === $version->id, 403, 'Seule la version la plus récente du devis peut être traitée.');
+        abort_unless($version->sent_at !== null, 403, 'Ce devis n\'a pas encore été envoyé.');
+        abort_unless(in_array($quote->status, [QuoteStatus::Sent, QuoteStatus::Negotiating], strict: true), 403, 'Ce devis n\'est plus en attente d\'une décision.');
     }
 }

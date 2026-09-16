@@ -3,29 +3,29 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Api\Controller;
-use App\Http\Resources\QuoteResource;
-use App\Models\Quote;
+use App\Http\Resources\OrderResource;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
-class QuoteController extends Controller
+class OrderController extends Controller
 {
     /**
      * Supervision admin en lecture seule (CLAUDE.md §5 règle 8).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $quotes = Quote::query()
+        $orders = Order::query()
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->with(['garage', 'user', 'appointment', 'versions.lines'])
+            ->with(['sellable', 'user', 'lines'])
             ->latest()
             ->paginate();
 
-        return QuoteResource::collection($quotes);
+        return OrderResource::collection($orders);
     }
 
-    public function show(Quote $quote): QuoteResource
+    public function show(Order $order): OrderResource
     {
-        return new QuoteResource($quote->load(['garage', 'user', 'appointment', 'versions.lines']));
+        return new OrderResource($order->load(['sellable', 'user', 'lines']));
     }
 }

@@ -147,4 +147,26 @@ class QuoteTest extends TestCase
 
         $this->get("/api/mobile/quotes/{$quote->id}/versions/{$version->id}/pdf")->assertOk();
     }
+
+    /**
+     * Un devis sans RDV associé (client walk-in — CLAUDE.md §5, ajout v0.9)
+     * reste consultable directement par son id.
+     */
+    public function test_an_automobiliste_can_list_and_view_a_walk_in_quote_without_an_appointment(): void
+    {
+        $client = User::factory()->create();
+        $quote = Quote::factory()->forClient($client)->create();
+        Sanctum::actingAs($client);
+
+        $this->getJson('/api/mobile/quotes')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson("/api/mobile/quotes/{$quote->id}")->assertOk()->assertJsonPath('data.appointment_id', null);
+    }
+
+    public function test_an_automobiliste_cannot_view_anothers_walk_in_quote(): void
+    {
+        $quote = Quote::factory()->create();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson("/api/mobile/quotes/{$quote->id}")->assertNotFound();
+    }
 }

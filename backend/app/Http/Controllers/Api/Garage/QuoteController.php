@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Garage;
 
+use App\Enums\AccountType;
 use App\Enums\AppointmentStatus;
 use App\Enums\QuoteStatus;
 use App\Http\Controllers\Api\Controller;
@@ -12,6 +13,7 @@ use App\Http\Resources\QuoteVersionResource;
 use App\Models\Appointment;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
+use App\Models\User;
 use App\Services\QuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,25 +33,69 @@ class QuoteController extends Controller
 
     private function authorizeQuote(Request $request, Quote $quote): void
     {
-        abort_unless($quote->appointment->garage_id === $this->authenticatedGarage($request)->id, 404);
+        abort_unless($quote->garage_id === $this->authenticatedGarage($request)->id, 404);
     }
 
     /**
-     * Un devis n'est créé qu'après un RDV confirmé (diagnostic effectué sur
-     * place — CLAUDE.md §5, ajout v0.8), un seul par RDV.
+     * Création directe, sans RDV (CLAUDE.md §5, ajout v0.9) : un devis est
+     * nécessaire dès qu'il y a une prestation, que le client se soit présenté
+     * avec ou sans RDV préalable. `client_id` peut être un compte
+     * automobiliste existant ou un compte "express" créé via
+     * ClientController::storeExpress au préalable.
      */
-    public function store(QuoteLinesRequest $request, Appointment $appointment): JsonResponse
+    public function store(QuoteLinesRequest $request): JsonResponse
+    {
+        $garage = $this->authenticatedGarage($request);
+        abort_unless($request->filled('client_id'), 422, 'Le client est obligatoire pour créer un devis sans RDV.');
+
+        $client = User::where('id', $request->integer('client_id'))
+            ->where('role', AccountType::Automobiliste)
+            ->firstOrFail();
+
+        $quote = $this->quoteService->createDraft($garage, $client, null, $request->array('lines'));
+
+        return $this->success(new QuoteResource($quote->load('versions.lines')), 'Devis créé en brouillon.', 201);
+    }
+
+    /**
+     * Création depuis un RDV existant, conservé pour la traçabilité
+     * (CLAUDE.md §5, ajout v0.9) : le RDV n'est plus une condition
+     * obligatoire pour créer un devis, mais reste le chemin naturel quand le
+     * client est passé par la prise de RDV. Toujours un seul devis par RDV.
+     */
+    public function storeForAppointment(QuoteLinesRequest $request, Appointment $appointment): JsonResponse
     {
         $this->authorizeAppointment($request, $appointment);
         abort_unless($appointment->status === AppointmentStatus::Confirmed, 403, 'Le RDV doit être confirmé avant de créer un devis.');
         abort_if($appointment->quote()->exists(), 403, 'Un devis existe déjà pour ce RDV.');
 
-        $quote = $this->quoteService->createDraft($appointment, $request->array('lines'));
+        $quote = $this->quoteService->createDraft($appointment->garage, $appointment->user, $appointment, $request->array('lines'));
 
         return $this->success(new QuoteResource($quote->load('versions.lines')), 'Devis créé en brouillon.', 201);
     }
 
-    public function show(Request $request, Appointment $appointment): JsonResponse
+    /**
+     * Liste de tous les devis du garage, avec ou sans RDV associé
+     * (CLAUDE.md §5, ajout v0.9).
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $quotes = $this->authenticatedGarage($request)->quotes()
+            ->with(['user', 'appointment', 'versions.lines'])
+            ->latest()
+            ->paginate();
+
+        return $this->success(QuoteResource::collection($quotes));
+    }
+
+    public function show(Request $request, Quote $quote): JsonResponse
+    {
+        $this->authorizeQuote($request, $quote);
+
+        return $this->success(new QuoteResource($quote->load('versions.lines', 'user', 'appointment')));
+    }
+
+    public function showForAppointment(Request $request, Appointment $appointment): JsonResponse
     {
         $this->authorizeAppointment($request, $appointment);
         $quote = $appointment->quote()->with('versions.lines')->firstOrFail();

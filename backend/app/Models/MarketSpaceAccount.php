@@ -43,4 +43,15 @@ class MarketSpaceAccount extends Model
     {
         return $this->user->isValidatedProfessional();
     }
+
+    /**
+     * Commandes de ce Market Space, stock totalement distinct de celui d'un
+     * garage (CLAUDE.md §5, ajout v0.9).
+     *
+     * @return MorphMany<Order, $this>
+     */
+    public function orders(): MorphMany
+    {
+        return $this->morphMany(Order::class, 'sellable');
+    }
 }

@@ -2,14 +2,15 @@
 
 namespace App\Http\Resources;
 
-use App\Models\Quote;
+use App\Models\Garage;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin Quote
+ * @mixin Order
  */
-class QuoteResource extends JsonResource
+class OrderResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -18,14 +19,14 @@ class QuoteResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'garage_id' => $this->garage_id,
+            'sellable_type' => $this->sellable_type === Garage::class ? 'garage' : 'market_space',
+            'sellable_id' => $this->sellable_id,
             'user_id' => $this->user_id,
-            'appointment_id' => $this->appointment_id,
             'status' => $this->status,
             'paid_at' => $this->paid_at,
-            'garage' => $this->whenLoaded('garage', fn () => new GarageResource($this->garage)),
+            'total' => $this->whenLoaded('lines', fn () => $this->total()),
+            'lines' => OrderLineResource::collection($this->whenLoaded('lines')),
             'client' => $this->whenLoaded('user', fn () => new UserResource($this->user)),
-            'versions' => QuoteVersionResource::collection($this->whenLoaded('versions')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

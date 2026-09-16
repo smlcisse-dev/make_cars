@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\Mobile;
 
-use App\Enums\QuoteStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Resources\QuoteResource;
 use App\Http\Resources\QuoteVersionResource;
@@ -12,6 +11,7 @@ use App\Models\QuoteVersion;
 use App\Services\QuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -26,23 +26,31 @@ class QuoteController extends Controller
 
     private function authorizeQuote(Request $request, Quote $quote): void
     {
-        abort_unless($quote->appointment->user_id === $request->user()->id, 404);
+        abort_unless($quote->user_id === $request->user()->id, 404);
     }
 
     /**
-     * La version courante n'est acceptable/refusable que si elle a bien été
-     * envoyée par le garagiste (jamais un brouillon).
+     * Tous les devis du client, avec ou sans RDV associé (CLAUDE.md §5,
+     * ajout v0.9).
      */
-    private function authorizeCurrentSentVersion(Quote $quote, QuoteVersion $version): void
+    public function index(Request $request): AnonymousResourceCollection
     {
-        abort_unless($version->quote_id === $quote->id, 404);
-        $current = $quote->currentVersion()->first();
-        abort_unless($current && $current->id === $version->id, 403, 'Seule la version la plus récente du devis peut être traitée.');
-        abort_unless($version->sent_at !== null, 403, 'Ce devis n\'a pas encore été envoyé.');
-        abort_unless(in_array($quote->status, [QuoteStatus::Sent, QuoteStatus::Negotiating], strict: true), 403, 'Ce devis n\'est plus en attente d\'une décision.');
+        $quotes = $request->user()->quotes()
+            ->with(['garage', 'appointment', 'versions.lines'])
+            ->latest()
+            ->paginate();
+
+        return QuoteResource::collection($quotes);
     }
 
-    public function show(Request $request, Appointment $appointment): JsonResponse
+    public function show(Request $request, Quote $quote): JsonResponse
+    {
+        $this->authorizeQuote($request, $quote);
+
+        return $this->success(new QuoteResource($quote->load('versions.lines', 'garage', 'appointment')));
+    }
+
+    public function showForAppointment(Request $request, Appointment $appointment): JsonResponse
     {
         $this->authorizeAppointment($request, $appointment);
         $quote = $appointment->quote()->with('versions.lines')->firstOrFail();
@@ -52,12 +60,14 @@ class QuoteController extends Controller
 
     /**
      * Action digitale explicite, jamais déduite du chat (CLAUDE.md §5,
-     * ajout v0.8) : rattachée précisément à la version concernée.
+     * ajout v0.8) : rattachée précisément à la version concernée. Même
+     * garde-fou que la décision par email pour un client "compte express"
+     * (CLAUDE.md §5, ajout v0.9) — mutualisé via QuoteService.
      */
     public function accept(Request $request, Quote $quote, QuoteVersion $version): JsonResponse
     {
         $this->authorizeQuote($request, $quote);
-        $this->authorizeCurrentSentVersion($quote, $version);
+        $this->quoteService->assertVersionIsDecidable($quote, $version);
 
         $version = $this->quoteService->accept($version, $request->user());
 
@@ -67,7 +77,7 @@ class QuoteController extends Controller
     public function reject(Request $request, Quote $quote, QuoteVersion $version): JsonResponse
     {
         $this->authorizeQuote($request, $quote);
-        $this->authorizeCurrentSentVersion($quote, $version);
+        $this->quoteService->assertVersionIsDecidable($quote, $version);
 
         $version = $this->quoteService->reject($version, $request->user());
 

@@ -79,11 +79,32 @@ class Garage extends Model
     }
 
     /**
+     * Devis du garage, avec ou sans RDV associé (CLAUDE.md §5, ajout v0.9).
+     *
+     * @return HasMany<Quote, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Quote::class);
+    }
+
+    /**
      * @return HasMany<Conversation, $this>
      */
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    /**
+     * Commandes isolées de la mini-boutique, sans prestation associée
+     * (CLAUDE.md §5, ajout v0.9).
+     *
+     * @return MorphMany<Order, $this>
+     */
+    public function orders(): MorphMany
+    {
+        return $this->morphMany(Order::class, 'sellable');
     }
 
     /**

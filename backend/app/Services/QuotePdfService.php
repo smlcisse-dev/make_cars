@@ -25,16 +25,15 @@ class QuotePdfService
      */
     public function generate(QuoteVersion $quoteVersion): QuoteVersion
     {
-        $quote = $quoteVersion->quote()->with('appointment.garage', 'appointment.user')->first();
-        $appointment = $quote->appointment;
+        $quote = $quoteVersion->quote()->with('garage', 'user')->first();
         $lines = $quoteVersion->lines()->get();
         $total = $lines->sum(fn ($line) => (float) $line->line_total);
 
         $pdf = Pdf::loadView('pdf.quote', [
             'quote' => $quote,
             'quoteVersion' => $quoteVersion,
-            'garage' => $appointment->garage,
-            'client' => $appointment->user,
+            'garage' => $quote->garage,
+            'client' => $quote->user,
             'lines' => $lines,
             'total' => $total,
             'documentLabel' => $quoteVersion->document_type->value === 'invoice' ? 'Facture' : 'Devis',

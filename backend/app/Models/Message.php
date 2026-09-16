@@ -11,16 +11,19 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Message texte et/ou image d'une conversation, ou message système posté
- * automatiquement lors de la génération d'un devis/facture (CLAUDE.md §5,
- * ajout v0.8) — `sender_id` null identifie un message système.
+ * automatiquement lors de la génération d'un devis/facture ou d'une commande
+ * (CLAUDE.md §5, ajouts v0.8 et v0.9) — `sender_id` null identifie un
+ * message système.
  */
-#[Fillable(['conversation_id', 'sender_id', 'body', 'image_disk', 'image_path', 'attachment_type', 'quote_version_id'])]
+#[Fillable(['conversation_id', 'sender_id', 'body', 'image_disk', 'image_path', 'attachment_type', 'quote_version_id', 'order_id'])]
 class Message extends Model
 {
     /** @use HasFactory<MessageFactory> */
     use HasFactory;
 
     public const ATTACHMENT_QUOTE_PDF = 'quote_pdf';
+
+    public const ATTACHMENT_ORDER_PDF = 'order_pdf';
 
     /**
      * @return BelongsTo<Conversation, $this>
@@ -44,6 +47,14 @@ class Message extends Model
     public function quoteVersion(): BelongsTo
     {
         return $this->belongsTo(QuoteVersion::class);
+    }
+
+    /**
+     * @return BelongsTo<Order, $this>
+     */
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function isSystemMessage(): bool

@@ -4,7 +4,9 @@ namespace Database\Factories;
 
 use App\Enums\QuoteStatus;
 use App\Models\Appointment;
+use App\Models\Garage;
 use App\Models\Quote;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,15 +22,37 @@ class QuoteFactory extends Factory
     public function definition(): array
     {
         return [
-            'appointment_id' => Appointment::factory()->confirmed(),
+            'garage_id' => Garage::factory(),
+            'user_id' => User::factory(),
+            'appointment_id' => null,
             'status' => QuoteStatus::Draft,
         ];
     }
 
+    /**
+     * Devis rattaché à un RDV, pour la traçabilité (CLAUDE.md §5, ajout
+     * v0.9) : garage/client sont dérivés du RDV pour rester cohérents.
+     */
     public function forAppointment(Appointment $appointment): static
     {
         return $this->state(fn (array $attributes) => [
+            'garage_id' => $appointment->garage_id,
+            'user_id' => $appointment->user_id,
             'appointment_id' => $appointment->id,
+        ]);
+    }
+
+    public function forGarage(Garage $garage): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'garage_id' => $garage->id,
+        ]);
+    }
+
+    public function forClient(User $client): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'user_id' => $client->id,
         ]);
     }
 

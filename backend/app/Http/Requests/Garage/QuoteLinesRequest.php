@@ -12,6 +12,8 @@ use Illuminate\Validation\Rule;
  * renégociation — même forme dans les trois cas). Le prix des lignes
  * service/produit n'est jamais accepté depuis le client : il est relu
  * depuis le catalogue du garage au moment de la résolution (QuoteService).
+ * `client_id` n'est utilisé que par la création directe (sans RDV) — ignoré
+ * par la création scopée à un RDV, où le client est déduit de celui-ci.
  */
 class QuoteLinesRequest extends FormRequest
 {
@@ -29,6 +31,7 @@ class QuoteLinesRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_id' => ['nullable', 'integer', 'exists:users,id'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.type' => ['required', Rule::enum(QuoteLineType::class)],
             'lines.*.repair_service_id' => ['required_if:lines.*.type,service', 'integer'],

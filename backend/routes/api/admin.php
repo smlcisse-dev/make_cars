@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AppointmentController;
 use App\Http\Controllers\Api\Admin\ConversationController;
 use App\Http\Controllers\Api\Admin\GarageController;
+use App\Http\Controllers\Api\Admin\OrderController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\QuoteController;
 use App\Http\Controllers\Api\Admin\RegistrationController;
@@ -37,6 +38,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     Route::get('quotes', [QuoteController::class, 'index']);
     Route::get('quotes/{quote}', [QuoteController::class, 'show']);
+
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
 
     Route::get('conversations', [ConversationController::class, 'index']);
     Route::get('conversations/{conversation}', [ConversationController::class, 'show']);
