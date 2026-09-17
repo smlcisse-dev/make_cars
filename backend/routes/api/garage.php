@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Garage\OrderController;
 use App\Http\Controllers\Api\Garage\ProductController;
 use App\Http\Controllers\Api\Garage\ProfileController;
 use App\Http\Controllers\Api\Garage\QuoteController;
+use App\Http\Controllers\Api\Garage\ReviewController;
 use App\Http\Controllers\Api\Garage\ServiceController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,4 +62,6 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
     Route::post('conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
     Route::get('conversations/{conversation}/messages/{message}/image', [ConversationController::class, 'downloadImage']);
+
+    Route::get('reviews', [ReviewController::class, 'index']);
 });

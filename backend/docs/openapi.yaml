@@ -1064,6 +1064,66 @@ paths:
         '200':
           description: OK
 
+  /admin/reviews:
+    get:
+      summary: >
+        Liste tous les avis, tous statuts confondus (y compris masqués) —
+        supervision en lecture seule (CLAUDE.md §5 règle 8, ajout v0.10).
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [visible, hidden]}
+        - name: reviewable_type
+          in: query
+          schema: {type: string, enum: [garage, market_space]}
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /admin/reviews/{review}:
+    get:
+      summary: Détail d'un avis (supervision admin).
+      tags: [Admin]
+      parameters:
+        - name: review
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+
+  /admin/reviews/{review}/moderate:
+    post:
+      summary: >
+        Masque un avis abusif/diffamatoire — motif obligatoire, comme pour un
+        rejet/une suspension de compte. Masquage logique tracé (motif,
+        auteur, date), jamais une suppression SQL, pour garder la preuve de
+        la modération elle-même (CLAUDE.md §5, ajout v0.10).
+      tags: [Admin]
+      parameters:
+        - name: review
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, maxLength: 1000}
+      responses:
+        '200':
+          description: Avis masqué.
+        '403':
+          description: Cet avis est déjà masqué.
+        '422':
+          description: Motif manquant.
+
   /garage/profile:
     get:
       summary: >
@@ -1860,6 +1920,17 @@ paths:
         '404':
           description: Message sans image, ou conversation appartenant à un autre garage.
 
+  /garage/reviews:
+    get:
+      summary: >
+        Avis reçus par le garage authentifié, en lecture seule — y compris
+        les avis masqués par modération, pour transparence sur son propre
+        historique (CLAUDE.md §5, ajout v0.10).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée.
+
   /market-space/products:
     get:
       summary: Catalogue du compte Market Space authentifié (tous statuts).
@@ -2003,12 +2074,24 @@ paths:
         '404':
           description: Facture pas encore générée, ou commande appartenant à un autre vendeur.
 
+  /market-space/reviews:
+    get:
+      summary: >
+        Avis reçus par le Market Space authentifié, en lecture seule — y
+        compris les avis masqués par modération, pour transparence sur son
+        propre historique (CLAUDE.md §5, ajout v0.10).
+      tags: [MarketSpace]
+      responses:
+        '200':
+          description: Liste paginée.
+
   /mobile/garages:
     get:
       summary: >
-        Liste les garages visibles publiquement (compte validé uniquement).
-        Recherche géographique par proximité : module à part, non couvert ici
-        (voir CLAUDE.md §7).
+        Liste les garages visibles publiquement (compte validé uniquement),
+        avec note moyenne ("average_rating") et nombre d'avis visibles
+        ("reviews_count") — CLAUDE.md §5, ajout v0.10. Recherche géographique
+        par proximité : module à part, non couvert ici (voir CLAUDE.md §7).
       tags: [Mobile]
       security: []
       responses:
@@ -2019,8 +2102,9 @@ paths:
     get:
       summary: >
         Détail public d'un garage, avec sa mini-boutique ("products", produits
-        "approved" uniquement) et ses services ("services", "approved" ET actifs
-        uniquement) — CLAUDE.md §5, ajouts v0.4 et v0.6.
+        "approved" uniquement), ses services ("services", "approved" ET actifs
+        uniquement) et sa note moyenne ("average_rating"/"reviews_count") —
+        CLAUDE.md §5, ajouts v0.4, v0.6 et v0.10.
       tags: [Mobile]
       security: []
       parameters:
@@ -2034,9 +2118,28 @@ paths:
         '404':
           description: Garage inexistant, compte non validé, ou suspendu (CLAUDE.md §5, ajout v0.6).
 
+  /mobile/garages/{garage}/reviews:
+    get:
+      summary: Avis publics d'un garage (les avis masqués par modération n'y apparaissent jamais).
+      tags: [Mobile]
+      security: []
+      parameters:
+        - name: garage
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Liste paginée.
+        '404':
+          description: Garage inexistant ou non visible publiquement.
+
   /mobile/market-space-accounts:
     get:
-      summary: Liste les boutiques Market Space visibles publiquement (compte validé, non suspendu).
+      summary: >
+        Liste les boutiques Market Space visibles publiquement (compte
+        validé, non suspendu), avec note moyenne ("average_rating") et
+        nombre d'avis visibles ("reviews_count") — CLAUDE.md §5, ajout v0.10.
       tags: [Mobile]
       security: []
       responses:
@@ -2045,7 +2148,10 @@ paths:
 
   /mobile/market-space-accounts/{marketSpaceAccount}:
     get:
-      summary: Détail public d'une boutique Market Space, avec son catalogue approuvé.
+      summary: >
+        Détail public d'une boutique Market Space, avec son catalogue
+        approuvé et sa note moyenne ("average_rating"/"reviews_count") —
+        CLAUDE.md §5, ajout v0.10.
       tags: [Mobile]
       security: []
       parameters:
@@ -2058,6 +2164,22 @@ paths:
           description: OK
         '404':
           description: Boutique inexistante, compte non validé, ou suspendu (CLAUDE.md §5, ajout v0.6).
+
+  /mobile/market-space-accounts/{marketSpaceAccount}/reviews:
+    get:
+      summary: Avis publics d'un Market Space (les avis masqués par modération n'y apparaissent jamais).
+      tags: [Mobile]
+      security: []
+      parameters:
+        - name: marketSpaceAccount
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Liste paginée.
+        '404':
+          description: Boutique inexistante ou non visible publiquement.
 
   /mobile/appointments:
     get:
@@ -2407,5 +2529,75 @@ paths:
         '404':
           description: Message sans image, ou conversation appartenant à un autre automobiliste.
 
-# Les endpoints métier suivants (paiements en ligne, avis, notifications...)
-# sont ajoutés ici au fur et à mesure de leur implémentation, module par module.
+  /mobile/reviews:
+    get:
+      summary: Liste les avis laissés par l'automobiliste authentifié, tous garages/boutiques confondus.
+      tags: [Mobile]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /mobile/quotes/{quote}/review:
+    post:
+      summary: >
+        Laisse un avis sur un devis facturé — un seul avis par devis
+        (CLAUDE.md §5, règle 7 et ajout v0.10).
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: {type: integer, minimum: 1, maximum: 5}
+                comment: {type: string, maxLength: 2000, nullable: true}
+      responses:
+        '201':
+          description: Avis publié.
+        '403':
+          description: Devis pas encore facturé.
+        '404':
+          description: Devis appartenant à un autre automobiliste.
+        '422':
+          description: Ce devis a déjà été noté.
+
+  /mobile/orders/{order}/review:
+    post:
+      summary: >
+        Laisse un avis sur une commande payée — un seul avis par commande
+        (CLAUDE.md §5, règle 7 et ajout v0.10).
+      tags: [Mobile]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: {type: integer, minimum: 1, maximum: 5}
+                comment: {type: string, maxLength: 2000, nullable: true}
+      responses:
+        '201':
+          description: Avis publié.
+        '403':
+          description: Commande pas encore payée.
+        '404':
+          description: Commande appartenant à un autre automobiliste.
+        '422':
+          description: Cette commande a déjà été notée.
+
+# Les endpoints métier suivants (paiements en ligne, notifications...) sont
+# ajoutés ici au fur et à mesure de leur implémentation, module par module.

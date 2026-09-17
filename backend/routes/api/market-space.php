@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\MarketSpace\OpeningHoursController;
 use App\Http\Controllers\Api\MarketSpace\OrderController;
 use App\Http\Controllers\Api\MarketSpace\ProductController;
 use App\Http\Controllers\Api\MarketSpace\ProfileController;
+use App\Http\Controllers\Api\MarketSpace\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
@@ -24,4 +25,6 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     Route::get('orders/{order}', [OrderController::class, 'show']);
     Route::post('orders/{order}/mark-paid', [OrderController::class, 'markPaid']);
     Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
+
+    Route::get('reviews', [ReviewController::class, 'index']);
 });

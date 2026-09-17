@@ -25,6 +25,8 @@ class GarageResource extends JsonResource
             'longitude' => $this->longitude,
             'phone' => $this->phone,
             'is_publicly_visible' => $this->isPubliclyVisible(),
+            'average_rating' => $this->average_rating !== null ? round((float) $this->average_rating, 1) : null,
+            'reviews_count' => (int) ($this->reviews_count ?? 0),
             'opening_hours' => GarageOpeningHourResource::collection($this->whenLoaded('openingHours')),
             'images' => GarageImageResource::collection($this->whenLoaded('images')),
             'products' => ProductResource::collection($this->whenLoaded('products')),

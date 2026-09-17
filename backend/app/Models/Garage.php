@@ -115,4 +115,15 @@ class Garage extends Model
     {
         return $this->user->isValidatedProfessional();
     }
+
+    /**
+     * Avis laissés après une prestation facturée (CLAUDE.md §5, règle 7 et
+     * ajout v0.10).
+     *
+     * @return MorphMany<Review, $this>
+     */
+    public function reviews(): MorphMany
+    {
+        return $this->morphMany(Review::class, 'reviewable');
+    }
 }

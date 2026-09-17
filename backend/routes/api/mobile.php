@@ -6,13 +6,16 @@ use App\Http\Controllers\Api\Mobile\GarageController;
 use App\Http\Controllers\Api\Mobile\MarketSpaceController;
 use App\Http\Controllers\Api\Mobile\OrderController;
 use App\Http\Controllers\Api\Mobile\QuoteController;
+use App\Http\Controllers\Api\Mobile\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('garages', [GarageController::class, 'index']);
 Route::get('garages/{garage}', [GarageController::class, 'show']);
+Route::get('garages/{garage}/reviews', [ReviewController::class, 'garageReviews']);
 
 Route::get('market-space-accounts', [MarketSpaceController::class, 'index']);
 Route::get('market-space-accounts/{marketSpaceAccount}', [MarketSpaceController::class, 'show']);
+Route::get('market-space-accounts/{marketSpaceAccount}/reviews', [ReviewController::class, 'marketSpaceReviews']);
 
 Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::get('appointments', [AppointmentController::class, 'index']);
@@ -39,4 +42,8 @@ Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
     Route::post('conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
     Route::get('conversations/{conversation}/messages/{message}/image', [ConversationController::class, 'downloadImage']);
+
+    Route::get('reviews', [ReviewController::class, 'index']);
+    Route::post('quotes/{quote}/review', [ReviewController::class, 'storeForQuote']);
+    Route::post('orders/{order}/review', [ReviewController::class, 'storeForOrder']);
 });

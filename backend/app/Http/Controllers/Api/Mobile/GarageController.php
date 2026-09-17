@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Mobile;
 use App\Enums\ProductStatus;
 use App\Enums\RegistrationStatus;
 use App\Enums\RepairServiceStatus;
+use App\Enums\ReviewStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Resources\GarageResource;
 use App\Models\Garage;
@@ -15,12 +16,16 @@ class GarageController extends Controller
     /**
      * Liste des garages visibles publiquement (compte validé — CLAUDE.md §5
      * règle 4). La recherche géographique par proximité est un module à part
-     * (carte, calcul de distance — cf. CLAUDE.md §7 points ouverts).
+     * (carte, calcul de distance — cf. CLAUDE.md §7 points ouverts). Note
+     * moyenne calculée via withAvg pour éviter le N+1 sur une liste (CLAUDE.md
+     * §5, ajout v0.10) — utile au client pour choisir un garage.
      */
     public function index(): AnonymousResourceCollection
     {
         $garages = Garage::query()
             ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
+            ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
+            ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['openingHours', 'images'])
             ->paginate();
 
@@ -35,6 +40,8 @@ class GarageController extends Controller
     {
         abort_unless($garage->isPubliclyVisible(), 404);
 
+        $garage->loadAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating');
+        $garage->loadCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)]);
         $garage->load([
             'openingHours',
             'images',

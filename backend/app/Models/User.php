@@ -112,4 +112,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(Quote::class);
     }
+
+    /**
+     * Avis laissés par cet automobiliste, uniquement après une transaction
+     * terminée (CLAUDE.md §5, règle 7 et ajout v0.10).
+     *
+     * @return HasMany<Review, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
 }

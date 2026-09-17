@@ -177,6 +177,19 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 - Le garagiste peut aussi télécharger le PDF du devis/de la facture directement depuis son dashboard pour le remettre en main propre, en complément de l'email.
 - **Point ouvert (§7)** : le mécanisme permettant à un client de « réclamer » plus tard son compte express (téléchargement de l'app, définition d'un mot de passe, finalisation de l'inscription) n'est pas construit — seul le champ `is_express` existe pour l'anticiper.
 
+### Module Avis/Notation (ajout v0.10, 2026-09-17)
+
+Instaure le climat de confiance visé par le projet (§1) : un avis n'est possible qu'après une prestation ou un achat réellement conclu, jamais avant, pour que la note reflète une expérience vécue plutôt qu'une opinion a priori.
+
+- **Éligibilité stricte** (règle 7) : un automobiliste ne peut laisser un avis que sur un devis **facturé** (`Quote.status = invoiced`) ou une commande **payée** (`Order.status = paid`) dont il est le client — jamais sur un devis/une commande en cours, refusé, abandonné ou appartenant à quelqu'un d'autre.
+- **Un seul avis par transaction terminée** : contrainte unique en base sur la transaction (le devis ou la commande) — un même devis facturé ou une même commande payée ne peut recevoir qu'un avis. Un même client peut en revanche laisser plusieurs avis distincts pour plusieurs transactions différentes avec le même garage/boutique, chacune reflétant une expérience différente.
+- **Cible de l'avis** : dérivée automatiquement de la transaction, jamais transmise par le client — le garage pour un devis (`Quote.garage`), le vendeur (Garage ou Market Space) pour une commande (`Order.sellable`, relation polymorphe déjà mutualisée entre les deux — voir « Mini-boutique Garage vs Market Space »).
+- **Composition** : une note obligatoire (1 à 5 étoiles) et un commentaire texte optionnel.
+- **Aucune validation admin préalable** : contrairement aux comptes/services/produits (règle 5), un avis est visible publiquement dès sa création — seule une modération a posteriori peut le retirer de la vue publique.
+- **Note moyenne exposée côté recherche** : chaque Garage/Market Space expose sa note moyenne et son nombre d'avis (calculés sur les seuls avis visibles) dans les listings et fiches consultés par l'app mobile — utile au client pour choisir un garage/boutique en fonction de sa réputation, comme visé par le projet (§1).
+- **Modération admin = masquage logique tracé, jamais une suppression SQL** : l'administrateur peut masquer un avis jugé abusif ou diffamatoire, avec un motif texte obligatoire — même logique que le rejet d'inscription ou la suspension de compte (§5, ajouts existants). Un avis masqué disparaît des listes publiques (mobile) mais reste conservé en base avec la trace de la modération (motif, auteur, date), précisément pour permettre d'auditer cette modération elle-même et éviter un abus de ce pouvoir. Un garage/boutique ne peut jamais masquer ses propres avis négatifs — cette action n'existe que côté Admin.
+- **Lecture seule côté professionnel** : le garage/la boutique concerné consulte l'intégralité de ses avis reçus (y compris ceux déjà masqués, par transparence sur son propre historique) mais ne dispose d'aucun endpoint pour les modifier ou les supprimer.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -196,7 +209,9 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 | Prise de rendez-vous | Oui (lecture) | Gestion agenda | Non concerné | Prise de RDV |
 | Chat avec l'automobiliste | Non | Oui | Oui | Oui |
 | Recherche garage par géoloc. | — | — | — | Oui |
-| Laisser un avis/notation | Non | Non | Non | Oui |
+| Laisser un avis/notation (transaction terminée) | Non | Non | Non | Oui |
+| Consulter ses avis reçus | Oui (lecture) | Oui (lecture seule) | Oui (lecture seule) | Non concerné |
+| Masquer un avis abusif (motif obligatoire) | Oui | Non | Non | Non |
 | Notifications push (statut commande) | — | — | — | Oui |
 
 ## 6. Exigences non fonctionnelles
@@ -234,6 +249,8 @@ Une conversation regroupe **tous** les échanges entre un garage et un automobil
 - **Automobiliste** : utilisateur final de l'app mobile.
 - **Commande** : achat isolé d'une ou plusieurs pièces/produits, sans prestation associée, payé immédiatement (§5, ajout v0.9) — distinct d'un devis, qui implique toujours une prestation de service.
 - **Compte express** : compte automobiliste minimal créé par un garagiste pour un client walk-in sans app (§5, ajout v0.9), pas encore « réclamé » par son propriétaire réel.
+- **Avis** : note (1 à 5) et commentaire optionnel laissés par un automobiliste sur un Garage ou un Market Space, uniquement après un devis facturé ou une commande payée (§5, ajout v0.10) — un seul avis par transaction terminée.
+- **Masquage (modération)** : retrait logique et tracé d'un avis abusif/diffamatoire de la vue publique par l'administrateur, motif obligatoire (§5, ajout v0.10) — jamais une suppression, pour garder la preuve de la modération elle-même.
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 
