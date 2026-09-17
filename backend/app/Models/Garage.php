@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\RegistrationStatus;
+use App\Models\Concerns\HasOpeningHours;
 use Database\Factories\GarageFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Garage extends Model
 {
     /** @use HasFactory<GarageFactory> */
-    use HasFactory;
+    use HasFactory, HasOpeningHours;
 
     /**
      * @return array<string, string>
@@ -114,6 +117,22 @@ class Garage extends Model
     public function isPubliclyVisible(): bool
     {
         return $this->user->isValidatedProfessional();
+    }
+
+    /**
+     * Même filtre qu'isPubliclyVisible(), utilisable directement dans une
+     * requête de liste (recherche géolocalisée notamment — CLAUDE.md §5,
+     * ajout v0.13) sans charger chaque garage un par un.
+     *
+     * @param  Builder<Garage>  $query
+     * @return Builder<Garage>
+     */
+    public function scopePubliclyVisible(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'user.professionalRegistration',
+            fn ($q) => $q->where('status', RegistrationStatus::Approved)->whereNull('suspended_at')
+        );
     }
 
     /**

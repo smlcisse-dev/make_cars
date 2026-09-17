@@ -2479,8 +2479,9 @@ paths:
       summary: >
         Liste les garages visibles publiquement (compte validé uniquement),
         avec note moyenne ("average_rating") et nombre d'avis visibles
-        ("reviews_count") — CLAUDE.md §5, ajout v0.10. Recherche géographique
-        par proximité : module à part, non couvert ici (voir CLAUDE.md §7).
+        ("reviews_count") — CLAUDE.md §5, ajout v0.10. Pas de tri par
+        proximité ici : voir /mobile/search/nearby pour la recherche
+        géolocalisée (CLAUDE.md §5, ajout v0.13).
       tags: [Mobile]
       security: []
       responses:
@@ -2569,6 +2570,58 @@ paths:
           description: Liste paginée.
         '404':
           description: Boutique inexistante ou non visible publiquement.
+
+  /mobile/search/nearby:
+    get:
+      summary: >
+        Recherche par proximité géographique (CLAUDE.md §5, ajout v0.13) :
+        garages et Market Space approuvés (et non suspendus) triés du plus
+        proche au plus loin, à partir de la position actuelle transmise par
+        l'automobiliste. Indépendante de tout fournisseur de cartographie
+        externe — uniquement un calcul de distance (formule de Haversine),
+        l'affichage sur une carte est un sujet frontend séparé. Publique,
+        comme les autres listes de découverte : utile même sans session
+        (panne, avant inscription).
+      tags: [Mobile]
+      security: []
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema: {type: number, format: float, minimum: -90, maximum: 90}
+        - name: longitude
+          in: query
+          required: true
+          schema: {type: number, format: float, minimum: -180, maximum: 180}
+        - name: radius_km
+          in: query
+          required: false
+          description: >
+            Rayon maximum en kilomètres. Par défaut GEO_DEFAULT_SEARCH_RADIUS_KM
+            (15 km), plafonné à GEO_MAX_SEARCH_RADIUS_KM (100 km) même si une
+            valeur plus grande est demandée.
+          schema: {type: number, format: float, minimum: 0.1}
+        - name: type
+          in: query
+          required: false
+          schema: {type: string, enum: [garage, market_space, both], default: both}
+        - name: page
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1}
+      responses:
+        '200':
+          description: >
+            Liste paginée triée par distance croissante. Chaque résultat
+            porte : type ("garage"/"market_space"), id, name, address (adresse
+            telle qu'enregistrée au profil, pas de format structuré court
+            distinct), photo_url (première image du profil, nullable),
+            distance_km, average_rating/reviews_count (avis visibles
+            uniquement — CLAUDE.md §5, ajout v0.10), et is_open_now (booléen,
+            ou null si le professionnel n'a pas encore renseigné ses horaires
+            pour le jour courant).
+        '422':
+          description: Position manquante ou hors bornes, rayon invalide, ou type inconnu.
 
   /mobile/appointments:
     get:

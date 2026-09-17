@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Mobile;
 
 use App\Enums\ProductStatus;
-use App\Enums\RegistrationStatus;
 use App\Enums\ReviewStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Resources\MarketSpaceAccountResource;
@@ -21,7 +20,7 @@ class MarketSpaceController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $accounts = MarketSpaceAccount::query()
-            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
+            ->publiclyVisible()
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['openingHours', 'images', 'products' => fn ($query) => $query->where('status', ProductStatus::Approved)])

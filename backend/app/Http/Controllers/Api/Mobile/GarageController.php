@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Mobile;
 
 use App\Enums\ProductStatus;
-use App\Enums\RegistrationStatus;
 use App\Enums\RepairServiceStatus;
 use App\Enums\ReviewStatus;
 use App\Http\Controllers\Api\Controller;
@@ -23,7 +22,7 @@ class GarageController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $garages = Garage::query()
-            ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
+            ->publiclyVisible()
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['openingHours', 'images'])

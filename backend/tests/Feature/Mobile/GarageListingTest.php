@@ -54,6 +54,19 @@ class GarageListingTest extends TestCase
         $response->assertOk()->assertJsonPath('data.id', $garage->id);
     }
 
+    /**
+     * Numéro de contact exposé pour permettre à l'automobiliste d'appeler
+     * directement en cas de panne (CLAUDE.md §5, ajout v0.13).
+     */
+    public function test_the_garage_profile_exposes_a_contact_phone_number(): void
+    {
+        $garage = $this->approvedGarage();
+
+        $this->getJson("/api/mobile/garages/{$garage->id}")
+            ->assertOk()
+            ->assertJsonPath('data.phone', $garage->phone);
+    }
+
     public function test_only_approved_mini_boutique_products_appear_on_the_garage_profile(): void
     {
         $garage = $this->approvedGarage();

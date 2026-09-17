@@ -44,6 +44,19 @@ class MarketSpaceListingTest extends TestCase
         $this->getJson("/api/mobile/market-space-accounts/{$account->id}")->assertNotFound();
     }
 
+    /**
+     * Numéro de contact exposé pour permettre à l'automobiliste d'appeler
+     * directement (CLAUDE.md §5, ajout v0.13).
+     */
+    public function test_the_market_space_profile_exposes_a_contact_phone_number(): void
+    {
+        $account = $this->approvedAccount();
+
+        $this->getJson("/api/mobile/market-space-accounts/{$account->id}")
+            ->assertOk()
+            ->assertJsonPath('data.phone', $account->phone);
+    }
+
     public function test_only_approved_products_appear_in_a_market_space_accounts_public_catalog(): void
     {
         $account = $this->approvedAccount();
