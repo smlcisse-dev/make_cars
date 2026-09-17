@@ -252,6 +252,16 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 e
 - **Résultat enrichi** : chaque résultat de vendeur porte désormais `matched_products` (tableau d'objets `id`/`name`/`price`) — les produits approuvés de ce vendeur qui correspondent à `product_name`, pour que le client voie directement ce qu'il cherche sans ouvrir chaque fiche. Toujours vide (`[]`) hors de ce filtre, jamais `null`, pour une forme de réponse stable.
 - **Combinable avec tous les autres critères** : `product_name` + `name` + position/rayon + tri fonctionnent ensemble sur la même requête, chaque filtre s'appliquant indépendamment.
 
+### Extension recherche : tranche de prix sur les produits (ajout v0.16, 2026-09-17)
+
+Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 à v0.15), sans nouvel endpoint : `min_price`/`max_price` restreignent aux vendeurs ayant au moins un produit approuvé dont le prix tombe dans la tranche demandée.
+
+- **`min_price` et `max_price` indépendants et combinables** : chacun peut être fourni seul (tranche ouverte d'un côté) ou ensemble (tranche fermée). `max_price` doit être supérieur ou égal à `min_price` quand les deux sont fournis (422 sinon).
+- **Filtré en SQL, contrairement au nom** : le prix est une comparaison numérique exacte (`Product.price >= min_price` / `<= max_price`), sans les problèmes de portabilité qui justifient de faire la comparaison de nom en PHP (§5, ajout v0.14) — `GeoSearchService::productsQuery()` applique ces bornes au chargement de la relation `products`, en plus du statut `approved`.
+- **Concerne les deux types de vendeurs, comme le nom de produit** : même mutualisation Garage/Market Space que `product_name` (§5, ajout v0.15) — ce filtre n'exclut jamais l'un ou l'autre, à la différence du filtre service.
+- **Combinable avec `product_name`** : quand les deux sont fournis, un produit doit satisfaire le nom **et** la tranche de prix pour compter comme correspondance — `matched_products` ne reprend alors que les produits qui remplissent les deux conditions à la fois.
+- **Seuls les produits approuvés comptent**, comme pour `product_name` (règle 5) — un produit `pending`/`rejected` dans la tranche ne fait jamais correspondre son vendeur.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -270,7 +280,7 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 e
 | Paiement en ligne | — | Réception | Réception | Émission |
 | Prise de rendez-vous | Oui (lecture) | Gestion agenda | Non concerné | Prise de RDV |
 | Chat avec l'automobiliste | Non | Oui | Oui | Oui |
-| Recherche (proximité, nom, service proposé, nom de produit, tri — garage et/ou Market Space) | — | — | — | Oui |
+| Recherche (proximité, nom, service proposé, nom de produit, tranche de prix, tri — garage et/ou Market Space) | — | — | — | Oui |
 | Laisser un avis/notation (transaction terminée) | Non | Non | Non | Oui |
 | Consulter ses avis reçus | Oui (lecture) | Oui (lecture seule) | Oui (lecture seule) | Non concerné |
 | Masquer un avis abusif (motif obligatoire) | Oui | Non | Non | Non |
@@ -323,7 +333,7 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 e
 - **Masquage (modération)** : retrait logique et tracé d'un avis abusif/diffamatoire de la vue publique par l'administrateur, motif obligatoire (§5, ajout v0.10) — jamais une suppression, pour garder la preuve de la modération elle-même.
 - **Réclamation (litige)** : contestation formelle d'un automobiliste sur une transaction terminée (devis facturé ou commande payée), instruite et tranchée par l'administrateur avec motif obligatoire (§5, ajout v0.11) — distincte d'un avis (qui note l'expérience sans nécessiter d'instruction) et du chat (qui n'est ni tracé pour l'arbitrage, ni ouvert à l'admin).
 - **Notification push** : événement notifiable enregistré pour un destinataire (RDV, devis, chat, compte pro, réclamation, commande, stock bas, nouveau produit) et diffusé via FCM (§5, ajout v0.12) — simulée (enregistrée, jamais réellement envoyée) tant que FCM n'est pas configuré (§7).
-- **Recherche géolocalisée** : recherche de garages/Market Space triée par distance à vol d'oiseau (formule de Haversine) à partir de la position de l'automobiliste, sans aucun fournisseur de cartographie externe côté backend (§5, ajout v0.13) — distincte de l'affichage visuel sur une carte, un sujet frontend séparé et non encore construit (§7). Étendue par recherche par nom, filtre par service proposé et choix du tri (§5, ajout v0.14), puis par recherche par nom de produit (§5, ajout v0.15) — tous combinables ou utilisables indépendamment de la position.
+- **Recherche géolocalisée** : recherche de garages/Market Space triée par distance à vol d'oiseau (formule de Haversine) à partir de la position de l'automobiliste, sans aucun fournisseur de cartographie externe côté backend (§5, ajout v0.13) — distincte de l'affichage visuel sur une carte, un sujet frontend séparé et non encore construit (§7). Étendue par recherche par nom, filtre par service proposé et choix du tri (§5, ajout v0.14), puis par recherche par nom de produit (§5, ajout v0.15) et par tranche de prix sur les produits (§5, ajout v0.16) — tous combinables ou utilisables indépendamment de la position.
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 

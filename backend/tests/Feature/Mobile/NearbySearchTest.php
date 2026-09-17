@@ -15,7 +15,8 @@ use Tests\TestCase;
 /**
  * Recherche publique de garages/Market Space (pas de session requise — un
  * automobiliste en panne peut ne pas être connecté), CLAUDE.md §5, ajouts
- * v0.13 (proximité), v0.14 (nom, service, tri) et v0.15 (nom de produit).
+ * v0.13 (proximité), v0.14 (nom, service, tri), v0.15 (nom de produit) et
+ * v0.16 (tranche de prix).
  */
 class NearbySearchTest extends TestCase
 {
@@ -358,5 +359,107 @@ class NearbySearchTest extends TestCase
         $this->getJson('/api/mobile/search/nearby?product_name='.str_repeat('a', 256))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('product_name');
+    }
+
+    public function test_price_range_filter_matches_garages_and_market_spaces_with_a_product_in_range(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile', 'price' => 5000]);
+
+        $marketSpace = $this->approvedMarketSpaceAccount();
+        Product::factory()->forMarketSpace($marketSpace)->approved()->create(['name' => 'Filtre', 'price' => 8000]);
+
+        $tooExpensive = $this->approvedGarage();
+        Product::factory()->forGarage($tooExpensive)->approved()->create(['name' => 'Pneu', 'price' => 50000]);
+
+        $this->getJson('/api/mobile/search/nearby?min_price=1000&max_price=10000')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_price_range_filter_can_be_open_ended(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile', 'price' => 5000]);
+
+        $expensiveGarage = $this->approvedGarage();
+        Product::factory()->forGarage($expensiveGarage)->approved()->create(['name' => 'Moteur reconditionné', 'price' => 300000]);
+
+        $this->getJson('/api/mobile/search/nearby?min_price=100000')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $expensiveGarage->id);
+
+        $this->getJson('/api/mobile/search/nearby?max_price=10000')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $garage->id);
+    }
+
+    public function test_price_range_filter_excludes_vendors_without_an_approved_product_in_range(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create(['price' => 50000]);
+
+        $this->getJson('/api/mobile/search/nearby?min_price=1000&max_price=10000')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_price_range_filter_only_considers_approved_products(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->create(['price' => 5000]); // pending
+
+        $this->getJson('/api/mobile/search/nearby?min_price=1000&max_price=10000')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_price_range_filter_response_includes_only_the_matching_products(): void
+    {
+        $garage = $this->approvedGarage();
+        $inRange = Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile', 'price' => 5000]);
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Pneu', 'price' => 50000]); // hors tranche
+
+        $response = $this->getJson('/api/mobile/search/nearby?min_price=1000&max_price=10000');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonCount(1, 'data.0.matched_products')
+            ->assertJsonPath('data.0.matched_products.0.id', $inRange->id);
+    }
+
+    public function test_price_range_filter_combines_with_product_name(): void
+    {
+        $garage = $this->approvedGarage();
+        $matching = Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur', 'price' => 5000]);
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur', 'price' => 50000]); // nom ok, prix hors tranche
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Pneu', 'price' => 5000]); // prix ok, nom hors filtre
+
+        $response = $this->getJson('/api/mobile/search/nearby?product_name=huile&min_price=1000&max_price=10000');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonCount(1, 'data.0.matched_products')
+            ->assertJsonPath('data.0.matched_products.0.id', $matching->id);
+    }
+
+    public function test_max_price_must_be_greater_than_or_equal_to_min_price(): void
+    {
+        $this->getJson('/api/mobile/search/nearby?min_price=10000&max_price=1000')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('max_price');
+    }
+
+    public function test_min_price_and_max_price_must_be_non_negative(): void
+    {
+        $this->getJson('/api/mobile/search/nearby?min_price=-1')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('min_price');
+
+        $this->getJson('/api/mobile/search/nearby?max_price=-1')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('max_price');
     }
 }

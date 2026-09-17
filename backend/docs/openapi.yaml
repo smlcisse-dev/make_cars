@@ -2575,20 +2575,20 @@ paths:
     get:
       summary: >
         Recherche de garages et Market Space approuvés (et non suspendus) —
-        CLAUDE.md §5, ajouts v0.13 (proximité), v0.14 (nom, service, tri) et
-        v0.15 (nom de produit). Tous les critères (position, nom, service,
-        tri, nom de produit) sont optionnels et combinables ; un client peut
-        chercher par nom seul, sans position. Seuls le rayon et le tri par
-        distance exigent une position transmise par l'automobiliste,
-        puisqu'ils n'ont pas de sens sans elle. La proximité est indépendante
-        de tout fournisseur de cartographie externe — uniquement un calcul de
-        distance (formule de Haversine), l'affichage sur une carte est un
-        sujet frontend séparé. Publique, comme les autres listes de
-        découverte : utile même sans session (panne, avant inscription).
-        Pas d'écran "urgence" dédié côté backend : le futur raccourci
-        "urgence" du frontend appellera cette même route avec sort=distance
-        et open_now (une fois ce filtre construit côté frontend) plutôt
-        qu'un nouvel endpoint.
+        CLAUDE.md §5, ajouts v0.13 (proximité), v0.14 (nom, service, tri),
+        v0.15 (nom de produit) et v0.16 (tranche de prix). Tous les critères
+        (position, nom, service, tri, nom de produit, tranche de prix) sont
+        optionnels et combinables ; un client peut chercher par nom seul,
+        sans position. Seuls le rayon et le tri par distance exigent une
+        position transmise par l'automobiliste, puisqu'ils n'ont pas de sens
+        sans elle. La proximité est indépendante de tout fournisseur de
+        cartographie externe — uniquement un calcul de distance (formule de
+        Haversine), l'affichage sur une carte est un sujet frontend séparé.
+        Publique, comme les autres listes de découverte : utile même sans
+        session (panne, avant inscription). Pas d'écran "urgence" dédié côté
+        backend : le futur raccourci "urgence" du frontend appellera cette
+        même route avec sort=distance et open_now (une fois ce filtre
+        construit côté frontend) plutôt qu'un nouvel endpoint.
       tags: [Mobile]
       security: []
       parameters:
@@ -2657,6 +2657,23 @@ paths:
             service_id, ce filtre concerne les deux types de vendeurs et
             n'exclut jamais les Market Space.
           schema: {type: string, maxLength: 255}
+        - name: min_price
+          in: query
+          required: false
+          description: >
+            Restreint aux vendeurs ayant au moins un produit approuvé dont
+            le prix est supérieur ou égal à cette valeur (CLAUDE.md §5,
+            ajout v0.16). Combinable avec max_price (tranche fermée) ou
+            seul (tranche ouverte vers le haut), et avec product_name (les
+            deux conditions s'appliquent alors au même produit).
+          schema: {type: number, format: float, minimum: 0}
+        - name: max_price
+          in: query
+          required: false
+          description: >
+            Symétrique de min_price, vers le haut. Doit être supérieur ou
+            égal à min_price si les deux sont fournis.
+          schema: {type: number, format: float, minimum: 0}
         - name: page
           in: query
           required: false
@@ -2673,14 +2690,16 @@ paths:
             CLAUDE.md §5, ajout v0.10), is_open_now (booléen, ou null si le
             professionnel n'a pas encore renseigné ses horaires pour le jour
             courant), et matched_products (tableau d'objets id/name/price —
-            produits approuvés de ce vendeur correspondant à product_name ;
-            toujours vide hors de ce filtre — CLAUDE.md §5, ajout v0.15).
+            produits approuvés de ce vendeur correspondant à product_name
+            et/ou à la tranche min_price/max_price ; toujours vide hors de
+            ces filtres — CLAUDE.md §5, ajouts v0.15 et v0.16).
         '422':
           description: >
             Position incomplète alors qu'elle est requise (longitude/radius_km/
             sort=distance fourni sans latitude, ou l'inverse), position hors
             bornes, rayon invalide, type/service_category/sort inconnu,
-            service_id inexistant, ou name/product_name trop long.
+            service_id inexistant, name/product_name trop long, min_price/
+            max_price négatif, ou max_price inférieur à min_price.
 
   /mobile/appointments:
     get:

@@ -4,12 +4,13 @@ namespace App\Http\Requests\Mobile;
 
 use App\Enums\ServiceCategory;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Recherche de garages/Market Space (CLAUDE.md §5, ajouts v0.13, v0.14 et
- * v0.15) : position, nom, service, tri et nom de produit sont tous
+ * Recherche de garages/Market Space (CLAUDE.md §5, ajouts v0.13 à v0.16) :
+ * position, nom, service, tri, nom de produit et tranche de prix sont tous
  * optionnels et combinables — seuls le rayon et le tri par distance
  * exigent une position, puisqu'ils n'ont pas de sens sans elle.
  */
@@ -35,6 +36,24 @@ class NearbySearchRequest extends FormRequest
             'service_id' => ['nullable', 'integer', 'exists:repair_services,id'],
             'sort' => ['nullable', Rule::in(['distance', 'rating'])],
             'product_name' => ['nullable', 'string', 'max:255'],
+            'min_price' => ['nullable', 'numeric', 'min:0'],
+            'max_price' => ['nullable', 'numeric', 'min:0'],
         ];
+    }
+
+    /**
+     * `gte:min_price` sur `max_price` ne convient pas ici : cette règle
+     * Laravel échoue dès que le champ comparé (`min_price`) est absent, alors
+     * que `max_price` seul (sans `min_price`) est un cas valide (tranche
+     * ouverte vers le bas — CLAUDE.md §5, ajout v0.16). Comparaison faite
+     * manuellement, seulement quand les deux sont fournis.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->filled('min_price') && $this->filled('max_price') && (float) $this->input('min_price') > (float) $this->input('max_price')) {
+                $validator->errors()->add('max_price', 'Le prix maximum doit être supérieur ou égal au prix minimum.');
+            }
+        });
     }
 }

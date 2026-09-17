@@ -18,8 +18,9 @@ use Tests\TestCase;
  * Recherche de garages/Market Space indépendante de tout fournisseur de
  * cartographie externe — uniquement la formule de Haversine sur les
  * coordonnées déjà stockées pour la proximité (CLAUDE.md §5, ajout v0.13),
- * complétée par un filtre nom/service, un choix de tri (ajout v0.14) et un
- * filtre par nom de produit (ajout v0.15).
+ * complétée par un filtre nom/service, un choix de tri (ajout v0.14), un
+ * filtre par nom de produit (ajout v0.15) et une tranche de prix (ajout
+ * v0.16).
  */
 class GeoSearchServiceTest extends TestCase
 {
@@ -232,6 +233,34 @@ class GeoSearchServiceTest extends TestCase
         $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, productName: 'huile');
 
         $this->assertCount(0, $results);
+    }
+
+    public function test_search_filters_by_price_range_and_can_be_open_ended(): void
+    {
+        $inRange = $this->approvedGarage();
+        Product::factory()->forGarage($inRange)->approved()->create(['price' => 5000]);
+
+        $tooExpensive = $this->approvedGarage();
+        Product::factory()->forGarage($tooExpensive)->approved()->create(['price' => 50000]);
+
+        $bounded = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, minPrice: 1000, maxPrice: 10000);
+        $this->assertSame([$inRange->id], $bounded->pluck('id')->all());
+
+        $openEndedMin = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, minPrice: 40000);
+        $this->assertSame([$tooExpensive->id], $openEndedMin->pluck('id')->all());
+    }
+
+    public function test_search_combines_price_range_with_product_name(): void
+    {
+        $garage = $this->approvedGarage();
+        $matching = Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur', 'price' => 5000]);
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur', 'price' => 50000]);
+
+        $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, productName: 'huile', minPrice: 1000, maxPrice: 10000);
+
+        $this->assertCount(1, $results);
+        $this->assertCount(1, $results->first()->matchedProducts);
+        $this->assertSame($matching->id, $results->first()->matchedProducts[0]->id);
     }
 
     private function reviewFor(Garage $garage, int $rating): void
