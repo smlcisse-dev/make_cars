@@ -32,6 +32,7 @@ class QuoteService
         private readonly ChatService $chatService,
         private readonly ProductService $productService,
         private readonly QuoteEmailDecisionService $emailDecisionService,
+        private readonly PushNotificationService $notificationService,
     ) {}
 
     /**
@@ -89,6 +90,7 @@ class QuoteService
         );
 
         $this->emailDecisionService->notifyIfExpressClient($quote, $version);
+        $this->notificationService->notifyQuoteSent($version);
 
         return $version->fresh();
     }
@@ -207,6 +209,8 @@ class QuoteService
                 }
             }
 
+            $this->notificationService->notifyQuoteAccepted($version);
+
             return $version->fresh();
         });
     }
@@ -220,6 +224,8 @@ class QuoteService
         ]);
 
         $version->quote->update(['status' => QuoteStatus::Rejected]);
+
+        $this->notificationService->notifyQuoteRejected($version);
 
         return $version->fresh();
     }
@@ -272,6 +278,8 @@ class QuoteService
                 $invoiceVersion,
                 'Facture disponible.'
             );
+
+            $this->notificationService->notifyQuoteInvoiced($quote);
 
             return $quote->fresh();
         });

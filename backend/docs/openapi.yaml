@@ -1444,6 +1444,8 @@ paths:
       summary: >
         Corrige la quantité en stock d'un produit — ne touche pas au statut de
         validation admin (correction de quantité, pas remise en cause du produit).
+        Le seuil d'alerte de stock bas voyage aussi ici plutôt que dans la mise
+        à jour de contenu, pour la même raison (CLAUDE.md §5, ajout v0.12).
       tags: [Garage]
       parameters:
         - name: product
@@ -1459,6 +1461,14 @@ paths:
               required: [stock_quantity]
               properties:
                 stock_quantity: {type: integer}
+                low_stock_threshold:
+                  type: integer
+                  nullable: true
+                  description: >
+                    Optionnel, pas de valeur par défaut imposée. Une notification
+                    est envoyée au vendeur quand le stock descend à ce seuil ou
+                    en dessous suite à une vente, une seule fois jusqu'à un
+                    réapprovisionnement au-dessus du seuil (CLAUDE.md §5, ajout v0.12).
       responses:
         '200':
           description: Stock mis à jour.
@@ -2148,6 +2158,50 @@ paths:
         '404':
           description: Photo n'appartenant pas à cette réclamation, ou réclamation concernant un autre garage.
 
+  /garage/notifications:
+    get:
+      summary: Liste les notifications push du compte garagiste authentifié (CLAUDE.md §5, ajout v0.12).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /garage/notifications/{notification}/read:
+    post:
+      summary: Marque une de ses notifications comme lue (idempotent).
+      tags: [Garage]
+      parameters:
+        - name: notification
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Notification marquée comme lue.
+        '404':
+          description: Notification appartenant à un autre compte.
+
+  /garage/device-tokens:
+    put:
+      summary: >
+        Enregistre ou met à jour le jeton FCM de l'appareil courant, à
+        appeler à chaque connexion (CLAUDE.md §5, ajout v0.12). Un même
+        jeton n'appartient jamais qu'à un seul compte à la fois.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+                platform: {type: string, enum: [android, ios, web], nullable: true}
+      responses:
+        '200':
+          description: Jeton enregistré.
+
   /market-space/products:
     get:
       summary: Catalogue du compte Market Space authentifié (tous statuts).
@@ -2215,7 +2269,10 @@ paths:
 
   /market-space/products/{product}/stock:
     put:
-      summary: Corrige la quantité en stock — ne touche pas au statut de validation admin.
+      summary: >
+        Corrige la quantité en stock — ne touche pas au statut de validation
+        admin. Le seuil d'alerte de stock bas voyage aussi ici (CLAUDE.md §5,
+        ajout v0.12).
       tags: [MarketSpace]
       parameters:
         - name: product
@@ -2231,6 +2288,7 @@ paths:
               required: [stock_quantity]
               properties:
                 stock_quantity: {type: integer}
+                low_stock_threshold: {type: integer, nullable: true}
       responses:
         '200':
           description: Stock mis à jour.
@@ -2372,6 +2430,49 @@ paths:
           description: Fichier binaire de l'image.
         '404':
           description: Photo n'appartenant pas à cette réclamation, ou réclamation concernant un autre Market Space.
+
+  /market-space/notifications:
+    get:
+      summary: Liste les notifications push du compte Market Space authentifié (CLAUDE.md §5, ajout v0.12).
+      tags: [MarketSpace]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /market-space/notifications/{notification}/read:
+    post:
+      summary: Marque une de ses notifications comme lue (idempotent).
+      tags: [MarketSpace]
+      parameters:
+        - name: notification
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Notification marquée comme lue.
+        '404':
+          description: Notification appartenant à un autre compte.
+
+  /market-space/device-tokens:
+    put:
+      summary: >
+        Enregistre ou met à jour le jeton FCM de l'appareil courant
+        (CLAUDE.md §5, ajout v0.12).
+      tags: [MarketSpace]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+                platform: {type: string, enum: [android, ios, web], nullable: true}
+      responses:
+        '200':
+          description: Jeton enregistré.
 
   /mobile/garages:
     get:
@@ -2993,5 +3094,50 @@ paths:
         '404':
           description: Photo n'appartenant pas à cette réclamation, ou réclamation appartenant à un autre automobiliste.
 
-# Les endpoints métier suivants (paiements en ligne, notifications push...)
-# sont ajoutés ici au fur et à mesure de leur implémentation, module par module.
+  /mobile/notifications:
+    get:
+      summary: Liste les notifications push de l'automobiliste authentifié (CLAUDE.md §5, ajout v0.12).
+      tags: [Mobile]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /mobile/notifications/{notification}/read:
+    post:
+      summary: Marque une de ses notifications comme lue (idempotent).
+      tags: [Mobile]
+      parameters:
+        - name: notification
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Notification marquée comme lue.
+        '404':
+          description: Notification appartenant à un autre automobiliste.
+
+  /mobile/device-tokens:
+    put:
+      summary: >
+        Enregistre ou met à jour le jeton FCM de l'appareil courant — l'app
+        Flutter l'appelle à chaque connexion (CLAUDE.md §5, ajout v0.12). Un
+        même jeton n'appartient jamais qu'à un seul compte à la fois : une
+        connexion avec un autre compte sur le même appareil le réassigne.
+      tags: [Mobile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+                platform: {type: string, enum: [android, ios, web], nullable: true}
+      responses:
+        '200':
+          description: Jeton enregistré.
+
+# Les endpoints métier suivants (paiements en ligne...) sont ajoutés ici au
+# fur et à mesure de leur implémentation, module par module.

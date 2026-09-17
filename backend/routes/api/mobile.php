@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\Mobile\AppointmentController;
 use App\Http\Controllers\Api\Mobile\ConversationController;
+use App\Http\Controllers\Api\Mobile\DeviceTokenController;
 use App\Http\Controllers\Api\Mobile\DisputeController;
 use App\Http\Controllers\Api\Mobile\GarageController;
 use App\Http\Controllers\Api\Mobile\MarketSpaceController;
+use App\Http\Controllers\Api\Mobile\NotificationController;
 use App\Http\Controllers\Api\Mobile\OrderController;
 use App\Http\Controllers\Api\Mobile\QuoteController;
 use App\Http\Controllers\Api\Mobile\ReviewController;
@@ -53,4 +55,8 @@ Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::post('quotes/{quote}/dispute', [DisputeController::class, 'storeForQuote']);
     Route::post('orders/{order}/dispute', [DisputeController::class, 'storeForOrder']);
     Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::put('device-tokens', [DeviceTokenController::class, 'store']);
 });

@@ -23,6 +23,7 @@ class OrderService
         private readonly OrderPdfService $pdfService,
         private readonly ChatService $chatService,
         private readonly ProductService $productService,
+        private readonly PushNotificationService $notificationService,
     ) {}
 
     /**
@@ -79,6 +80,8 @@ class OrderService
     {
         $order->update(['status' => OrderStatus::Cancelled]);
 
+        $this->notificationService->notifyOrderStatusChanged($order);
+
         return $order;
     }
 
@@ -102,6 +105,8 @@ class OrderService
             if ($order->sellable instanceof Garage) {
                 $this->chatService->postOrderMessage($order->sellable, $order->user, $order, 'Facture disponible pour votre commande.');
             }
+
+            $this->notificationService->notifyOrderStatusChanged($order);
 
             return $order->fresh(['lines', 'sellable']);
         });

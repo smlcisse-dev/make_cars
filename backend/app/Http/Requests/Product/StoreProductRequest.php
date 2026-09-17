@@ -27,6 +27,7 @@ class StoreProductRequest extends FormRequest
             'sku' => ['nullable', 'string', 'max:100'],
             'price' => ['required', 'numeric', 'min:0'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
+            'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

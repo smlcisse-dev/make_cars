@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\Garage\AppointmentController;
 use App\Http\Controllers\Api\Garage\ClientController;
 use App\Http\Controllers\Api\Garage\ConversationController;
+use App\Http\Controllers\Api\Garage\DeviceTokenController;
 use App\Http\Controllers\Api\Garage\DisputeController;
 use App\Http\Controllers\Api\Garage\GarageImageController;
+use App\Http\Controllers\Api\Garage\NotificationController;
 use App\Http\Controllers\Api\Garage\OpeningHoursController;
 use App\Http\Controllers\Api\Garage\OrderController;
 use App\Http\Controllers\Api\Garage\ProductController;
@@ -70,4 +72,8 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
     Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
     Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::put('device-tokens', [DeviceTokenController::class, 'store']);
 });

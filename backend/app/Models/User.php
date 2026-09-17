@@ -134,4 +134,27 @@ class User extends Authenticatable
     {
         return $this->hasMany(Dispute::class);
     }
+
+    /**
+     * Notifications push reçues par ce compte, tous rôles confondus
+     * (CLAUDE.md §5, ajout v0.12). Distinct de notifications() (trait
+     * Notifiable) qui reste inutilisé côté notifications intégrées Laravel.
+     *
+     * @return HasMany<PushNotification, $this>
+     */
+    public function pushNotifications(): HasMany
+    {
+        return $this->hasMany(PushNotification::class);
+    }
+
+    /**
+     * Jetons FCM des appareils de ce compte — un utilisateur peut en avoir
+     * plusieurs (CLAUDE.md §5, ajout v0.12).
+     *
+     * @return HasMany<DeviceToken, $this>
+     */
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
 }

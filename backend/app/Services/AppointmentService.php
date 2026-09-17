@@ -17,12 +17,14 @@ use Carbon\CarbonInterface;
  */
 class AppointmentService
 {
+    public function __construct(private readonly PushNotificationService $notificationService) {}
+
     /**
      * @param  array{description: ?string, requested_at: string}  $data
      */
     public function create(User $automobiliste, Garage $garage, ?RepairService $repairService, array $data): Appointment
     {
-        return Appointment::create([
+        $appointment = Appointment::create([
             'garage_id' => $garage->id,
             'user_id' => $automobiliste->id,
             'repair_service_id' => $repairService?->id,
@@ -30,6 +32,10 @@ class AppointmentService
             'requested_at' => $data['requested_at'],
             'status' => AppointmentStatus::Pending,
         ]);
+
+        $this->notificationService->notifyAppointmentRequested($appointment);
+
+        return $appointment;
     }
 
     /**
@@ -42,6 +48,8 @@ class AppointmentService
             'confirmed_at' => $appointment->requested_at,
         ]);
 
+        $this->notificationService->notifyAppointmentConfirmed($appointment);
+
         return $appointment;
     }
 
@@ -51,6 +59,8 @@ class AppointmentService
             'status' => AppointmentStatus::Rejected,
             'rejection_reason' => $reason,
         ]);
+
+        $this->notificationService->notifyAppointmentRejected($appointment);
 
         return $appointment;
     }
@@ -65,6 +75,8 @@ class AppointmentService
             'status' => AppointmentStatus::Rescheduled,
             'proposed_at' => $proposedAt,
         ]);
+
+        $this->notificationService->notifyAppointmentRescheduled($appointment);
 
         return $appointment;
     }

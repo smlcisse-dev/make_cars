@@ -16,6 +16,8 @@ use App\Models\User;
  */
 class ProductService
 {
+    public function __construct(private readonly PushNotificationService $notificationService) {}
+
     /**
      * @param  array{name: string, description: ?string, sku: ?string, price: float, stock_quantity: int}  $data
      */
@@ -49,10 +51,26 @@ class ProductService
     /**
      * Correction de quantité en stock : ne remet pas en cause la validation
      * admin déjà accordée (ce n'est pas la légitimité du produit qui change).
+     * Le seuil d'alerte voyage avec cet endpoint plutôt qu'avec update() pour
+     * la même raison (CLAUDE.md §5, ajout v0.12). Un réapprovisionnement qui
+     * remonte au-dessus du seuil réarme l'alerte pour la prochaine descente
+     * — la vente reste le seul mécanisme qui peut la déclencher.
+     *
+     * @param  array{low_stock_threshold?: ?int}  $data
      */
-    public function updateStock(Product $product, int $quantity): Product
+    public function updateStock(Product $product, int $quantity, array $data = []): Product
     {
-        $product->update(['stock_quantity' => $quantity]);
+        $updates = ['stock_quantity' => $quantity];
+
+        if (array_key_exists('low_stock_threshold', $data)) {
+            $updates['low_stock_threshold'] = $data['low_stock_threshold'];
+        }
+
+        $product->update($updates);
+
+        if (! $product->isAtOrBelowLowStockThreshold() && $product->low_stock_alert_sent_at !== null) {
+            $product->update(['low_stock_alert_sent_at' => null]);
+        }
 
         return $product;
     }
@@ -62,13 +80,21 @@ class ProductService
      * "un seul mécanisme de décrément de stock") : appelé par le module
      * Devis à l'acceptation d'un devis contenant des lignes de pièces
      * (CLAUDE.md §5, ajout v0.8), que la vente soit isolée ou intégrée à
-     * une prestation.
+     * une prestation. Déclenche l'alerte de stock bas au vendeur, une seule
+     * fois jusqu'à ce que le stock remonte au-dessus du seuil (CLAUDE.md §5,
+     * ajout v0.12).
      */
     public function decrementStock(Product $product, int $quantity): Product
     {
         $product->decrement('stock_quantity', $quantity);
+        $product->refresh();
 
-        return $product->refresh();
+        if ($product->isAtOrBelowLowStockThreshold() && $product->low_stock_alert_sent_at === null) {
+            $product->update(['low_stock_alert_sent_at' => now()]);
+            $this->notificationService->notifyLowStock($product);
+        }
+
+        return $product;
     }
 
     public function delete(Product $product): void
@@ -76,6 +102,11 @@ class ProductService
         $product->delete();
     }
 
+    /**
+     * La notification "nouveau produit" part d'ici (validation admin), pas
+     * de la création : c'est le moment où le produit devient réellement
+     * visible côté app mobile (CLAUDE.md §5, règle 5 et ajout v0.12).
+     */
     public function approve(Product $product, User $admin): Product
     {
         $product->update([
@@ -84,6 +115,8 @@ class ProductService
             'reviewed_by' => $admin->id,
             'reviewed_at' => now(),
         ]);
+
+        $this->notificationService->notifyNewProductToPastClients($product);
 
         return $product;
     }

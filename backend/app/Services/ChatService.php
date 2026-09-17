@@ -17,6 +17,8 @@ use Illuminate\Http\UploadedFile;
  */
 class ChatService
 {
+    public function __construct(private readonly PushNotificationService $notificationService) {}
+
     private function disk(): string
     {
         return config('filesystems.private_media_disk', 'local');
@@ -47,6 +49,8 @@ class ChatService
         }
 
         $conversation->update(['last_message_at' => $message->created_at]);
+
+        $this->notificationService->notifyNewMessage($message);
 
         return $message;
     }

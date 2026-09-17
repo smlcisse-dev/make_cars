@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\MarketSpace\DeviceTokenController;
 use App\Http\Controllers\Api\MarketSpace\DisputeController;
 use App\Http\Controllers\Api\MarketSpace\MarketSpaceImageController;
+use App\Http\Controllers\Api\MarketSpace\NotificationController;
 use App\Http\Controllers\Api\MarketSpace\OpeningHoursController;
 use App\Http\Controllers\Api\MarketSpace\OrderController;
 use App\Http\Controllers\Api\MarketSpace\ProductController;
@@ -33,4 +35,8 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
     Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
     Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::put('device-tokens', [DeviceTokenController::class, 'store']);
 });

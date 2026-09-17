@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * mutualise catalogue/commande/paiement entre les deux cas plutôt que de
  * dupliquer la logique (CLAUDE.md §5, ajout v0.4).
  */
-#[Fillable(['name', 'description', 'sku', 'price', 'stock_quantity', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])]
+#[Fillable(['name', 'description', 'sku', 'price', 'stock_quantity', 'low_stock_threshold', 'low_stock_alert_sent_at', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -30,6 +30,8 @@ class Product extends Model
         return [
             'price' => 'decimal:2',
             'stock_quantity' => 'integer',
+            'low_stock_threshold' => 'integer',
+            'low_stock_alert_sent_at' => 'datetime',
             'status' => ProductStatus::class,
             'reviewed_at' => 'datetime',
         ];
@@ -67,5 +69,14 @@ class Product extends Model
     public function isPubliclyVisible(): bool
     {
         return $this->status === ProductStatus::Approved && $this->sellable->isPubliclyVisible();
+    }
+
+    /**
+     * Aucun seuil configuré par le vendeur = jamais d'alerte automatique
+     * (CLAUDE.md §5, ajout v0.12).
+     */
+    public function isAtOrBelowLowStockThreshold(): bool
+    {
+        return $this->low_stock_threshold !== null && $this->stock_quantity <= $this->low_stock_threshold;
     }
 }

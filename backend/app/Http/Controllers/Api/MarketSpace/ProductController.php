@@ -53,7 +53,7 @@ class ProductController extends Controller
         $account = $this->authenticatedMarketSpaceAccount($request);
         abort_unless($product->sellable_id === $account->id && $product->sellable_type === $account->getMorphClass(), 404);
 
-        $product = $this->productService->updateStock($product, $request->integer('stock_quantity'));
+        $product = $this->productService->updateStock($product, $request->integer('stock_quantity'), $request->validated());
 
         return $this->success(new ProductResource($product), 'Stock mis à jour.');
     }

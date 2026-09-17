@@ -88,6 +88,26 @@ class ProductTest extends TestCase
         ]);
     }
 
+    /**
+     * Le seuil d'alerte de stock bas voyage avec l'endpoint stock, pas avec
+     * la mise à jour de contenu — pas de revalidation admin pour ça
+     * (CLAUDE.md §5, ajout v0.12).
+     */
+    public function test_a_garagiste_can_set_a_low_stock_alert_threshold_via_the_stock_endpoint(): void
+    {
+        $garage = Garage::factory()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create(['stock_quantity' => 5, 'low_stock_threshold' => null]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/products/{$product->id}/stock", [
+            'stock_quantity' => 5,
+            'low_stock_threshold' => 3,
+        ]);
+
+        $response->assertOk()->assertJsonPath('data.low_stock_threshold', 3);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'low_stock_threshold' => 3]);
+    }
+
     public function test_a_garagiste_can_delete_its_own_product(): void
     {
         $garage = Garage::factory()->create();

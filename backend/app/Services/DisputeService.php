@@ -26,6 +26,7 @@ class DisputeService
 {
     public function __construct(
         private readonly ProfessionalRegistrationService $registrationService,
+        private readonly PushNotificationService $notificationService,
     ) {}
 
     private function disk(): string
@@ -80,7 +81,10 @@ class DisputeService
                 $dispute->attachments()->create(['disk' => $disk, 'path' => $path, 'position' => $position]);
             }
 
-            return $dispute->fresh('attachments');
+            $dispute = $dispute->fresh('attachments');
+            $this->notificationService->notifyDisputeSubmitted($dispute);
+
+            return $dispute;
         });
     }
 
@@ -181,12 +185,14 @@ class DisputeService
     }
 
     /**
-     * Seul canal disponible pour notifier l'automobiliste de la décision
-     * finale, en l'absence de notifications push (CLAUDE.md §7) et de chat
-     * Admin↔Automobiliste.
+     * Notifie l'automobiliste de la décision finale par email (seul canal
+     * pour un compte sans app — CLAUDE.md §5, ajout v0.11) et par push
+     * (CLAUDE.md §5, ajout v0.12).
      */
     private function notifyClient(Dispute $dispute): void
     {
+        $this->notificationService->notifyDisputeDecided($dispute);
+
         $client = $dispute->user;
 
         if ($client->email === null) {

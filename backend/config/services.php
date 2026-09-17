@@ -45,4 +45,19 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],
 
+    /*
+     * Notifications push (CLAUDE.md §5, ajout v0.12). Tant que
+     * FCM_SERVER_KEY est absent, PushNotificationService fonctionne en mode
+     * simulation : les notifications sont créées et enregistrées en base,
+     * jamais réellement envoyées, sans erreur bloquante (même approche que
+     * le paiement manuel V1 — CLAUDE.md §7, point ouvert). Clé serveur de
+     * l'API FCM historique (HTTP legacy) — une future migration vers l'API
+     * HTTP v1 (OAuth, clé de compte de service) est un changement de
+     * PushNotificationService::attemptDelivery() uniquement, sans impact sur
+     * le reste du module.
+     */
+    'fcm' => [
+        'server_key' => env('FCM_SERVER_KEY'),
+    ],
+
 ];

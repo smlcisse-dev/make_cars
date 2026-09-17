@@ -15,6 +15,7 @@ class ProfessionalRegistrationService
     public function __construct(
         private readonly GarageService $garageService,
         private readonly MarketSpaceAccountService $marketSpaceAccountService,
+        private readonly PushNotificationService $notificationService,
     ) {}
 
     /**
@@ -90,6 +91,8 @@ class ProfessionalRegistrationService
             $this->marketSpaceAccountService->createFromRegistration($registration);
         }
 
+        $this->notificationService->notifyRegistrationApproved($registration);
+
         return $registration;
     }
 
@@ -101,6 +104,8 @@ class ProfessionalRegistrationService
             'reviewed_by' => $admin->id,
             'reviewed_at' => now(),
         ]);
+
+        $this->notificationService->notifyRegistrationRejected($registration);
 
         return $registration;
     }
@@ -119,6 +124,8 @@ class ProfessionalRegistrationService
             'suspended_at' => now(),
         ]);
 
+        $this->notificationService->notifyAccountSuspended($registration);
+
         return $registration;
     }
 
@@ -129,6 +136,8 @@ class ProfessionalRegistrationService
             'suspended_by' => null,
             'suspended_at' => null,
         ]);
+
+        $this->notificationService->notifyAccountReactivated($registration);
 
         return $registration;
     }

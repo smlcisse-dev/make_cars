@@ -203,8 +203,20 @@ Deuxième mécanisme de confiance après les avis (§5, ajout v0.10) : un canal 
 - **Décision finale motivée et tracée, comme les autres actions de modération** (rejet d'inscription, suspension, masquage d'avis) : `rejected` (classée sans suite, motif obligatoire) ou `resolved_founded` (motif obligatoire **et** action choisie librement par l'admin selon la gravité qu'il évalue — **aucune sanction automatique**). Deux actions possibles pour une réclamation fondée :
   - **`suspension`** : réutilise tel quel le mécanisme de suspension de compte déjà construit (`ProfessionalRegistrationService::suspend`, §5 ajout v0.6) — mêmes garanties (réversible, motif tracé, historique conservé).
   - **`warning`** : avertissement formel sans suspension — le dossier de réclamation lui-même (motif, décision, action) **est** la trace de cet avertissement ; aucune structure séparée n'est nécessaire.
-- **Notification du client** : l'automobiliste suit le statut de ses réclamations depuis l'app (liste + détail) et reçoit un email à la décision finale (fondée ou rejetée) — seul canal disponible pour l'instant en l'absence de notifications push (§7) et d'un chat Admin↔Automobiliste ; silencieusement ignoré si son compte n'a pas d'email (cas rare d'un compte express non encore réclamé, §5 ajout v0.9).
+- **Notification du client** : l'automobiliste suit le statut de ses réclamations depuis l'app (liste + détail) et reçoit un email à la décision finale (fondée ou rejetée) — email silencieusement ignoré si son compte n'a pas d'email (cas rare d'un compte express non encore réclamé, §5 ajout v0.9). Depuis l'ajout v0.12, une notification push accompagne systématiquement cette décision (dépôt de la réclamation compris, côté professionnel) ; en l'absence de configuration FCM elle reste simulée, l'email demeure donc le canal réellement livré en attendant.
 - **Lecture seule côté professionnel, hors réponse** : le garage/la boutique concerné consulte les réclamations le visant et peut répondre dans l'espace d'échange dédié, mais ne dispose d'aucun endpoint de décision — cette action reste exclusivement Admin, comme pour la modération des avis.
+
+### Module Notifications push (ajout v0.12, 2026-09-17)
+
+FCM n'est pas encore configuré (§7, point ouvert) : ce module suit la même logique que le paiement manuel V1 (§5, ajout v0.8/v0.9) — la structure interne est complète et fonctionnelle, l'envoi réel est simulé tant que la configuration manque, sans erreur bloquante.
+
+- **Modèle de notification** (`PushNotification`, table `push_notifications`) : destinataire, type d'événement (catalogue fermé, changement de code pour en ajouter un — même principe que `ServiceCategory`), titre, contenu, données de deep-link, statut, horodatages. Nommé "Push*" et pas "Notification" tout court pour ne jamais entrer en collision avec le système de notifications intégré de Laravel (trait `Notifiable` de `User`, déjà présent mais inutilisé côté notifications base de données) — les deux restent indépendants.
+- **Statut à trois valeurs** : `created` (créée) → `sent` (envoyée) ou `failed` (échouée). Tant que FCM n'est pas configuré, une notification reste `created` indéfiniment — c'est aussi bien le statut initial que le statut "en attente d'envoi réel" : aucune tentative d'envoi n'est faite sans clé FCM, donc jamais d'échec artificiel. Dès qu'une clé est renseignée (`FCM_SERVER_KEY`), l'envoi réel est tenté pour toute nouvelle notification et bascule vers `sent`/`failed` selon le résultat — aucun code à changer ailleurs que la configuration.
+- **Jetons d'appareil** (`DeviceToken`, table `device_tokens`) : un utilisateur peut avoir plusieurs appareils : un jeton donné n'appartient jamais qu'à un seul compte à la fois (unique sur `token` seul) — une connexion avec un autre compte sur le même appareil réassigne le jeton au lieu d'en dupliquer un. Mis à jour à chaque connexion via l'endpoint dédié.
+- **Service centralisé** (`PushNotificationService`) : chaque service métier déjà en place (RDV, devis, chat, inscription pro, réclamation, commande, produit) appelle une méthode `notifyXxx()` dédiée plutôt que de construire lui-même le contenu — même principe de centralisation que `ChatService` pour les messages système. Événements couverts : RDV (nouvelle demande, confirmé, refusé, reprogrammé), devis (envoyé, accepté, refusé, facturé), nouveau message de chat (humain uniquement — un message système de génération de devis/facture est déjà couvert par sa propre notification dédiée, pas de doublon sur le même événement), validation/rejet d'inscription, suspension/réactivation de compte, réclamation (déposée, décidée), changement de statut de commande, stock bas, nouveau produit publié.
+- **Nouveau produit publié = anti-spam volontaire** : ne notifie jamais tous les automobilistes de la plateforme — uniquement ceux ayant déjà au moins une transaction terminée (devis facturé ou commande payée) avec ce garage/cette boutique précis. Déclenché à la validation admin du produit (moment où il devient réellement visible), pas à sa création. Piste d'amélioration future : cibler aussi les clients à proximité géographique une fois la recherche géolocalisée en place (§7).
+- **Alerte de stock bas** : seuil optionnel par produit (`low_stock_threshold`), pas de valeur par défaut imposée — sans seuil configuré, jamais d'alerte automatique. Voyage avec l'endpoint de correction de stock (`PUT .../products/{product}/stock`), pas avec la mise à jour de contenu : ce n'est pas une donnée qui remet en cause la validation admin déjà accordée, même principe que `stock_quantity`. Ne se déclenche qu'à la vente (décrément de stock, mécanisme unique — §5 ajout v0.4), jamais sur une correction manuelle. Une seule alerte jusqu'à ce que le stock remonte strictement au-dessus du seuil (`low_stock_alert_sent_at` réarmé à ce moment-là) puis redescende à nouveau — pas de spam au vendeur à chaque vente supplémentaire sous le seuil.
+- **Endpoints Mobile/Garage/Market Space** (mêmes trois routes dans chaque espace) : liste de ses propres notifications, marquage comme lue (idempotent, appartenance vérifiée), enregistrement/mise à jour du jeton FCM de l'appareil courant.
 
 ### Matrice des droits d'accès (résumé)
 
@@ -231,6 +243,9 @@ Deuxième mécanisme de confiance après les avis (§5, ajout v0.10) : un canal 
 | Déposer une réclamation (transaction terminée) | Non | Non | Non | Oui |
 | Consulter les réclamations la/le concernant, y répondre | Oui (lecture) | Oui (lecture + réponse) | Oui (lecture + réponse) | Suivi de ses réclamations |
 | Décider d'une réclamation (rejeter/fondée + action, motif obligatoire) | Oui | Non | Non | Non |
+| Consulter ses notifications push, marquer comme lue | Non | Oui | Oui | Oui |
+| Enregistrer/mettre à jour le jeton FCM de l'appareil courant | Non | Oui | Oui | Oui |
+| Définir le seuil d'alerte de stock bas sur ses produits | Non | Oui | Oui | Non concerné |
 | Notifications push (statut commande) | — | — | — | Oui |
 
 ## 6. Exigences non fonctionnelles
@@ -256,6 +271,7 @@ Deuxième mécanisme de confiance après les avis (§5, ajout v0.10) : un canal 
 - Périmètre exact du catalogue « mini-boutique » d'un garage (catégories de produits autorisées, limite de nombre éventuelle) et seuil au-delà duquel un garage devrait plutôt ouvrir un compte Market Space à part entière.
 - Mécanisme de « réclamation » d'un compte automobiliste « express » par son propriétaire réel (téléchargement de l'app, définition d'un mot de passe, finalisation de l'inscription) — non construit, voir §5 ajout v0.9.
 - Page de confirmation conviviale pour le lien de décision par email d'un devis (actuellement réponse JSON brute, faute de frontend Vue existant) — à intégrer au futur SPA sans changement backend, voir §5 ajout v0.9.
+- Configuration FCM (`FCM_SERVER_KEY`) en attente : le module Notifications push (§5, ajout v0.12) fonctionne en mode simulation tant qu'elle n'est pas renseignée — voir aussi une future migration vers l'API HTTP v1 de FCM (OAuth, clé de compte de service) à la place de l'API legacy utilisée pour l'instant.
 
 ## 8. Glossaire
 
@@ -271,6 +287,7 @@ Deuxième mécanisme de confiance après les avis (§5, ajout v0.10) : un canal 
 - **Avis** : note (1 à 5) et commentaire optionnel laissés par un automobiliste sur un Garage ou un Market Space, uniquement après un devis facturé ou une commande payée (§5, ajout v0.10) — un seul avis par transaction terminée.
 - **Masquage (modération)** : retrait logique et tracé d'un avis abusif/diffamatoire de la vue publique par l'administrateur, motif obligatoire (§5, ajout v0.10) — jamais une suppression, pour garder la preuve de la modération elle-même.
 - **Réclamation (litige)** : contestation formelle d'un automobiliste sur une transaction terminée (devis facturé ou commande payée), instruite et tranchée par l'administrateur avec motif obligatoire (§5, ajout v0.11) — distincte d'un avis (qui note l'expérience sans nécessiter d'instruction) et du chat (qui n'est ni tracé pour l'arbitrage, ni ouvert à l'admin).
+- **Notification push** : événement notifiable enregistré pour un destinataire (RDV, devis, chat, compte pro, réclamation, commande, stock bas, nouveau produit) et diffusé via FCM (§5, ajout v0.12) — simulée (enregistrée, jamais réellement envoyée) tant que FCM n'est pas configuré (§7).
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 
