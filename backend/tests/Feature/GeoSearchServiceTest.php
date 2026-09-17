@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ServiceCategory;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
+use App\Models\Product;
 use App\Models\ProfessionalRegistration;
 use App\Models\RepairService;
 use App\Models\Review;
@@ -17,7 +18,8 @@ use Tests\TestCase;
  * Recherche de garages/Market Space indépendante de tout fournisseur de
  * cartographie externe — uniquement la formule de Haversine sur les
  * coordonnées déjà stockées pour la proximité (CLAUDE.md §5, ajout v0.13),
- * complétée par un filtre nom/service et un choix de tri (ajout v0.14).
+ * complétée par un filtre nom/service, un choix de tri (ajout v0.14) et un
+ * filtre par nom de produit (ajout v0.15).
  */
 class GeoSearchServiceTest extends TestCase
 {
@@ -196,6 +198,40 @@ class GeoSearchServiceTest extends TestCase
         $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, sort: 'rating');
 
         $this->assertSame([$best->id, $worst->id, $unrated->id], $results->pluck('id')->all());
+    }
+
+    public function test_search_filters_by_product_name_across_garages_and_market_spaces(): void
+    {
+        $garage = $this->approvedGarage();
+        $product = Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur 5W30', 'price' => 12000]);
+
+        $marketSpace = $this->approvedMarketSpaceAccount();
+        Product::factory()->forMarketSpace($marketSpace)->approved()->create(['name' => 'Huile de boîte']);
+
+        $noMatch = $this->approvedGarage();
+        Product::factory()->forGarage($noMatch)->approved()->create(['name' => 'Pneu 4x4']);
+
+        $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, productName: 'huile');
+
+        $this->assertCount(2, $results);
+        $this->assertTrue($results->contains(fn ($result) => $result->type === 'garage' && $result->id === $garage->id));
+        $this->assertTrue($results->contains(fn ($result) => $result->type === 'market_space' && $result->id === $marketSpace->id));
+
+        $garageResult = $results->first(fn ($result) => $result->type === 'garage' && $result->id === $garage->id);
+        $this->assertCount(1, $garageResult->matchedProducts);
+        $this->assertSame($product->id, $garageResult->matchedProducts[0]->id);
+        $this->assertSame('Huile moteur 5W30', $garageResult->matchedProducts[0]->name);
+        $this->assertSame(12000.0, $garageResult->matchedProducts[0]->price);
+    }
+
+    public function test_search_excludes_vendors_without_an_approved_matching_product(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->create(['name' => 'Huile moteur']); // pending
+
+        $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, productName: 'huile');
+
+        $this->assertCount(0, $results);
     }
 
     private function reviewFor(Garage $garage, int $rating): void

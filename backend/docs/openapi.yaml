@@ -2575,19 +2575,20 @@ paths:
     get:
       summary: >
         Recherche de garages et Market Space approuvés (et non suspendus) —
-        CLAUDE.md §5, ajouts v0.13 (proximité) et v0.14 (nom, service, tri).
-        Tous les critères (position, nom, service, tri) sont optionnels et
-        combinables ; un client peut chercher par nom seul, sans position.
-        Seuls le rayon et le tri par distance exigent une position transmise
-        par l'automobiliste, puisqu'ils n'ont pas de sens sans elle. La
-        proximité est indépendante de tout fournisseur de cartographie
-        externe — uniquement un calcul de distance (formule de Haversine),
-        l'affichage sur une carte est un sujet frontend séparé. Publique,
-        comme les autres listes de découverte : utile même sans session
-        (panne, avant inscription). Pas d'écran "urgence" dédié côté backend :
-        le futur raccourci "urgence" du frontend appellera cette même route
-        avec sort=distance et open_now (une fois ce filtre construit côté
-        frontend) plutôt qu'un nouvel endpoint.
+        CLAUDE.md §5, ajouts v0.13 (proximité), v0.14 (nom, service, tri) et
+        v0.15 (nom de produit). Tous les critères (position, nom, service,
+        tri, nom de produit) sont optionnels et combinables ; un client peut
+        chercher par nom seul, sans position. Seuls le rayon et le tri par
+        distance exigent une position transmise par l'automobiliste,
+        puisqu'ils n'ont pas de sens sans elle. La proximité est indépendante
+        de tout fournisseur de cartographie externe — uniquement un calcul de
+        distance (formule de Haversine), l'affichage sur une carte est un
+        sujet frontend séparé. Publique, comme les autres listes de
+        découverte : utile même sans session (panne, avant inscription).
+        Pas d'écran "urgence" dédié côté backend : le futur raccourci
+        "urgence" du frontend appellera cette même route avec sort=distance
+        et open_now (une fois ce filtre construit côté frontend) plutôt
+        qu'un nouvel endpoint.
       tags: [Mobile]
       security: []
       parameters:
@@ -2619,7 +2620,7 @@ paths:
         - name: name
           in: query
           required: false
-          description: Recherche partielle, insensible à la casse et aux accents, sur le nom.
+          description: Recherche partielle, insensible à la casse et aux accents, sur le nom du vendeur (garage ou Market Space).
           schema: {type: string, maxLength: 255}
         - name: service_category
           in: query
@@ -2644,6 +2645,18 @@ paths:
             Par défaut "distance" si une position est fournie, sinon
             "rating".
           schema: {type: string, enum: [distance, rating]}
+        - name: product_name
+          in: query
+          required: false
+          description: >
+            Recherche partielle, insensible à la casse et aux accents (même
+            comparaison que "name"), sur le nom des produits du catalogue
+            (mini-boutique Garage ou Market Space — CLAUDE.md §5, ajout
+            v0.15). Restreint aux vendeurs ayant au moins un produit
+            approuvé correspondant ; contrairement à service_category/
+            service_id, ce filtre concerne les deux types de vendeurs et
+            n'exclut jamais les Market Space.
+          schema: {type: string, maxLength: 255}
         - name: page
           in: query
           required: false
@@ -2657,15 +2670,17 @@ paths:
             photo_url (première image du profil, nullable), distance_km
             (nullable — null si aucune position n'a été transmise),
             average_rating/reviews_count (avis visibles uniquement —
-            CLAUDE.md §5, ajout v0.10), et is_open_now (booléen, ou null si le
+            CLAUDE.md §5, ajout v0.10), is_open_now (booléen, ou null si le
             professionnel n'a pas encore renseigné ses horaires pour le jour
-            courant).
+            courant), et matched_products (tableau d'objets id/name/price —
+            produits approuvés de ce vendeur correspondant à product_name ;
+            toujours vide hors de ce filtre — CLAUDE.md §5, ajout v0.15).
         '422':
           description: >
             Position incomplète alors qu'elle est requise (longitude/radius_km/
             sort=distance fourni sans latitude, ou l'inverse), position hors
-            bornes, rayon invalide, type/service_category/sort inconnu, ou
-            service_id inexistant.
+            bornes, rayon invalide, type/service_category/sort inconnu,
+            service_id inexistant, ou name/product_name trop long.
 
   /mobile/appointments:
     get:

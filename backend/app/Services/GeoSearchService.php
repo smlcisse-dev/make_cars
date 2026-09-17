@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\ProductStatus;
 use App\Enums\RepairServiceStatus;
 use App\Enums\ReviewStatus;
 use App\Enums\ServiceCategory;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
+use App\Models\Product;
+use App\Support\MatchedProductResult;
 use App\Support\NearbySearchResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -17,7 +20,8 @@ use Illuminate\Support\Collection;
  * cartographie externe (Google Maps, Mapbox...) — uniquement la formule de
  * Haversine sur les coordonnées déjà stockées pour la proximité (CLAUDE.md
  * §5, ajout v0.13), complétée par une recherche par nom, un filtre par
- * service proposé et un choix de tri (CLAUDE.md §5, ajout v0.14).
+ * service proposé, un choix de tri (CLAUDE.md §5, ajout v0.14) et une
+ * recherche par nom de produit (CLAUDE.md §5, ajout v0.15).
  *
  * Le calcul de distance est fait en PHP plutôt qu'en SQL trigonométrique :
  * portable entre SQLite (tests) et PostgreSQL (production) sans extension
@@ -40,7 +44,10 @@ class GeoSearchService
      * Le filtre service (catégorie ou service précis) ne peut jamais être
      * satisfait par un Market Space (qui ne fait pas de réparation — CLAUDE.md
      * §5, ajout v0.6) : sa présence exclut donc les Market Space du résultat,
-     * quel que soit le `type` demandé.
+     * quel que soit le `type` demandé. Le filtre par nom de produit, lui,
+     * concerne les deux types de vendeurs (mini-boutique Garage et Market
+     * Space partagent la même logique catalogue — CLAUDE.md §5, ajout v0.4)
+     * et n'exclut donc jamais l'un ou l'autre.
      *
      * @param  'garage'|'market_space'|'both'  $type
      * @param  'distance'|'rating'|null  $sort  Par défaut 'distance' si une
@@ -57,6 +64,7 @@ class GeoSearchService
         ?ServiceCategory $serviceCategory = null,
         ?int $serviceId = null,
         ?string $sort = null,
+        ?string $productName = null,
     ): LengthAwarePaginator {
         $hasPosition = $latitude !== null && $longitude !== null;
         $sort ??= $hasPosition ? 'distance' : 'rating';
@@ -69,11 +77,11 @@ class GeoSearchService
         $results = collect();
 
         if ($type !== 'market_space') {
-            $results = $results->merge($this->searchGarages($latitude, $longitude, $name, $serviceCategory, $serviceId));
+            $results = $results->merge($this->searchGarages($latitude, $longitude, $name, $serviceCategory, $serviceId, $productName));
         }
 
         if ($type !== 'garage' && ! $hasServiceFilter) {
-            $results = $results->merge($this->searchMarketSpaces($latitude, $longitude, $name));
+            $results = $results->merge($this->searchMarketSpaces($latitude, $longitude, $name, $productName));
         }
 
         if ($radiusKm !== null) {
@@ -113,7 +121,7 @@ class GeoSearchService
     /**
      * @return Collection<int, NearbySearchResult>
      */
-    private function searchGarages(?float $latitude, ?float $longitude, ?string $name, ?ServiceCategory $serviceCategory, ?int $serviceId): Collection
+    private function searchGarages(?float $latitude, ?float $longitude, ?string $name, ?ServiceCategory $serviceCategory, ?int $serviceId, ?string $productName): Collection
     {
         return Garage::query()
             ->publiclyVisible()
@@ -132,6 +140,7 @@ class GeoSearchService
                     }
                 }
             ))
+            ->when($productName !== null, fn (Builder $query) => $query->with(['products' => fn ($q) => $q->where('status', ProductStatus::Approved)]))
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['images', 'openingHours'])
@@ -149,17 +158,20 @@ class GeoSearchService
                 averageRating: $garage->average_rating !== null ? (float) $garage->average_rating : null,
                 reviewsCount: (int) $garage->reviews_count,
                 isOpenNow: $garage->isOpenNow(),
-            ));
+                matchedProducts: $this->matchedProducts($garage, $productName),
+            ))
+            ->filter(fn (NearbySearchResult $result) => $productName === null || $result->matchedProducts !== []);
     }
 
     /**
      * @return Collection<int, NearbySearchResult>
      */
-    private function searchMarketSpaces(?float $latitude, ?float $longitude, ?string $name): Collection
+    private function searchMarketSpaces(?float $latitude, ?float $longitude, ?string $name, ?string $productName): Collection
     {
         return MarketSpaceAccount::query()
             ->publiclyVisible()
             ->when($latitude !== null && $longitude !== null, fn (Builder $query) => $query->whereNotNull('latitude')->whereNotNull('longitude'))
+            ->when($productName !== null, fn (Builder $query) => $query->with(['products' => fn ($q) => $q->where('status', ProductStatus::Approved)]))
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['images', 'openingHours'])
@@ -177,17 +189,20 @@ class GeoSearchService
                 averageRating: $account->average_rating !== null ? (float) $account->average_rating : null,
                 reviewsCount: (int) $account->reviews_count,
                 isOpenNow: $account->isOpenNow(),
-            ));
+                matchedProducts: $this->matchedProducts($account, $productName),
+            ))
+            ->filter(fn (NearbySearchResult $result) => $productName === null || $result->matchedProducts !== []);
     }
 
     /**
-     * Recherche partielle et insensible à la casse (et aux accents, via
-     * mb_strtolower) sur le nom (CLAUDE.md §5, ajout v0.14). Comparaison
-     * faite en PHP plutôt qu'en SQL (LOWER() ne gère les caractères
-     * accentués correctement ni sous SQLite ni de façon garantie sous
-     * PostgreSQL sans configuration de locale) — même choix de portabilité
-     * que le calcul de distance, à l'échelle actuelle du volume de
-     * professionnels (§6).
+     * Recherche partielle, insensible à la casse et aux accents, sur le nom
+     * (CLAUDE.md §5, ajout v0.14 pour le nom du vendeur, v0.15 pour le nom
+     * de produit — même comparaison réutilisée dans les deux cas).
+     * Comparaison faite en PHP plutôt qu'en SQL (LOWER() ne gère pas les
+     * caractères accentués correctement sous SQLite, et un simple LOWER()
+     * ne fait de toute façon pas de repli sur les accents sous PostgreSQL) —
+     * même choix de portabilité que le calcul de distance, à l'échelle
+     * actuelle du volume de professionnels/produits (§6).
      */
     private function matchesName(string $candidateName, ?string $name): bool
     {
@@ -195,7 +210,43 @@ class GeoSearchService
             return true;
         }
 
-        return mb_stripos($candidateName, $name) !== false;
+        return str_contains($this->normalizeForSearch($candidateName), $this->normalizeForSearch($name));
+    }
+
+    /**
+     * Translittère vers de l'ASCII minuscule (ext-intl, ICU) pour une
+     * comparaison insensible à la casse et aux accents portable entre
+     * environnements — contrairement à `iconv(..., 'ASCII//TRANSLIT', ...)`,
+     * dont le support de la table de translittération varie selon
+     * l'implémentation d'iconv du système (ex. musl/Alpine vs glibc).
+     */
+    private function normalizeForSearch(string $value): string
+    {
+        $normalized = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $value);
+
+        return $normalized !== false ? $normalized : mb_strtolower($value);
+    }
+
+    /**
+     * Produits approuvés du vendeur (Garage ou Market Space) dont le nom
+     * correspond à la recherche par nom de produit (CLAUDE.md §5, ajout
+     * v0.15) — même comparaison insensible casse/accents que matchesName().
+     * Vide si aucun filtre produit n'est demandé, ou si aucun produit ne
+     * correspond.
+     *
+     * @return array<int, MatchedProductResult>
+     */
+    private function matchedProducts(Garage|MarketSpaceAccount $sellable, ?string $productName): array
+    {
+        if ($productName === null) {
+            return [];
+        }
+
+        return $sellable->products
+            ->filter(fn (Product $product) => $this->matchesName($product->name, $productName))
+            ->map(fn (Product $product) => new MatchedProductResult($product->id, $product->name, (float) $product->price))
+            ->values()
+            ->all();
     }
 
     /**

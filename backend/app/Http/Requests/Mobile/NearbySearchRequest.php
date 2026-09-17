@@ -8,10 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Recherche de garages/Market Space (CLAUDE.md §5, ajouts v0.13 et v0.14) :
- * position, nom, service et tri sont tous optionnels et combinables — seuls
- * le rayon et le tri par distance exigent une position, puisqu'ils n'ont pas
- * de sens sans elle.
+ * Recherche de garages/Market Space (CLAUDE.md §5, ajouts v0.13, v0.14 et
+ * v0.15) : position, nom, service, tri et nom de produit sont tous
+ * optionnels et combinables — seuls le rayon et le tri par distance
+ * exigent une position, puisqu'ils n'ont pas de sens sans elle.
  */
 class NearbySearchRequest extends FormRequest
 {
@@ -34,6 +34,7 @@ class NearbySearchRequest extends FormRequest
             'service_category' => ['nullable', Rule::enum(ServiceCategory::class)],
             'service_id' => ['nullable', 'integer', 'exists:repair_services,id'],
             'sort' => ['nullable', Rule::in(['distance', 'rating'])],
+            'product_name' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

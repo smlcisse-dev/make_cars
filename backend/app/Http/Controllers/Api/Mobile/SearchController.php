@@ -16,11 +16,12 @@ class SearchController extends Controller
     /**
      * Garages et Market Space approuvés (et non suspendus), avec recherche
      * par proximité (CLAUDE.md §5, ajout v0.13), par nom, par service
-     * proposé, et tri au choix du client (distance ou note — CLAUDE.md §5,
-     * ajout v0.14). Tous ces critères sont combinables ; seuls le rayon et
-     * le tri par distance exigent une position (validés en amont). Publique
-     * comme les listes garages/market-space-accounts : un automobiliste en
-     * panne n'a pas forcément de session ouverte.
+     * proposé, par tri au choix du client (distance ou note — CLAUDE.md §5,
+     * ajout v0.14) et par nom de produit (les deux types de vendeurs —
+     * CLAUDE.md §5, ajout v0.15). Tous ces critères sont combinables ; seuls
+     * le rayon et le tri par distance exigent une position (validés en
+     * amont). Publique comme les listes garages/market-space-accounts : un
+     * automobiliste en panne n'a pas forcément de session ouverte.
      */
     public function nearby(NearbySearchRequest $request): AnonymousResourceCollection
     {
@@ -34,6 +35,7 @@ class SearchController extends Controller
             serviceCategory: $request->filled('service_category') ? ServiceCategory::from($request->input('service_category')) : null,
             serviceId: $request->filled('service_id') ? $request->integer('service_id') : null,
             sort: $request->filled('sort') ? $request->input('sort') : null,
+            productName: $request->filled('product_name') ? (string) $request->input('product_name') : null,
         );
 
         return NearbySearchResultResource::collection($results);

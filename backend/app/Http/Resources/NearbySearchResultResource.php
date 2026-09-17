@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\MatchedProductResult;
 use App\Support\NearbySearchResult;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -26,6 +27,12 @@ class NearbySearchResultResource extends JsonResource
             'average_rating' => $this->averageRating !== null ? round($this->averageRating, 1) : null,
             'reviews_count' => $this->reviewsCount,
             'is_open_now' => $this->isOpenNow,
+            // Vide hors filtre `product_name` (CLAUDE.md §5, ajout v0.15).
+            'matched_products' => collect($this->matchedProducts)->map(fn (MatchedProductResult $product) => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'price' => $product->price,
+            ])->all(),
         ];
     }
 }

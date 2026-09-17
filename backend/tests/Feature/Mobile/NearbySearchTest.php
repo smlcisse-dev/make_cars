@@ -5,6 +5,7 @@ namespace Tests\Feature\Mobile;
 use App\Enums\ServiceCategory;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
+use App\Models\Product;
 use App\Models\ProfessionalRegistration;
 use App\Models\RepairService;
 use App\Models\Review;
@@ -14,7 +15,7 @@ use Tests\TestCase;
 /**
  * Recherche publique de garages/Market Space (pas de session requise — un
  * automobiliste en panne peut ne pas être connecté), CLAUDE.md §5, ajouts
- * v0.13 (proximité) et v0.14 (nom, service, tri).
+ * v0.13 (proximité), v0.14 (nom, service, tri) et v0.15 (nom de produit).
  */
 class NearbySearchTest extends TestCase
 {
@@ -270,5 +271,92 @@ class NearbySearchTest extends TestCase
 
         $ids = collect($response->json('data'))->pluck('id')->all();
         $this->assertSame([$far->id, $near->id], $ids);
+    }
+
+    public function test_product_name_filter_matches_garages_and_market_spaces_with_a_matching_approved_product(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur Étoile 5W30']);
+
+        $marketSpace = $this->approvedMarketSpaceAccount();
+        Product::factory()->forMarketSpace($marketSpace)->approved()->create(['name' => 'Filtre à huile']);
+
+        $noMatch = $this->approvedGarage();
+        Product::factory()->forGarage($noMatch)->approved()->create(['name' => 'Pneu 4x4']);
+
+        $this->getJson('/api/mobile/search/nearby?product_name=huile')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_product_name_filter_matches_partially_and_ignores_case_and_accents(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile Étoile']);
+
+        $this->getJson('/api/mobile/search/nearby?product_name=ETOILE')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_product_name_filter_excludes_vendors_without_an_approved_matching_product(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->create(['name' => 'Huile moteur']); // pending, pas encore visible
+        Product::factory()->forGarage($garage)->rejected()->create(['name' => 'Huile rejetée']);
+
+        $this->getJson('/api/mobile/search/nearby?product_name=huile')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_product_name_filter_response_includes_the_matching_products(): void
+    {
+        $garage = $this->approvedGarage();
+        $matching = Product::factory()->forGarage($garage)->approved()->create(['name' => 'Huile moteur 5W30', 'price' => 12000]);
+        Product::factory()->forGarage($garage)->approved()->create(['name' => 'Pneu 4x4']); // ne matche pas, ne doit pas apparaître
+
+        $response = $this->getJson('/api/mobile/search/nearby?product_name=huile');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonCount(1, 'data.0.matched_products')
+            ->assertJsonPath('data.0.matched_products.0.id', $matching->id)
+            ->assertJsonPath('data.0.matched_products.0.name', 'Huile moteur 5W30')
+            ->assertJsonPath('data.0.matched_products.0.price', 12000);
+    }
+
+    public function test_product_name_filter_combines_with_the_geographic_and_name_filters(): void
+    {
+        $near = $this->approvedGarage(['name' => 'Garage Rapide', 'latitude' => 0, 'longitude' => 0.01]);
+        Product::factory()->forGarage($near)->approved()->create(['name' => 'Huile moteur']);
+
+        $far = $this->approvedGarage(['name' => 'Garage Rapide', 'latitude' => 0, 'longitude' => 1]);
+        Product::factory()->forGarage($far)->approved()->create(['name' => 'Huile moteur']);
+
+        $wrongName = $this->approvedGarage(['name' => 'Garage Lent', 'latitude' => 0, 'longitude' => 0.01]);
+        Product::factory()->forGarage($wrongName)->approved()->create(['name' => 'Huile moteur']);
+
+        $this->getJson('/api/mobile/search/nearby?latitude=0&longitude=0&radius_km=10&name=Rapide&product_name=huile')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $near->id);
+    }
+
+    public function test_matched_products_is_empty_without_the_product_name_filter(): void
+    {
+        $garage = $this->approvedGarage();
+        Product::factory()->forGarage($garage)->approved()->create();
+
+        $this->getJson('/api/mobile/search/nearby')
+            ->assertOk()
+            ->assertJsonPath('data.0.matched_products', []);
+    }
+
+    public function test_product_name_must_not_exceed_the_maximum_length(): void
+    {
+        $this->getJson('/api/mobile/search/nearby?product_name='.str_repeat('a', 256))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('product_name');
     }
 }
