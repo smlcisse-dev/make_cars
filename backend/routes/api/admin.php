@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AppointmentController;
 use App\Http\Controllers\Api\Admin\ConversationController;
 use App\Http\Controllers\Api\Admin\GarageController;
+use App\Http\Controllers\Api\Admin\MarketSpaceController;
 use App\Http\Controllers\Api\Admin\OrderController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\QuoteController;
@@ -22,6 +23,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     Route::get('garages', [GarageController::class, 'index']);
     Route::get('garages/{garage}', [GarageController::class, 'show']);
+
+    Route::get('market-space-accounts', [MarketSpaceController::class, 'index']);
+    Route::get('market-space-accounts/{marketSpaceAccount}', [MarketSpaceController::class, 'show']);
 
     Route::get('products', [ProductController::class, 'index']);
     Route::get('products/{product}', [ProductController::class, 'show']);

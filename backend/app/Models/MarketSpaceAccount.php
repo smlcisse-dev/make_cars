@@ -7,13 +7,25 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['name', 'description', 'address', 'phone'])]
+#[Fillable(['name', 'description', 'address', 'latitude', 'longitude', 'phone'])]
 class MarketSpaceAccount extends Model
 {
     /** @use HasFactory<MarketSpaceAccountFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>
@@ -21,6 +33,22 @@ class MarketSpaceAccount extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return HasMany<MarketSpaceOpeningHour, $this>
+     */
+    public function openingHours(): HasMany
+    {
+        return $this->hasMany(MarketSpaceOpeningHour::class);
+    }
+
+    /**
+     * @return HasMany<MarketSpaceImage, $this>
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(MarketSpaceImage::class)->orderBy('position');
     }
 
     /**

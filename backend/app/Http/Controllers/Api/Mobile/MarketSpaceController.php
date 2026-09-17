@@ -19,7 +19,7 @@ class MarketSpaceController extends Controller
     {
         $accounts = MarketSpaceAccount::query()
             ->whereHas('user.professionalRegistration', fn ($query) => $query->where('status', RegistrationStatus::Approved)->whereNull('suspended_at'))
-            ->with(['products' => fn ($query) => $query->where('status', ProductStatus::Approved)])
+            ->with(['openingHours', 'images', 'products' => fn ($query) => $query->where('status', ProductStatus::Approved)])
             ->paginate();
 
         return MarketSpaceAccountResource::collection($accounts);
@@ -29,7 +29,11 @@ class MarketSpaceController extends Controller
     {
         abort_unless($marketSpaceAccount->isPubliclyVisible(), 404);
 
-        $marketSpaceAccount->load(['products' => fn ($query) => $query->where('status', ProductStatus::Approved)]);
+        $marketSpaceAccount->load([
+            'openingHours',
+            'images',
+            'products' => fn ($query) => $query->where('status', ProductStatus::Approved),
+        ]);
 
         return new MarketSpaceAccountResource($marketSpaceAccount);
     }

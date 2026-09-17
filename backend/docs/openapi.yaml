@@ -181,15 +181,38 @@ components:
 
     MarketSpaceAccount:
       type: object
+      description: >
+        Même structure de profil que Garage (module Profil Market Space,
+        ajout v0.10).
       properties:
         id: {type: integer}
         name: {type: string}
         description: {type: string, nullable: true}
         address: {type: string}
+        latitude: {type: number, format: float, nullable: true}
+        longitude: {type: number, format: float, nullable: true}
         phone: {type: string, nullable: true}
         is_publicly_visible:
           type: boolean
           description: Reflète la validation admin ET l'absence de suspension du compte Market Space (CLAUDE.md §5 règle 4, ajout v0.6).
+        opening_hours:
+          type: array
+          items:
+            type: object
+            properties:
+              day_of_week: {type: integer, minimum: 1, maximum: 7, description: "ISO-8601 : 1 = lundi ... 7 = dimanche"}
+              day_label: {type: string}
+              is_closed: {type: boolean}
+              opens_at: {type: string, nullable: true, example: "08:00"}
+              closes_at: {type: string, nullable: true, example: "18:00"}
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              url: {type: string}
+              position: {type: integer}
         products:
           type: array
           items: {$ref: '#/components/schemas/Product'}

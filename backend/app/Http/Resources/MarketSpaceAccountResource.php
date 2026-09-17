@@ -21,8 +21,12 @@ class MarketSpaceAccountResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'address' => $this->address,
+            'latitude' => $this->latitude,
+            'longitude' => $this->longitude,
             'phone' => $this->phone,
             'is_publicly_visible' => $this->isPubliclyVisible(),
+            'opening_hours' => MarketSpaceOpeningHourResource::collection($this->whenLoaded('openingHours')),
+            'images' => MarketSpaceImageResource::collection($this->whenLoaded('images')),
             'products' => ProductResource::collection($this->whenLoaded('products')),
         ];
     }
