@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\MarketSpace;
 
+use App\Enums\City;
+use App\Enums\Region;
 use App\Models\MarketSpaceAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,16 +42,23 @@ class ProfileTest extends TestCase
             'name' => 'Pièces Auto Fidjrossè',
             'description' => 'Grand choix de pièces neuves et d\'occasion.',
             'address' => 'Fidjrossè, Cotonou',
+            'city' => City::Cotonou->value,
+            'region' => Region::Littoral->value,
             'latitude' => 6.3703,
             'longitude' => 2.3912,
             'phone' => '+22997000000',
         ]);
 
-        $response->assertOk()->assertJsonPath('data.name', 'Pièces Auto Fidjrossè');
+        $response->assertOk()
+            ->assertJsonPath('data.name', 'Pièces Auto Fidjrossè')
+            ->assertJsonPath('data.city', City::Cotonou->value)
+            ->assertJsonPath('data.region', Region::Littoral->value);
         $this->assertDatabaseHas('market_space_accounts', [
             'id' => $account->id,
             'name' => 'Pièces Auto Fidjrossè',
             'address' => 'Fidjrossè, Cotonou',
+            'city' => City::Cotonou->value,
+            'region' => Region::Littoral->value,
         ]);
     }
 

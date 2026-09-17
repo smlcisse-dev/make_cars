@@ -262,6 +262,27 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 �
 - **Combinable avec `product_name`** : quand les deux sont fournis, un produit doit satisfaire le nom **et** la tranche de prix pour compter comme correspondance — `matched_products` ne reprend alors que les produits qui remplissent les deux conditions à la fois.
 - **Seuls les produits approuvés comptent**, comme pour `product_name` (règle 5) — un produit `pending`/`rejected` dans la tranche ne fait jamais correspondre son vendeur.
 
+### Réclamation de compte express (ajout v0.17, 2026-09-17)
+
+Ferme le point ouvert correspondant (§7) : un client « compte express » (§5, ajout v0.9) peut désormais récupérer son compte lui-même, sans intervention du garagiste.
+
+- **Demande** (`POST /auth/express-claim`, publique) : l'automobiliste renseigne son email. S'il correspond à un compte `is_express = true`, un email est envoyé avec un lien signé (`URL::temporarySignedRoute`, 7 jours) — même mécanisme que la validation de devis par email (§5, ajout v0.9). Ré-appelable à volonté tant que le compte reste « express » (pas de compte trouvé/déjà réclamé → erreur claire, 422).
+- **Une seule URL signée, deux usages** (`GET`/`POST /express-clients/{user}/claim`) : la vérification Laravel d'un lien signé ne porte que sur l'URL (chemin + query), jamais sur la méthode HTTP ni le nom de route. `GET` (le lien cliqué depuis l'email) confirme la validité du lien et renvoie une réponse JSON brute — page de confirmation laissée au futur frontend Vue, même point ouvert que la décision de devis par email (§5, ajout v0.9), sans qu'aucun second lien ne soit nécessaire. `POST`, à la même URL, définit effectivement le mot de passe (`password`/`password_confirmation`) : c'est ce que le futur formulaire Vue appellera en arrière-plan, sans changement côté backend.
+- **Bascule hors « express »** : une fois le mot de passe défini, `is_express` repasse à `false` — le compte redevient un automobiliste standard, utilisable en email/mot de passe ou Google OAuth si l'email correspond (§5, ajout v0.5), sans distinction avec un compte créé classiquement.
+- **Lien déjà utilisé ou compte déjà réclamé** : `409` avec message clair (« Ce compte a déjà été réclamé. Connectez-vous avec votre email et votre mot de passe. »), que ce soit sur `GET` ou `POST` — même famille de garde-fou que `QuoteService::assertVersionIsDecidable` pour une décision de devis déjà tranchée.
+- **Point ouvert restant** (§7, inchangé) : la finalisation de l'inscription (nom/téléphone déjà présents, mot de passe désormais définissable) ne prévoit pas encore de flux additionnel (ex. vérification téléphone) — hors périmètre de cette fermeture, qui couvre strictement « définir un mot de passe ».
+
+### Localisation structurée et statistiques agrégées admin (ajout v0.18, 2026-09-17)
+
+Prépare les données agrégées pour les autorités béninoises visées par le projet (§1).
+
+- **Champs `city`/`region` structurés** sur le profil Garage et le profil Market Space, en complément de l'`address` texte libre déjà existante — jamais en remplacement. Listes fixes (`App\Enums\City`, villes principales du Bénin ; `App\Enums\Region`, les 12 départements), même principe que `ServiceCategory` (§5, ajout v0.6) : un professionnel choisit dans la liste, l'extension à d'autres pays d'Afrique de l'Ouest (§1) se fait par ajout de cas dans l'enum (changement de code), pas par une action d'administration. Les deux champs sont indépendants l'un de l'autre (pas de validation croisée ville↔région en V1) et nullable : renseignés via `PUT /garage/profile` ou `PUT /market-space/profile`, comme les autres champs de profil, jamais imposés à la création du profil (pré-rempli uniquement avec nom/adresse depuis le dossier KYC — §5, ajout v0.6).
+- **Endpoint `GET /admin/statistics`** (`AdminStatisticsService`), période optionnelle (`start_date`/`end_date`, `end_date` ≥ `start_date` sinon 422) filtrant uniquement le volume d'activité — tout le reste (structures, géographie, avis, réclamations) reste un instantané global, sans notion de période. Calcul en SQL/mémoire simple sur l'ensemble des données, même principe de performance-acceptable-en-V1 que `GeoSearchService` (§5, ajout v0.13) : pas d'agrégation matérialisée à ce stade.
+  - **Structures par type et statut** : lu depuis `professional_registrations` (jamais depuis `Garage`/`MarketSpaceAccount`, qui n'existent qu'une fois le dossier approuvé — §5, ajout v0.6), statut dérivé `approved`/`pending`/`suspended`/`rejected` par type de compte (`garagiste`/`market_space`).
+  - **Répartition géographique** par ville et par région, Garage et Market Space confondus (uniquement les structures approuvées, seules à porter ces champs) ; une entrée dédiée regroupe les profils n'ayant pas encore renseigné le champ.
+  - **Volume d'activité sur la période** : nombre de RDV et de devis émis (statut au-delà de `draft`) créés dans la période, nombre de commandes créées dans la période, nombre de factures générées (devis `invoiced` + commandes `paid`, comptés sur leur date de paiement `paid_at`) et montant total facturé (somme des lignes des versions `invoice` des devis facturés + des lignes des commandes payées, dans la période). Sans bornes fournies, totaux depuis le début.
+  - **Avis et réclamations** : nombre d'avis visibles et note moyenne globale de la plateforme (même filtre `visible()` que côté recherche — §5, ajout v0.10) ; nombre total de réclamations et répartition par statut (§5, ajout v0.11).
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -291,6 +312,8 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 �
 | Enregistrer/mettre à jour le jeton FCM de l'appareil courant | Non | Oui | Oui | Oui |
 | Définir le seuil d'alerte de stock bas sur ses produits | Non | Oui | Oui | Non concerné |
 | Notifications push (statut commande) | — | — | — | Oui |
+| Consulter les statistiques agrégées (structures, géographie, activité, avis, réclamations) | Oui | Non | Non | Non |
+| Réclamer un compte express (définir un mot de passe) | Non concerné | Non concerné | Non concerné | Oui (lien email) |
 
 ## 6. Exigences non fonctionnelles
 
@@ -313,8 +336,7 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 �
 - Cadre légal précis de partage des données agrégées avec l'administration béninoise (nature des données, fréquence, base légale RGPD/loi locale).
 - Authentification côté automobiliste par téléphone/SMS (email + Google désormais tranchés, voir §5 ajout v0.5).
 - Périmètre exact du catalogue « mini-boutique » d'un garage (catégories de produits autorisées, limite de nombre éventuelle) et seuil au-delà duquel un garage devrait plutôt ouvrir un compte Market Space à part entière.
-- Mécanisme de « réclamation » d'un compte automobiliste « express » par son propriétaire réel (téléchargement de l'app, définition d'un mot de passe, finalisation de l'inscription) — non construit, voir §5 ajout v0.9.
-- Page de confirmation conviviale pour le lien de décision par email d'un devis (actuellement réponse JSON brute, faute de frontend Vue existant) — à intégrer au futur SPA sans changement backend, voir §5 ajout v0.9.
+- Page de confirmation conviviale pour le lien de décision par email d'un devis, et pour le lien de réclamation d'un compte express (actuellement réponse JSON brute sur les deux, faute de frontend Vue existant) — à intégrer au futur SPA sans changement backend, voir §5 ajouts v0.9 et v0.17.
 - Configuration FCM (`FCM_SERVER_KEY`) en attente : le module Notifications push (§5, ajout v0.12) fonctionne en mode simulation tant qu'elle n'est pas renseignée — voir aussi une future migration vers l'API HTTP v1 de FCM (OAuth, clé de compte de service) à la place de l'API legacy utilisée pour l'instant.
 - Fuseau horaire métier unique (`Africa/Porto-Novo`) codé en configuration globale pour le calcul "ouvert maintenant" (§5, ajout v0.13) — correct tant que la plateforme reste au Bénin, mais à revoir (fuseau par garage/boutique) avant une extension à un pays d'Afrique de l'Ouest à fuseau différent (§1).
 
@@ -328,12 +350,13 @@ Complète encore la même route `GET /mobile/search/nearby` (§5, ajouts v0.13 �
 - **KYC** : vérification d'identité/légitimité d'un professionnel via justificatifs, préalable à la validation du compte.
 - **Automobiliste** : utilisateur final de l'app mobile.
 - **Commande** : achat isolé d'une ou plusieurs pièces/produits, sans prestation associée, payé immédiatement (§5, ajout v0.9) — distinct d'un devis, qui implique toujours une prestation de service.
-- **Compte express** : compte automobiliste minimal créé par un garagiste pour un client walk-in sans app (§5, ajout v0.9), pas encore « réclamé » par son propriétaire réel.
+- **Compte express** : compte automobiliste minimal créé par un garagiste pour un client walk-in sans app (§5, ajout v0.9). Réclamable par son propriétaire réel via un lien signé reçu par email, qui lui permet de définir un mot de passe (`is_express` repasse alors à `false` — §5, ajout v0.17).
 - **Avis** : note (1 à 5) et commentaire optionnel laissés par un automobiliste sur un Garage ou un Market Space, uniquement après un devis facturé ou une commande payée (§5, ajout v0.10) — un seul avis par transaction terminée.
 - **Masquage (modération)** : retrait logique et tracé d'un avis abusif/diffamatoire de la vue publique par l'administrateur, motif obligatoire (§5, ajout v0.10) — jamais une suppression, pour garder la preuve de la modération elle-même.
 - **Réclamation (litige)** : contestation formelle d'un automobiliste sur une transaction terminée (devis facturé ou commande payée), instruite et tranchée par l'administrateur avec motif obligatoire (§5, ajout v0.11) — distincte d'un avis (qui note l'expérience sans nécessiter d'instruction) et du chat (qui n'est ni tracé pour l'arbitrage, ni ouvert à l'admin).
 - **Notification push** : événement notifiable enregistré pour un destinataire (RDV, devis, chat, compte pro, réclamation, commande, stock bas, nouveau produit) et diffusé via FCM (§5, ajout v0.12) — simulée (enregistrée, jamais réellement envoyée) tant que FCM n'est pas configuré (§7).
 - **Recherche géolocalisée** : recherche de garages/Market Space triée par distance à vol d'oiseau (formule de Haversine) à partir de la position de l'automobiliste, sans aucun fournisseur de cartographie externe côté backend (§5, ajout v0.13) — distincte de l'affichage visuel sur une carte, un sujet frontend séparé et non encore construit (§7). Étendue par recherche par nom, filtre par service proposé et choix du tri (§5, ajout v0.14), puis par recherche par nom de produit (§5, ajout v0.15) et par tranche de prix sur les produits (§5, ajout v0.16) — tous combinables ou utilisables indépendamment de la position.
+- **Statistiques agrégées (admin)** : données de supervision globale exposées à l'administrateur (`GET /admin/statistics`) — structures par type/statut, répartition géographique (ville/région), volume d'activité sur une période optionnelle, avis et réclamations — pour appuyer les politiques de régulation/formalisation du secteur auprès des autorités béninoises (§1, ajout v0.18).
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Admin\QuoteController;
 use App\Http\Controllers\Api\Admin\RegistrationController;
 use App\Http\Controllers\Api\Admin\ReviewController;
 use App\Http\Controllers\Api\Admin\ServiceController;
+use App\Http\Controllers\Api\Admin\StatisticsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
@@ -62,4 +63,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('disputes/{dispute}/resolve', [DisputeController::class, 'resolve']);
     Route::post('disputes/{dispute}/close', [DisputeController::class, 'close']);
     Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+
+    /**
+     * Statistiques agrégées pour les autorités béninoises (CLAUDE.md §1,
+     * ajout v0.17) : structures par type/statut, répartition géographique,
+     * volume d'activité sur une période optionnelle, avis et réclamations.
+     */
+    Route::get('statistics', [StatisticsController::class, 'index']);
 });

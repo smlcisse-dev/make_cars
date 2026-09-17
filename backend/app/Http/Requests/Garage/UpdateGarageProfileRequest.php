@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests\Garage;
 
+use App\Enums\City;
+use App\Enums\Region;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateGarageProfileRequest extends FormRequest
 {
@@ -24,6 +27,8 @@ class UpdateGarageProfileRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'address' => ['required', 'string', 'max:255'],
+            'city' => ['nullable', Rule::enum(City::class)],
+            'region' => ['nullable', Rule::enum(Region::class)],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'phone' => ['nullable', 'string', 'max:30'],

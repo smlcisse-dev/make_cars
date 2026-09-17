@@ -25,7 +25,7 @@ class GarageService
     }
 
     /**
-     * @param  array{name?: string, description?: ?string, address?: string, latitude?: ?float, longitude?: ?float, phone?: ?string}  $data
+     * @param  array{name?: string, description?: ?string, address?: string, city?: ?string, region?: ?string, latitude?: ?float, longitude?: ?float, phone?: ?string}  $data
      */
     public function update(Garage $garage, array $data): Garage
     {

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\City;
+use App\Enums\Region;
 use App\Enums\RegistrationStatus;
 use App\Models\Concerns\HasOpeningHours;
 use Database\Factories\MarketSpaceAccountFactory;
@@ -13,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-#[Fillable(['name', 'description', 'address', 'latitude', 'longitude', 'phone'])]
+#[Fillable(['name', 'description', 'address', 'city', 'region', 'latitude', 'longitude', 'phone'])]
 class MarketSpaceAccount extends Model
 {
     /** @use HasFactory<MarketSpaceAccountFactory> */
@@ -27,6 +29,8 @@ class MarketSpaceAccount extends Model
         return [
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
+            'city' => City::class,
+            'region' => Region::class,
         ];
     }
 

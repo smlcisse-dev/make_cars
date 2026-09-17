@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Garage;
 
+use App\Enums\City;
+use App\Enums\Region;
 use App\Models\Garage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,16 +42,23 @@ class ProfileTest extends TestCase
             'name' => 'Garage Awa Réparation',
             'description' => 'Spécialiste climatisation.',
             'address' => 'Fidjrossè, Cotonou',
+            'city' => City::Cotonou->value,
+            'region' => Region::Littoral->value,
             'latitude' => 6.3703,
             'longitude' => 2.3912,
             'phone' => '+22997000000',
         ]);
 
-        $response->assertOk()->assertJsonPath('data.name', 'Garage Awa Réparation');
+        $response->assertOk()
+            ->assertJsonPath('data.name', 'Garage Awa Réparation')
+            ->assertJsonPath('data.city', City::Cotonou->value)
+            ->assertJsonPath('data.region', Region::Littoral->value);
         $this->assertDatabaseHas('garages', [
             'id' => $garage->id,
             'name' => 'Garage Awa Réparation',
             'address' => 'Fidjrossè, Cotonou',
+            'city' => City::Cotonou->value,
+            'region' => Region::Littoral->value,
         ]);
     }
 

@@ -146,6 +146,16 @@ components:
         name: {type: string}
         description: {type: string, nullable: true}
         address: {type: string}
+        city:
+          type: string
+          nullable: true
+          description: "Liste fixe App\\Enums\\City (CLAUDE.md §5, ajout v0.17)."
+        city_label: {type: string, nullable: true}
+        region:
+          type: string
+          nullable: true
+          description: "Liste fixe App\\Enums\\Region, départements du Bénin (CLAUDE.md §5, ajout v0.17)."
+        region_label: {type: string, nullable: true}
         latitude: {type: number, format: float, nullable: true}
         longitude: {type: number, format: float, nullable: true}
         phone: {type: string, nullable: true}
@@ -189,6 +199,16 @@ components:
         name: {type: string}
         description: {type: string, nullable: true}
         address: {type: string}
+        city:
+          type: string
+          nullable: true
+          description: "Liste fixe App\\Enums\\City (CLAUDE.md §5, ajout v0.17)."
+        city_label: {type: string, nullable: true}
+        region:
+          type: string
+          nullable: true
+          description: "Liste fixe App\\Enums\\Region, départements du Bénin (CLAUDE.md §5, ajout v0.17)."
+        region_label: {type: string, nullable: true}
         latitude: {type: number, format: float, nullable: true}
         longitude: {type: number, format: float, nullable: true}
         phone: {type: string, nullable: true}
@@ -650,6 +670,113 @@ paths:
           description: >
             Jeton invalide/expiré/mal destiné, email non vérifié, ou email
             déjà utilisé par un compte professionnel (jamais rattaché à Google).
+
+  /auth/express-claim:
+    post:
+      summary: >
+        Réclamation d'un compte "express" par son propriétaire réel
+        (CLAUDE.md §5, ajout v0.17) : envoie un email avec un lien signé
+        permettant de définir un mot de passe. Ré-appelable tant que le
+        compte reste "express" (non encore réclamé).
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string}
+      responses:
+        '200':
+          description: Email envoyé (si un compte express correspond à cet email).
+        '422':
+          description: Aucun compte express en attente de réclamation ne correspond à cet email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /express-clients/{user}/claim:
+    get:
+      summary: >
+        Confirme la validité du lien signé reçu par email (CLAUDE.md §5,
+        ajout v0.17). Route publique protégée par signature+expiration (pas
+        de Sanctum), 7 jours. Réponse JSON brute (API REST pure — CLAUDE.md
+        §4) ; une page de confirmation sera ajoutée par le futur frontend
+        Vue, sans changement côté backend.
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: signature
+          in: query
+          required: true
+          schema: {type: string}
+        - name: expires
+          in: query
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Lien valide, compte encore "express".
+        '403':
+          description: Signature invalide/expirée.
+        '409':
+          description: Ce compte a déjà été réclamé.
+    post:
+      summary: >
+        Définit le mot de passe du compte "express" et le fait basculer vers
+        un compte automobiliste classique (`is_express` repasse à false).
+        Utilise la même URL signée que GET ci-dessus — la vérification
+        Laravel d'un lien signé ne porte que sur l'URL, pas sur la méthode
+        HTTP (CLAUDE.md §5, ajout v0.17).
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: signature
+          in: query
+          required: true
+          schema: {type: string}
+        - name: expires
+          in: query
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password, password_confirmation]
+              properties:
+                password: {type: string}
+                password_confirmation: {type: string}
+      responses:
+        '200':
+          description: Mot de passe défini, compte réclamé.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '403':
+          description: Signature invalide/expirée.
+        '409':
+          description: Ce compte a déjà été réclamé.
+        '422':
+          description: Erreur de validation (mot de passe).
 
   /auth/me:
     get:
@@ -1270,6 +1397,88 @@ paths:
         '404':
           description: Photo n'appartenant pas à cette réclamation.
 
+  /admin/statistics:
+    get:
+      summary: >
+        Statistiques agrégées pour appuyer les politiques de
+        régulation/formalisation du secteur auprès des autorités béninoises
+        (CLAUDE.md §1, ajout v0.17) : structures par type/statut, répartition
+        géographique (ville/région), volume d'activité sur une période
+        optionnelle, avis et réclamations.
+      tags: [Admin]
+      parameters:
+        - name: start_date
+          in: query
+          required: false
+          schema: {type: string, format: date}
+          description: Borne basse du volume d'activité (incluse). Totaux depuis le début si absente.
+        - name: end_date
+          in: query
+          required: false
+          schema: {type: string, format: date}
+          description: Borne haute du volume d'activité (incluse) ; doit être postérieure ou égale à start_date.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      structures:
+                        type: object
+                        description: >
+                          Par type de compte (garagiste/market_space), compté
+                          depuis professional_registrations : approved,
+                          pending, suspended, rejected, total.
+                      geography:
+                        type: object
+                        properties:
+                          by_city:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                city: {type: string, nullable: true}
+                                city_label: {type: string}
+                                count: {type: integer}
+                          by_region:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                region: {type: string, nullable: true}
+                                region_label: {type: string}
+                                count: {type: integer}
+                      activity:
+                        type: object
+                        properties:
+                          period:
+                            type: object
+                            properties:
+                              start: {type: string, format: date, nullable: true}
+                              end: {type: string, format: date, nullable: true}
+                          appointments_count: {type: integer}
+                          quotes_issued_count: {type: integer}
+                          orders_count: {type: integer}
+                          invoices_count: {type: integer, description: Devis facturés + commandes payées.}
+                          total_invoiced_amount: {type: string, description: "Somme décimale (2 décimales) des devis facturés et commandes payées."}
+                      reviews:
+                        type: object
+                        properties:
+                          count: {type: integer}
+                          average_rating: {type: number, nullable: true}
+                      disputes:
+                        type: object
+                        properties:
+                          total: {type: integer}
+                          by_status: {type: object}
+        '422':
+          description: end_date antérieure à start_date.
+
   /garage/profile:
     get:
       summary: >
@@ -1290,7 +1499,9 @@ paths:
         '404':
           description: Profil pas encore créé (compte non validé).
     put:
-      summary: Met à jour le profil du garage (nom, adresse, géoloc, téléphone).
+      summary: >
+        Met à jour le profil du garage (nom, adresse, ville/région
+        structurées, géoloc, téléphone).
       tags: [Garage]
       requestBody:
         required: true
@@ -1303,6 +1514,14 @@ paths:
                 name: {type: string}
                 description: {type: string, nullable: true}
                 address: {type: string}
+                city:
+                  type: string
+                  nullable: true
+                  description: "Valeur de App\\Enums\\City (CLAUDE.md §5, ajout v0.17)."
+                region:
+                  type: string
+                  nullable: true
+                  description: "Valeur de App\\Enums\\Region (CLAUDE.md §5, ajout v0.17)."
                 latitude: {type: number, nullable: true}
                 longitude: {type: number, nullable: true}
                 phone: {type: string, nullable: true}
