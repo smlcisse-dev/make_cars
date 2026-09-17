@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MarketSpace\DisputeController;
 use App\Http\Controllers\Api\MarketSpace\MarketSpaceImageController;
 use App\Http\Controllers\Api\MarketSpace\OpeningHoursController;
 use App\Http\Controllers\Api\MarketSpace\OrderController;
@@ -27,4 +28,9 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
 
     Route::get('reviews', [ReviewController::class, 'index']);
+
+    Route::get('disputes', [DisputeController::class, 'index']);
+    Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
+    Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
+    Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
 });

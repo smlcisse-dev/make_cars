@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Mobile\AppointmentController;
 use App\Http\Controllers\Api\Mobile\ConversationController;
+use App\Http\Controllers\Api\Mobile\DisputeController;
 use App\Http\Controllers\Api\Mobile\GarageController;
 use App\Http\Controllers\Api\Mobile\MarketSpaceController;
 use App\Http\Controllers\Api\Mobile\OrderController;
@@ -46,4 +47,10 @@ Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::get('reviews', [ReviewController::class, 'index']);
     Route::post('quotes/{quote}/review', [ReviewController::class, 'storeForQuote']);
     Route::post('orders/{order}/review', [ReviewController::class, 'storeForOrder']);
+
+    Route::get('disputes', [DisputeController::class, 'index']);
+    Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
+    Route::post('quotes/{quote}/dispute', [DisputeController::class, 'storeForQuote']);
+    Route::post('orders/{order}/dispute', [DisputeController::class, 'storeForOrder']);
+    Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
 });

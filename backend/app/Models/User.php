@@ -123,4 +123,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(Review::class);
     }
+
+    /**
+     * Réclamations déposées par cet automobiliste, uniquement sur une
+     * transaction terminée (CLAUDE.md §5, ajout v0.11).
+     *
+     * @return HasMany<Dispute, $this>
+     */
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(Dispute::class);
+    }
 }

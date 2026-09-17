@@ -93,4 +93,15 @@ class MarketSpaceAccount extends Model
     {
         return $this->morphMany(Review::class, 'reviewable');
     }
+
+    /**
+     * Réclamations visant ce Market Space, rattachées à une transaction
+     * terminée (CLAUDE.md §5, ajout v0.11).
+     *
+     * @return MorphMany<Dispute, $this>
+     */
+    public function disputes(): MorphMany
+    {
+        return $this->morphMany(Dispute::class, 'respondent');
+    }
 }

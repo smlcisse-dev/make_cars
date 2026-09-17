@@ -1124,6 +1124,152 @@ paths:
         '422':
           description: Motif manquant.
 
+  /admin/disputes:
+    get:
+      summary: Liste toutes les réclamations, filtrable par statut — supervision admin (CLAUDE.md §5, ajout v0.11).
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, enum: [submitted, under_review, resolved_founded, resolved_rejected, closed]}
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /admin/disputes/{dispute}:
+    get:
+      summary: >
+        Instruction du dossier : la réclamation, la transaction concernée,
+        la conversation de chat Garage↔Automobiliste associée (quand elle
+        existe) et les avis déjà laissés sur le professionnel visé — tout
+        l'historique lié nécessaire pour trancher (CLAUDE.md §5, ajout v0.11).
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK — objet avec les clés "dispute", "conversation" (nullable) et "reviews".
+
+  /admin/disputes/{dispute}/request-response:
+    post:
+      summary: >
+        Demande une réponse/défense au professionnel — optionnelle, l'admin
+        peut trancher directement si les preuves jointes suffisent.
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message: {type: string, maxLength: 2000, nullable: true}
+      responses:
+        '200':
+          description: Réponse demandée au professionnel.
+        '403':
+          description: Une réponse a déjà été demandée, ou le dossier est déjà tranché.
+
+  /admin/disputes/{dispute}/reject:
+    post:
+      summary: Rejette (classe sans suite) une réclamation — motif obligatoire (CLAUDE.md §5, ajout v0.11).
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, maxLength: 1000}
+      responses:
+        '200':
+          description: Réclamation rejetée.
+        '403':
+          description: Cette réclamation est déjà tranchée.
+        '422':
+          description: Motif manquant.
+
+  /admin/disputes/{dispute}/resolve:
+    post:
+      summary: >
+        Juge la réclamation fondée — motif obligatoire et action librement
+        choisie selon la gravité, aucune sanction automatique. "suspension"
+        réutilise le mécanisme de suspension de compte déjà construit
+        (CLAUDE.md §5, ajout v0.11).
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, action]
+              properties:
+                reason: {type: string, maxLength: 1000}
+                action: {type: string, enum: [warning, suspension]}
+      responses:
+        '200':
+          description: Réclamation jugée fondée.
+        '403':
+          description: Cette réclamation est déjà tranchée.
+        '422':
+          description: Motif ou action manquant/invalide, ou inscription introuvable pour une suspension.
+
+  /admin/disputes/{dispute}/close:
+    post:
+      summary: >
+        Clôture le dossier une fois la décision (et son éventuelle suite)
+        actée — pas de clôture automatique (CLAUDE.md §5, ajout v0.11).
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Réclamation clôturée.
+        '403':
+          description: Seule une réclamation déjà tranchée peut être clôturée.
+
+  /admin/disputes/{dispute}/attachments/{attachment}/download:
+    get:
+      summary: Télécharge une photo jointe en preuve à une réclamation.
+      tags: [Admin]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: attachment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Photo n'appartenant pas à cette réclamation.
+
   /garage/profile:
     get:
       summary: >
@@ -1931,6 +2077,77 @@ paths:
         '200':
           description: Liste paginée.
 
+  /garage/disputes:
+    get:
+      summary: Liste les réclamations concernant le garage authentifié (CLAUDE.md §5, ajout v0.11).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /garage/disputes/{dispute}:
+    get:
+      summary: Détail d'une réclamation concernant le garage, avec ses preuves et l'espace d'échange dédié.
+      tags: [Garage]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Réclamation concernant un autre garage.
+
+  /garage/disputes/{dispute}/respond:
+    post:
+      summary: >
+        Répond/se défend dans l'espace d'échange dédié à la réclamation —
+        jamais de décision côté garage, réservée à l'admin (CLAUDE.md §5,
+        ajout v0.11).
+      tags: [Garage]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: {type: string, maxLength: 2000}
+      responses:
+        '201':
+          description: Réponse envoyée.
+        '403':
+          description: Cette réclamation est déjà tranchée.
+        '404':
+          description: Réclamation concernant un autre garage.
+
+  /garage/disputes/{dispute}/attachments/{attachment}/download:
+    get:
+      summary: Télécharge une photo jointe en preuve à une réclamation.
+      tags: [Garage]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: attachment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Photo n'appartenant pas à cette réclamation, ou réclamation concernant un autre garage.
+
   /market-space/products:
     get:
       summary: Catalogue du compte Market Space authentifié (tous statuts).
@@ -2084,6 +2301,77 @@ paths:
       responses:
         '200':
           description: Liste paginée.
+
+  /market-space/disputes:
+    get:
+      summary: Liste les réclamations concernant le Market Space authentifié (CLAUDE.md §5, ajout v0.11).
+      tags: [MarketSpace]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /market-space/disputes/{dispute}:
+    get:
+      summary: Détail d'une réclamation concernant le Market Space, avec ses preuves et l'espace d'échange dédié.
+      tags: [MarketSpace]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Réclamation concernant un autre Market Space.
+
+  /market-space/disputes/{dispute}/respond:
+    post:
+      summary: >
+        Répond/se défend dans l'espace d'échange dédié à la réclamation —
+        jamais de décision côté Market Space, réservée à l'admin
+        (CLAUDE.md §5, ajout v0.11).
+      tags: [MarketSpace]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: {type: string, maxLength: 2000}
+      responses:
+        '201':
+          description: Réponse envoyée.
+        '403':
+          description: Cette réclamation est déjà tranchée.
+        '404':
+          description: Réclamation concernant un autre Market Space.
+
+  /market-space/disputes/{dispute}/attachments/{attachment}/download:
+    get:
+      summary: Télécharge une photo jointe en preuve à une réclamation.
+      tags: [MarketSpace]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: attachment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Photo n'appartenant pas à cette réclamation, ou réclamation concernant un autre Market Space.
 
   /mobile/garages:
     get:
@@ -2599,5 +2887,111 @@ paths:
         '422':
           description: Cette commande a déjà été notée.
 
-# Les endpoints métier suivants (paiements en ligne, notifications...) sont
-# ajoutés ici au fur et à mesure de leur implémentation, module par module.
+  /mobile/disputes:
+    get:
+      summary: Liste les réclamations déposées par l'automobiliste authentifié, pour suivre leur statut.
+      tags: [Mobile]
+      responses:
+        '200':
+          description: Liste paginée.
+
+  /mobile/disputes/{dispute}:
+    get:
+      summary: Consulte une de ses réclamations (statut, réponse du professionnel si demandée, décision finale si tranchée).
+      tags: [Mobile]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Réclamation appartenant à un autre automobiliste.
+
+  /mobile/quotes/{quote}/dispute:
+    post:
+      summary: >
+        Dépose une réclamation sur un devis facturé, avec motif obligatoire
+        et photos en preuve optionnelles (CLAUDE.md §5, ajout v0.11).
+      tags: [Mobile]
+      parameters:
+        - name: quote
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, maxLength: 2000}
+                photos:
+                  type: array
+                  maxItems: 5
+                  items: {type: string, format: binary}
+      responses:
+        '201':
+          description: Réclamation déposée.
+        '403':
+          description: Devis pas encore facturé.
+        '404':
+          description: Devis appartenant à un autre automobiliste.
+
+  /mobile/orders/{order}/dispute:
+    post:
+      summary: >
+        Dépose une réclamation sur une commande payée, avec motif obligatoire
+        et photos en preuve optionnelles (CLAUDE.md §5, ajout v0.11).
+      tags: [Mobile]
+      parameters:
+        - name: order
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, maxLength: 2000}
+                photos:
+                  type: array
+                  maxItems: 5
+                  items: {type: string, format: binary}
+      responses:
+        '201':
+          description: Réclamation déposée.
+        '403':
+          description: Commande pas encore payée.
+        '404':
+          description: Commande appartenant à un autre automobiliste.
+
+  /mobile/disputes/{dispute}/attachments/{attachment}/download:
+    get:
+      summary: Télécharge une photo jointe en preuve à sa propre réclamation.
+      tags: [Mobile]
+      parameters:
+        - name: dispute
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: attachment
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fichier binaire de l'image.
+        '404':
+          description: Photo n'appartenant pas à cette réclamation, ou réclamation appartenant à un autre automobiliste.
+
+# Les endpoints métier suivants (paiements en ligne, notifications push...)
+# sont ajoutés ici au fur et à mesure de leur implémentation, module par module.

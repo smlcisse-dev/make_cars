@@ -190,6 +190,22 @@ Instaure le climat de confiance visé par le projet (§1) : un avis n'est possib
 - **Modération admin = masquage logique tracé, jamais une suppression SQL** : l'administrateur peut masquer un avis jugé abusif ou diffamatoire, avec un motif texte obligatoire — même logique que le rejet d'inscription ou la suspension de compte (§5, ajouts existants). Un avis masqué disparaît des listes publiques (mobile) mais reste conservé en base avec la trace de la modération (motif, auteur, date), précisément pour permettre d'auditer cette modération elle-même et éviter un abus de ce pouvoir. Un garage/boutique ne peut jamais masquer ses propres avis négatifs — cette action n'existe que côté Admin.
 - **Lecture seule côté professionnel** : le garage/la boutique concerné consulte l'intégralité de ses avis reçus (y compris ceux déjà masqués, par transparence sur son propre historique) mais ne dispose d'aucun endpoint pour les modifier ou les supprimer.
 
+### Module Réclamations/Litiges (ajout v0.11, 2026-09-17)
+
+Deuxième mécanisme de confiance après les avis (§5, ajout v0.10) : un canal formel pour qu'un automobiliste conteste une prestation/un achat précis et obtienne une décision motivée de l'administrateur, sans devoir passer par le chat (qui n'est ni tracé pour l'arbitrage, ni scopé Admin↔Automobiliste).
+
+- **Éligibilité identique au module Avis** : une réclamation est toujours rattachée à une transaction terminée précise — un devis **facturé** ou une commande **payée** dont l'automobiliste est le client — jamais à une transaction en cours ou appartenant à quelqu'un d'autre. Contrairement aux avis, plusieurs réclamations peuvent viser la même transaction (pas de contrainte d'unicité : un litige peut nécessiter plusieurs échanges/relances).
+- **Cible dérivée automatiquement** de la transaction, jamais transmise par le client — même mécanisme que le module Avis (le garage pour un devis, le vendeur Garage/Market Space pour une commande).
+- **Composition** : un motif/description obligatoire, avec possibilité de joindre jusqu'à 5 photos en preuve — réutilise le disque privé dédié aux médias déjà en place pour les images du chat (`private_media_disk`, téléchargement toujours authentifié, jamais d'URL publique — CLAUDE.md §5, ajout v0.8).
+- **Cycle de vie** : `submitted` (déposée) → `under_review` (en cours d'instruction, atteint dès qu'une réponse est demandée par l'admin ou envoyée par le professionnel) → `resolved_founded` ou `resolved_rejected` (décision motivée de l'admin) → `closed` (clôture explicite du dossier par l'admin, un pas distinct de la décision elle-même — pas de clôture automatique).
+- **Espace d'échange dédié entre l'admin et le professionnel** (distinct du chat Garage↔Automobiliste, dont la portée reste limitée à cette paire — ajout v0.8) : l'admin peut demander une réponse/défense (optionnel — il peut aussi trancher directement si les preuves jointes suffisent), le professionnel y répond ; les deux peuvent s'y exprimer à plusieurs reprises avant la décision.
+- **Instruction avec accès à tout l'historique lié** : la fiche admin d'une réclamation embarque la transaction concernée, la conversation de chat Garage↔Automobiliste associée (quand elle existe) et les avis déjà laissés sur le professionnel visé — tout ce qui permet de juger du bien-fondé sans naviguer entre plusieurs écrans.
+- **Décision finale motivée et tracée, comme les autres actions de modération** (rejet d'inscription, suspension, masquage d'avis) : `rejected` (classée sans suite, motif obligatoire) ou `resolved_founded` (motif obligatoire **et** action choisie librement par l'admin selon la gravité qu'il évalue — **aucune sanction automatique**). Deux actions possibles pour une réclamation fondée :
+  - **`suspension`** : réutilise tel quel le mécanisme de suspension de compte déjà construit (`ProfessionalRegistrationService::suspend`, §5 ajout v0.6) — mêmes garanties (réversible, motif tracé, historique conservé).
+  - **`warning`** : avertissement formel sans suspension — le dossier de réclamation lui-même (motif, décision, action) **est** la trace de cet avertissement ; aucune structure séparée n'est nécessaire.
+- **Notification du client** : l'automobiliste suit le statut de ses réclamations depuis l'app (liste + détail) et reçoit un email à la décision finale (fondée ou rejetée) — seul canal disponible pour l'instant en l'absence de notifications push (§7) et d'un chat Admin↔Automobiliste ; silencieusement ignoré si son compte n'a pas d'email (cas rare d'un compte express non encore réclamé, §5 ajout v0.9).
+- **Lecture seule côté professionnel, hors réponse** : le garage/la boutique concerné consulte les réclamations le visant et peut répondre dans l'espace d'échange dédié, mais ne dispose d'aucun endpoint de décision — cette action reste exclusivement Admin, comme pour la modération des avis.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -212,6 +228,9 @@ Instaure le climat de confiance visé par le projet (§1) : un avis n'est possib
 | Laisser un avis/notation (transaction terminée) | Non | Non | Non | Oui |
 | Consulter ses avis reçus | Oui (lecture) | Oui (lecture seule) | Oui (lecture seule) | Non concerné |
 | Masquer un avis abusif (motif obligatoire) | Oui | Non | Non | Non |
+| Déposer une réclamation (transaction terminée) | Non | Non | Non | Oui |
+| Consulter les réclamations la/le concernant, y répondre | Oui (lecture) | Oui (lecture + réponse) | Oui (lecture + réponse) | Suivi de ses réclamations |
+| Décider d'une réclamation (rejeter/fondée + action, motif obligatoire) | Oui | Non | Non | Non |
 | Notifications push (statut commande) | — | — | — | Oui |
 
 ## 6. Exigences non fonctionnelles
@@ -251,6 +270,7 @@ Instaure le climat de confiance visé par le projet (§1) : un avis n'est possib
 - **Compte express** : compte automobiliste minimal créé par un garagiste pour un client walk-in sans app (§5, ajout v0.9), pas encore « réclamé » par son propriétaire réel.
 - **Avis** : note (1 à 5) et commentaire optionnel laissés par un automobiliste sur un Garage ou un Market Space, uniquement après un devis facturé ou une commande payée (§5, ajout v0.10) — un seul avis par transaction terminée.
 - **Masquage (modération)** : retrait logique et tracé d'un avis abusif/diffamatoire de la vue publique par l'administrateur, motif obligatoire (§5, ajout v0.10) — jamais une suppression, pour garder la preuve de la modération elle-même.
+- **Réclamation (litige)** : contestation formelle d'un automobiliste sur une transaction terminée (devis facturé ou commande payée), instruite et tranchée par l'administrateur avec motif obligatoire (§5, ajout v0.11) — distincte d'un avis (qui note l'expérience sans nécessiter d'instruction) et du chat (qui n'est ni tracé pour l'arbitrage, ni ouvert à l'admin).
 
 ## 9. Consignes opérationnelles pour l'assistant (Claude Code)
 

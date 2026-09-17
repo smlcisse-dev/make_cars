@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Garage\AppointmentController;
 use App\Http\Controllers\Api\Garage\ClientController;
 use App\Http\Controllers\Api\Garage\ConversationController;
+use App\Http\Controllers\Api\Garage\DisputeController;
 use App\Http\Controllers\Api\Garage\GarageImageController;
 use App\Http\Controllers\Api\Garage\OpeningHoursController;
 use App\Http\Controllers\Api\Garage\OrderController;
@@ -64,4 +65,9 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::get('conversations/{conversation}/messages/{message}/image', [ConversationController::class, 'downloadImage']);
 
     Route::get('reviews', [ReviewController::class, 'index']);
+
+    Route::get('disputes', [DisputeController::class, 'index']);
+    Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
+    Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
+    Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
 });
