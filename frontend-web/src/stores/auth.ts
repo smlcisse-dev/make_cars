@@ -1,0 +1,80 @@
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+
+import * as authApi from '@/api/auth'
+import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/token'
+import type { AccountType, User } from '@/types/user'
+
+const USER_STORAGE_KEY = 'make_cars_user'
+
+function readStoredUser(): User | null {
+  const raw = localStorage.getItem(USER_STORAGE_KEY)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw) as User
+  } catch {
+    return null
+  }
+}
+
+// Chemin d'accueil de chaque espace, une fois connecté (CLAUDE.md §3) —
+// l'app mobile Flutter reste le seul accès pour un automobiliste, ce SPA ne
+// gère jamais ce rôle.
+const HOME_PATH_BY_ROLE: Record<Exclude<AccountType, 'automobiliste'>, string> = {
+  admin: '/admin',
+  garagiste: '/garage',
+  market_space: '/market-space',
+}
+
+export function homePathForRole(role: AccountType): string {
+  return role === 'automobiliste' ? '/login' : HOME_PATH_BY_ROLE[role]
+}
+
+// Store Pinia en "Composition API" (setup store) : on écrit son contenu
+// comme un composable Vue normal — `ref()` pour l'état réactif, `computed()`
+// pour les valeurs dérivées, des fonctions pour les actions — plutôt que
+// l'ancienne syntaxe { state, getters, actions }. Pinia détecte que c'est un
+// store grâce à `defineStore`, mais à l'intérieur c'est de la réactivité Vue
+// ordinaire : `token.value` change -> tout composant qui lit `token` (ou
+// `isAuthenticated`, qui en dépend) se met à jour automatiquement.
+export const useAuthStore = defineStore('auth', () => {
+  const token = ref<string | null>(getStoredToken())
+  const user = ref<User | null>(readStoredUser())
+
+  const isAuthenticated = computed(() => token.value !== null && user.value !== null)
+
+  function setSession(newUser: User, newToken: string): void {
+    user.value = newUser
+    token.value = newToken
+    setStoredToken(newToken)
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser))
+  }
+
+  function clearSession(): void {
+    user.value = null
+    token.value = null
+    clearStoredToken()
+    localStorage.removeItem(USER_STORAGE_KEY)
+  }
+
+  async function login(email: string, password: string): Promise<void> {
+    const { user: loggedInUser, token: issuedToken } = await authApi.login({ email, password })
+    setSession(loggedInUser, issuedToken)
+  }
+
+  async function logout(): Promise<void> {
+    try {
+      await authApi.logout()
+    } finally {
+      // Le nettoyage local a lieu même si l'appel réseau échoue (token déjà
+      // expiré côté serveur, hors ligne...) — se déconnecter localement ne
+      // doit jamais rester bloqué par un problème réseau.
+      clearSession()
+    }
+  }
+
+  return { token, user, isAuthenticated, login, logout, setSession, clearSession }
+})

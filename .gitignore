@@ -2,13 +2,15 @@
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+# Racine du dépôt uniquement (slash de tête) : un `.vscode/` sans slash
+# ignorerait aussi frontend-web/.vscode/, alors que ce sous-projet gère déjà
+# le sien via son propre .gitignore (garde extensions.json, ignore le reste).
+/.vscode/
 
 # Claude Code local session settings (machine-specific)
 .claude/settings.local.json
 
-# Frontend web (Vue 3 + TypeScript) — node_modules and env not yet created,
-# ignored in advance so they never get committed once the project exists.
+# Frontend web (Vue 3 + TypeScript)
 frontend-web/node_modules/
 frontend-web/dist/
 frontend-web/.env
