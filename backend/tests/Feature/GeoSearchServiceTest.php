@@ -2,18 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ServiceCategory;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Models\ProfessionalRegistration;
+use App\Models\RepairService;
+use App\Models\Review;
 use App\Models\User;
 use App\Services\GeoSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Recherche géolocalisée indépendante de tout fournisseur de cartographie
- * externe — uniquement la formule de Haversine sur les coordonnées déjà
- * stockées (CLAUDE.md §5, ajout v0.13).
+ * Recherche de garages/Market Space indépendante de tout fournisseur de
+ * cartographie externe — uniquement la formule de Haversine sur les
+ * coordonnées déjà stockées pour la proximité (CLAUDE.md §5, ajout v0.13),
+ * complétée par un filtre nom/service et un choix de tri (ajout v0.14).
  */
 class GeoSearchServiceTest extends TestCase
 {
@@ -148,5 +152,54 @@ class GeoSearchServiceTest extends TestCase
         $this->assertGreaterThan(0, $result->distanceKm);
         $this->assertNull($result->averageRating);
         $this->assertSame(0, $result->reviewsCount);
+    }
+
+    public function test_search_without_a_position_returns_all_matches_with_a_null_distance(): void
+    {
+        $this->approvedGarage(['latitude' => null, 'longitude' => null]);
+
+        $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1);
+
+        $this->assertCount(1, $results);
+        $this->assertNull($results->first()->distanceKm);
+    }
+
+    public function test_search_filters_by_service_category_and_excludes_market_spaces(): void
+    {
+        $matching = $this->approvedGarage();
+        RepairService::factory()->forGarage($matching)->approved()->create(['category' => ServiceCategory::Pneumatiques]);
+
+        $nonMatching = $this->approvedGarage();
+        RepairService::factory()->forGarage($nonMatching)->approved()->create(['category' => ServiceCategory::Carrosserie]);
+
+        $this->approvedMarketSpaceAccount();
+
+        $results = app(GeoSearchService::class)->search(
+            null, null, radiusKm: null, type: 'both', page: 1,
+            serviceCategory: ServiceCategory::Pneumatiques,
+        );
+
+        $this->assertSame([$matching->id], $results->pluck('id')->all());
+        $this->assertSame(['garage'], $results->pluck('type')->unique()->all());
+    }
+
+    public function test_search_sorts_by_rating_when_requested(): void
+    {
+        $worst = $this->approvedGarage(['name' => 'Z Garage']);
+        $this->reviewFor($worst, 2);
+
+        $best = $this->approvedGarage(['name' => 'A Garage']);
+        $this->reviewFor($best, 5);
+
+        $unrated = $this->approvedGarage(['name' => 'M Garage']);
+
+        $results = app(GeoSearchService::class)->search(null, null, radiusKm: null, type: 'both', page: 1, sort: 'rating');
+
+        $this->assertSame([$best->id, $worst->id, $unrated->id], $results->pluck('id')->all());
+    }
+
+    private function reviewFor(Garage $garage, int $rating): void
+    {
+        Review::factory()->forGarage($garage)->create(['rating' => $rating]);
     }
 }

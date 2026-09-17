@@ -2,20 +2,22 @@
 
 namespace App\Services;
 
+use App\Enums\RepairServiceStatus;
 use App\Enums\ReviewStatus;
+use App\Enums\ServiceCategory;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Support\NearbySearchResult;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 /**
- * Recherche par proximité géographique, indépendante de tout fournisseur de
+ * Recherche de garages/Market Space, indépendante de tout fournisseur de
  * cartographie externe (Google Maps, Mapbox...) — uniquement la formule de
- * Haversine sur les coordonnées déjà stockées (CLAUDE.md §5, ajout v0.13).
- * Clôt le point ouvert §7 sur la recherche géolocalisée ; l'affichage
- * visuel sur une carte reste un sujet frontend séparé, sans dépendance à ce
- * module.
+ * Haversine sur les coordonnées déjà stockées pour la proximité (CLAUDE.md
+ * §5, ajout v0.13), complétée par une recherche par nom, un filtre par
+ * service proposé et un choix de tri (CLAUDE.md §5, ajout v0.14).
  *
  * Le calcul de distance est fait en PHP plutôt qu'en SQL trigonométrique :
  * portable entre SQLite (tests) et PostgreSQL (production) sans extension
@@ -29,26 +31,56 @@ class GeoSearchService
     private const EARTH_RADIUS_KM = 6371.0;
 
     /**
+     * La position (latitude/longitude) est désormais optionnelle : une
+     * recherche par nom et/ou par service doit pouvoir fonctionner seule,
+     * sans filtre géographique (CLAUDE.md §5, ajout v0.14). Le rayon et le
+     * tri par distance restent impossibles sans position — la couche
+     * validation (NearbySearchRequest) l'impose déjà avant d'arriver ici.
+     *
+     * Le filtre service (catégorie ou service précis) ne peut jamais être
+     * satisfait par un Market Space (qui ne fait pas de réparation — CLAUDE.md
+     * §5, ajout v0.6) : sa présence exclut donc les Market Space du résultat,
+     * quel que soit le `type` demandé.
+     *
      * @param  'garage'|'market_space'|'both'  $type
+     * @param  'distance'|'rating'|null  $sort  Par défaut 'distance' si une
+     *                                          position est fournie, sinon 'rating'.
      */
-    public function search(float $latitude, float $longitude, ?float $radiusKm, string $type, int $page, int $perPage = 15): LengthAwarePaginator
-    {
-        $radiusKm = min($radiusKm ?? (float) config('geo.default_search_radius_km'), (float) config('geo.max_search_radius_km'));
+    public function search(
+        ?float $latitude,
+        ?float $longitude,
+        ?float $radiusKm,
+        string $type,
+        int $page,
+        int $perPage = 15,
+        ?string $name = null,
+        ?ServiceCategory $serviceCategory = null,
+        ?int $serviceId = null,
+        ?string $sort = null,
+    ): LengthAwarePaginator {
+        $hasPosition = $latitude !== null && $longitude !== null;
+        $sort ??= $hasPosition ? 'distance' : 'rating';
+        $hasServiceFilter = $serviceCategory !== null || $serviceId !== null;
+
+        $radiusKm = $hasPosition
+            ? min($radiusKm ?? (float) config('geo.default_search_radius_km'), (float) config('geo.max_search_radius_km'))
+            : null;
 
         $results = collect();
 
         if ($type !== 'market_space') {
-            $results = $results->merge($this->searchGarages($latitude, $longitude));
+            $results = $results->merge($this->searchGarages($latitude, $longitude, $name, $serviceCategory, $serviceId));
         }
 
-        if ($type !== 'garage') {
-            $results = $results->merge($this->searchMarketSpaces($latitude, $longitude));
+        if ($type !== 'garage' && ! $hasServiceFilter) {
+            $results = $results->merge($this->searchMarketSpaces($latitude, $longitude, $name));
         }
 
-        $results = $results
-            ->filter(fn (NearbySearchResult $result) => $result->distanceKm <= $radiusKm)
-            ->sortBy('distanceKm')
-            ->values();
+        if ($radiusKm !== null) {
+            $results = $results->filter(fn (NearbySearchResult $result) => $result->distanceKm !== null && $result->distanceKm <= $radiusKm);
+        }
+
+        $results = $this->sortResults($results, $sort)->values();
 
         return new LengthAwarePaginator(
             $results->forPage($page, $perPage)->values(),
@@ -60,25 +92,60 @@ class GeoSearchService
     }
 
     /**
+     * @param  Collection<int, NearbySearchResult>  $results
+     * @param  'distance'|'rating'  $sort
      * @return Collection<int, NearbySearchResult>
      */
-    private function searchGarages(float $latitude, float $longitude): Collection
+    private function sortResults(Collection $results, string $sort): Collection
+    {
+        if ($sort === 'rating') {
+            return $results->sort(function (NearbySearchResult $a, NearbySearchResult $b) {
+                $ratingA = $a->averageRating ?? -1;
+                $ratingB = $b->averageRating ?? -1;
+
+                return $ratingB <=> $ratingA ?: $a->name <=> $b->name;
+            });
+        }
+
+        return $results->sortBy('distanceKm');
+    }
+
+    /**
+     * @return Collection<int, NearbySearchResult>
+     */
+    private function searchGarages(?float $latitude, ?float $longitude, ?string $name, ?ServiceCategory $serviceCategory, ?int $serviceId): Collection
     {
         return Garage::query()
             ->publiclyVisible()
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->when($latitude !== null && $longitude !== null, fn (Builder $query) => $query->whereNotNull('latitude')->whereNotNull('longitude'))
+            ->when($serviceCategory !== null || $serviceId !== null, fn (Builder $query) => $query->whereHas(
+                'services',
+                function (Builder $serviceQuery) use ($serviceCategory, $serviceId) {
+                    $serviceQuery->where('status', RepairServiceStatus::Approved)->where('is_active', true);
+
+                    if ($serviceCategory !== null) {
+                        $serviceQuery->where('category', $serviceCategory);
+                    }
+
+                    if ($serviceId !== null) {
+                        $serviceQuery->where('id', $serviceId);
+                    }
+                }
+            ))
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['images', 'openingHours'])
             ->get()
+            ->filter(fn (Garage $garage) => $this->matchesName($garage->name, $name))
             ->map(fn (Garage $garage) => new NearbySearchResult(
                 type: 'garage',
                 id: $garage->id,
                 name: $garage->name,
                 address: $garage->address,
                 photoUrl: $garage->images->first()?->url(),
-                distanceKm: $this->distanceKm($latitude, $longitude, (float) $garage->latitude, (float) $garage->longitude),
+                distanceKm: $latitude !== null && $longitude !== null
+                    ? $this->distanceKm($latitude, $longitude, (float) $garage->latitude, (float) $garage->longitude)
+                    : null,
                 averageRating: $garage->average_rating !== null ? (float) $garage->average_rating : null,
                 reviewsCount: (int) $garage->reviews_count,
                 isOpenNow: $garage->isOpenNow(),
@@ -88,27 +155,47 @@ class GeoSearchService
     /**
      * @return Collection<int, NearbySearchResult>
      */
-    private function searchMarketSpaces(float $latitude, float $longitude): Collection
+    private function searchMarketSpaces(?float $latitude, ?float $longitude, ?string $name): Collection
     {
         return MarketSpaceAccount::query()
             ->publiclyVisible()
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->when($latitude !== null && $longitude !== null, fn (Builder $query) => $query->whereNotNull('latitude')->whereNotNull('longitude'))
             ->withAvg(['reviews as average_rating' => fn ($query) => $query->where('status', ReviewStatus::Visible)], 'rating')
             ->withCount(['reviews as reviews_count' => fn ($query) => $query->where('status', ReviewStatus::Visible)])
             ->with(['images', 'openingHours'])
             ->get()
+            ->filter(fn (MarketSpaceAccount $account) => $this->matchesName($account->name, $name))
             ->map(fn (MarketSpaceAccount $account) => new NearbySearchResult(
                 type: 'market_space',
                 id: $account->id,
                 name: $account->name,
                 address: $account->address,
                 photoUrl: $account->images->first()?->url(),
-                distanceKm: $this->distanceKm($latitude, $longitude, (float) $account->latitude, (float) $account->longitude),
+                distanceKm: $latitude !== null && $longitude !== null
+                    ? $this->distanceKm($latitude, $longitude, (float) $account->latitude, (float) $account->longitude)
+                    : null,
                 averageRating: $account->average_rating !== null ? (float) $account->average_rating : null,
                 reviewsCount: (int) $account->reviews_count,
                 isOpenNow: $account->isOpenNow(),
             ));
+    }
+
+    /**
+     * Recherche partielle et insensible à la casse (et aux accents, via
+     * mb_strtolower) sur le nom (CLAUDE.md §5, ajout v0.14). Comparaison
+     * faite en PHP plutôt qu'en SQL (LOWER() ne gère les caractères
+     * accentués correctement ni sous SQLite ni de façon garantie sous
+     * PostgreSQL sans configuration de locale) — même choix de portabilité
+     * que le calcul de distance, à l'échelle actuelle du volume de
+     * professionnels (§6).
+     */
+    private function matchesName(string $candidateName, ?string $name): bool
+    {
+        if ($name === null) {
+            return true;
+        }
+
+        return mb_stripos($candidateName, $name) !== false;
     }
 
     /**

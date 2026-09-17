@@ -2574,37 +2574,76 @@ paths:
   /mobile/search/nearby:
     get:
       summary: >
-        Recherche par proximité géographique (CLAUDE.md §5, ajout v0.13) :
-        garages et Market Space approuvés (et non suspendus) triés du plus
-        proche au plus loin, à partir de la position actuelle transmise par
-        l'automobiliste. Indépendante de tout fournisseur de cartographie
+        Recherche de garages et Market Space approuvés (et non suspendus) —
+        CLAUDE.md §5, ajouts v0.13 (proximité) et v0.14 (nom, service, tri).
+        Tous les critères (position, nom, service, tri) sont optionnels et
+        combinables ; un client peut chercher par nom seul, sans position.
+        Seuls le rayon et le tri par distance exigent une position transmise
+        par l'automobiliste, puisqu'ils n'ont pas de sens sans elle. La
+        proximité est indépendante de tout fournisseur de cartographie
         externe — uniquement un calcul de distance (formule de Haversine),
         l'affichage sur une carte est un sujet frontend séparé. Publique,
         comme les autres listes de découverte : utile même sans session
-        (panne, avant inscription).
+        (panne, avant inscription). Pas d'écran "urgence" dédié côté backend :
+        le futur raccourci "urgence" du frontend appellera cette même route
+        avec sort=distance et open_now (une fois ce filtre construit côté
+        frontend) plutôt qu'un nouvel endpoint.
       tags: [Mobile]
       security: []
       parameters:
         - name: latitude
           in: query
-          required: true
+          required: false
+          description: >
+            Obligatoire si longitude, radius_km ou sort=distance est fourni ;
+            optionnelle sinon (recherche par nom/service sans position).
           schema: {type: number, format: float, minimum: -90, maximum: 90}
         - name: longitude
           in: query
-          required: true
+          required: false
+          description: Obligatoire si latitude, radius_km ou sort=distance est fourni.
           schema: {type: number, format: float, minimum: -180, maximum: 180}
         - name: radius_km
           in: query
           required: false
           description: >
-            Rayon maximum en kilomètres. Par défaut GEO_DEFAULT_SEARCH_RADIUS_KM
-            (15 km), plafonné à GEO_MAX_SEARCH_RADIUS_KM (100 km) même si une
-            valeur plus grande est demandée.
+            Rayon maximum en kilomètres (nécessite latitude/longitude). Par
+            défaut GEO_DEFAULT_SEARCH_RADIUS_KM (15 km), plafonné à
+            GEO_MAX_SEARCH_RADIUS_KM (100 km) même si une valeur plus grande
+            est demandée.
           schema: {type: number, format: float, minimum: 0.1}
         - name: type
           in: query
           required: false
           schema: {type: string, enum: [garage, market_space, both], default: both}
+        - name: name
+          in: query
+          required: false
+          description: Recherche partielle, insensible à la casse et aux accents, sur le nom.
+          schema: {type: string, maxLength: 255}
+        - name: service_category
+          in: query
+          required: false
+          description: >
+            Restreint aux garages proposant un service approuvé et actif de
+            cette catégorie. Un Market Space ne fait jamais de réparation :
+            ce filtre exclut donc toujours les Market Space, quel que soit
+            "type" (CLAUDE.md §5, ajout v0.6).
+          schema: {type: string, enum: [entretien_courant, freinage_suspension, pneumatiques, electricite_electronique, climatisation_refroidissement, carrosserie, diagnostic_controle, autre_divers]}
+        - name: service_id
+          in: query
+          required: false
+          description: Restreint au garage proposant précisément ce service (approuvé et actif). Même exclusion des Market Space que service_category.
+          schema: {type: integer}
+        - name: sort
+          in: query
+          required: false
+          description: >
+            "distance" (nécessite une position) ou "rating" (note moyenne
+            décroissante, non notés en dernier, égalité départagée par nom).
+            Par défaut "distance" si une position est fournie, sinon
+            "rating".
+          schema: {type: string, enum: [distance, rating]}
         - name: page
           in: query
           required: false
@@ -2612,16 +2651,21 @@ paths:
       responses:
         '200':
           description: >
-            Liste paginée triée par distance croissante. Chaque résultat
-            porte : type ("garage"/"market_space"), id, name, address (adresse
-            telle qu'enregistrée au profil, pas de format structuré court
-            distinct), photo_url (première image du profil, nullable),
-            distance_km, average_rating/reviews_count (avis visibles
-            uniquement — CLAUDE.md §5, ajout v0.10), et is_open_now (booléen,
-            ou null si le professionnel n'a pas encore renseigné ses horaires
-            pour le jour courant).
+            Liste paginée triée selon "sort". Chaque résultat porte : type
+            ("garage"/"market_space"), id, name, address (adresse telle
+            qu'enregistrée au profil, pas de format structuré court distinct),
+            photo_url (première image du profil, nullable), distance_km
+            (nullable — null si aucune position n'a été transmise),
+            average_rating/reviews_count (avis visibles uniquement —
+            CLAUDE.md §5, ajout v0.10), et is_open_now (booléen, ou null si le
+            professionnel n'a pas encore renseigné ses horaires pour le jour
+            courant).
         '422':
-          description: Position manquante ou hors bornes, rayon invalide, ou type inconnu.
+          description: >
+            Position incomplète alors qu'elle est requise (longitude/radius_km/
+            sort=distance fourni sans latitude, ou l'inverse), position hors
+            bornes, rayon invalide, type/service_category/sort inconnu, ou
+            service_id inexistant.
 
   /mobile/appointments:
     get:

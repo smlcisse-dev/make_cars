@@ -22,7 +22,7 @@ class NearbySearchResultResource extends JsonResource
             'name' => $this->name,
             'address' => $this->address,
             'photo_url' => $this->photoUrl,
-            'distance_km' => round($this->distanceKm, 2),
+            'distance_km' => $this->distanceKm !== null ? round($this->distanceKm, 2) : null,
             'average_rating' => $this->averageRating !== null ? round($this->averageRating, 1) : null,
             'reviews_count' => $this->reviewsCount,
             'is_open_now' => $this->isOpenNow,
