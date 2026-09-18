@@ -2,23 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import * as authApi from '@/api/auth'
-import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/token'
+import { clearStoredSession, getStoredToken, getStoredUser, setStoredToken, setStoredUser } from '@/lib/token'
 import type { AccountType, User } from '@/types/user'
-
-const USER_STORAGE_KEY = 'make_cars_user'
-
-function readStoredUser(): User | null {
-  const raw = localStorage.getItem(USER_STORAGE_KEY)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    return JSON.parse(raw) as User
-  } catch {
-    return null
-  }
-}
 
 // Chemin d'accueil de chaque espace, une fois connecté (CLAUDE.md §3) —
 // l'app mobile Flutter reste le seul accès pour un automobiliste, ce SPA ne
@@ -42,7 +27,7 @@ export function homePathForRole(role: AccountType): string {
 // `isAuthenticated`, qui en dépend) se met à jour automatiquement.
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(getStoredToken())
-  const user = ref<User | null>(readStoredUser())
+  const user = ref<User | null>(getStoredUser())
 
   const isAuthenticated = computed(() => token.value !== null && user.value !== null)
 
@@ -50,14 +35,13 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = newUser
     token.value = newToken
     setStoredToken(newToken)
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser))
+    setStoredUser(newUser)
   }
 
   function clearSession(): void {
     user.value = null
     token.value = null
-    clearStoredToken()
-    localStorage.removeItem(USER_STORAGE_KEY)
+    clearStoredSession()
   }
 
   async function login(email: string, password: string): Promise<void> {

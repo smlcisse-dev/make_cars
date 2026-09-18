@@ -92,13 +92,28 @@ const router = createRouter({
 // `meta.role` est hérité par les enfants sans le redéclarer (une route
 // enfant sans meta propre "voit" quand même le meta du parent via
 // `to.matched`, qui liste toute la chaîne parent -> enfant).
+//
+// Entièrement synchrone, aucun appel réseau : `auth.isAuthenticated`/
+// `auth.user` ne font que lire l'état déjà en mémoire (chargé une fois depuis
+// localStorage à la création du store) — il n'y a donc pas de "vérification
+// de session" à éviter ici, la session n'est jamais re-vérifiée auprès du
+// backend à chaque navigation. La seule vérification serveur se produit
+// naturellement au premier appel API de la page visitée (ex. le chargement
+// de la liste dans RegistrationsView.vue) : un 401 y déclenche le nettoyage
+// et la redirection (voir src/api/http.ts).
 router.beforeEach((to) => {
   const auth = useAuthStore()
   const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role
 
   if (to.name === 'login') {
     // Déjà connecté : inutile de repasser par le login, direction son espace.
-    return auth.user ? { path: homePathForRole(auth.user.role) } : true
+    // On vérifie `isAuthenticated` (token ET utilisateur), pas `user` seul :
+    // un `user` sans token valide ne doit jamais faire croire à une session
+    // active (voir le commentaire de clearStoredSession() dans lib/token.ts).
+    if (!auth.isAuthenticated || !auth.user) {
+      return true
+    }
+    return { path: homePathForRole(auth.user.role) }
   }
 
   if (!requiredRole) {

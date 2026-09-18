@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
 // `ref()` crée une valeur réactive : Vue suit qui la lit (ici le template,
 // via `v-model`) et republie automatiquement l'affichage quand elle change.
@@ -34,7 +35,7 @@ async function handleSubmit(): Promise<void> {
     if (axios.isAxiosError(error) && error.response?.status === 422) {
       errorMessage.value = (error.response.data as { message?: string }).message ?? 'Identifiants invalides.'
     } else {
-      errorMessage.value = 'Une erreur est survenue. Réessayez.'
+      errorMessage.value = extractApiErrorMessage(error, 'Une erreur est survenue. Réessayez.')
     }
   } finally {
     isSubmitting.value = false

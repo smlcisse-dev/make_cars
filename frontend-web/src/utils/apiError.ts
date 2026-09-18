@@ -10,6 +10,9 @@ export function extractApiErrorMessage(error: unknown, fallback: string): string
   console.error(error)
 
   if (axios.isAxiosError(error)) {
+    if (error.code === 'ECONNABORTED') {
+      return 'Le serveur met trop de temps à répondre (délai dépassé). Réessayez.'
+    }
     if (!error.response) {
       return 'Impossible de joindre le serveur. Vérifiez que le backend est démarré et accessible.'
     }
