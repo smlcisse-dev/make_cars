@@ -48,7 +48,7 @@ Le backend Laravel expose une **API REST unique**, consommée à la fois par l'a
 - **Authentification API** : **Laravel Sanctum** (tokens), utilisée par le frontend web et l'app mobile. Émission de token identique quelle que soit la méthode de connexion (email/mot de passe ou Google — voir §5, ajout v0.5) : Sanctum n'est pas concerné par *comment* l'utilisateur a prouvé son identité, seulement par l'émission du token une fois l'identité établie.
 - **Frontend web** : SPA **découplée** en **Vue 3 + TypeScript**, un seul projet (`frontend-web/`) gérant les trois espaces (Admin / Garagiste / Market Space) via son propre routing/permissions internes. Communique uniquement via l'API REST, comme Flutter. Gère elle-même l'auth (stockage du token Sanctum) ; CORS déjà configuré côté Laravel (`backend/config/cors.php`, origine par défaut `http://localhost:5173`). Outillage retenu (socle posé le 2026-09-17) : **Vite** (build/dev server), **Vue Router** (routing interne des 3 espaces + garde de navigation par rôle), **Pinia** en style *setup store* (Composition API), **Axios** (client HTTP unique, intercepteur pour le token Sanctum et la déconnexion automatique sur 401), **Tailwind CSS** (choix explicite de l'utilisateur : contrôle total du design, pas de bibliothèque de composants imposée — voir aussi la note pédagogique en tête de fichier).
 - **Application mobile** : Flutter (Android / iOS).
-- **Base de données** : PostgreSQL hébergée sur **Supabase**.
+- **Base de données** : PostgreSQL hébergée sur **Supabase**. Deux projets Supabase distincts (développement et production) — voir « Environnements de base de données » ci-dessous.
 - **Géolocalisation / cartographie** : prestataire tiers à sélectionner (Google Maps, Mapbox ou OpenStreetMap — non encore arbitré, cf. §7 points ouverts).
 - **Stockage fichiers** (images, justificatifs KYC) : Supabase Storage ou équivalent.
 - **Paiement** : agrégateur local à sélectionner (ex. Kkiapay, FedaPay) supportant Mobile Money (MTN Mobile Money, Moov Money, Celtiis Cash) et carte bancaire.
@@ -56,6 +56,22 @@ Le backend Laravel expose une **API REST unique**, consommée à la fois par l'a
 - **Chat temps réel** : solution à arbitrer (WebSockets / Laravel Reverb, Pusher, ou Supabase Realtime).
 
 > Note pédagogique : l'utilisateur découvre Vue 3 et TypeScript sur ce projet — expliquer brièvement les concepts clés (Composition API, réactivité, typage) au fil du code produit côté frontend.
+
+### Environnements de base de données : développement et production (ajout 2026-09-18)
+
+Deux projets Supabase séparés, pour ne jamais faire porter des essais/migrations risqués à la base réelle :
+
+- **Production** : projet Supabase historique du projet (`postgres.aowpgpeabffpqneflzas`), utilisé depuis le début du développement.
+- **Développement** : second projet Supabase créé le 2026-09-18, dédié aux essais locaux (migrations, seeders, données de test) — même host/port/nom de base (pooler Supabase région `eu-central-1`), seul l'identifiant de projet (`DB_USERNAME`) et le mot de passe diffèrent.
+
+**Mécanisme de bascule** : `backend/.env` n'est plus un fichier ordinaire mais un **lien symbolique** vers `backend/.env.development` ou `backend/.env.production` (les deux fichiers réels, jamais commités — `backend/.gitignore`). Un lien symbolique plutôt qu'une copie manuelle : `readlink backend/.env` (ou le script ci-dessous) dit toujours sans ambiguïté quel environnement est actif, alors qu'un `.env` obtenu par copie ne garde aucune trace de son origine.
+
+- **Basculer** : `backend/bin/switch-env.sh dev` (développement) ou `backend/bin/switch-env.sh prod` (production).
+- **Vérifier l'environnement actif** (à faire en cas de doute avant toute opération sensible — migration, seed, requête destructive) : `backend/bin/switch-env.sh status`, qui affiche le fichier ciblé par le lien ainsi que `DB_HOST`/`DB_USERNAME` (jamais le mot de passe).
+- **Redémarrer `php artisan serve`** après une bascule : le `.env` n'est relu qu'au démarrage du processus PHP, pas à chaud.
+- **Défaut volontaire sur développement** : après une installation/un clone, `.env` doit pointer vers `.env.development`, jamais `.env.production` par défaut — un oubli de bascule doit tomber sans risque sur la base de test, jamais sur la base réelle.
+- **Mot de passe jamais dans ce dépôt ni généré par l'assistant** : chaque `.env.{development,production}` est créé avec `DB_PASSWORD` vide (développement) ou déjà renseigné manuellement par l'utilisateur (production, existant) ; toute mise à jour de mot de passe se fait à la main, directement dans le fichier concerné.
+- **Migrations** : après bascule sur `dev` et mot de passe renseigné dans `backend/.env.development`, `php artisan migrate` (voire `migrate:fresh --seed` pour un jeu de données de test) applique le même schéma que la production, sans risque pour les données réelles.
 
 ## 5. Règles de gestion transversales
 
