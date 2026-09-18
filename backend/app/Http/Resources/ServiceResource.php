@@ -30,6 +30,7 @@ class ServiceResource extends JsonResource
             'status' => $this->status,
             'rejection_reason' => $this->rejection_reason,
             'is_publicly_visible' => $this->isPubliclyVisible(),
+            'garage' => $this->whenLoaded('garage', fn () => new GarageResource($this->garage)),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

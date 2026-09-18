@@ -23,6 +23,10 @@ class ProductApprovalTest extends TestCase
         $response = $this->getJson('/api/admin/products?status=pending');
 
         $response->assertOk()->assertJsonCount(2, 'data');
+        // Le vendeur (Garage ou Market Space) doit être exposé (pas juste
+        // sellable_id) pour que le dashboard admin affiche un nom sans
+        // requête supplémentaire, quel que soit son type polymorphe.
+        $response->assertJsonStructure(['data' => ['*' => ['sellable' => ['id', 'name']]]]);
     }
 
     public function test_a_non_admin_cannot_list_products(): void

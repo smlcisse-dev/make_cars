@@ -22,6 +22,9 @@ class ServiceApprovalTest extends TestCase
         $response = $this->getJson('/api/admin/services?status=pending');
 
         $response->assertOk()->assertJsonCount(2, 'data');
+        // Le garage doit être exposé (pas juste garage_id) pour que le
+        // dashboard admin affiche un nom sans requête supplémentaire.
+        $response->assertJsonStructure(['data' => ['*' => ['garage' => ['id', 'name']]]]);
     }
 
     public function test_a_non_admin_cannot_list_services(): void

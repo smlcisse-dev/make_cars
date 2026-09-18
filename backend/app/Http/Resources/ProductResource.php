@@ -30,6 +30,9 @@ class ProductResource extends JsonResource
             'status' => $this->status,
             'rejection_reason' => $this->rejection_reason,
             'is_publicly_visible' => $this->isPubliclyVisible(),
+            'sellable' => $this->whenLoaded('sellable', fn () => $this->sellable_type === Garage::class
+                ? new GarageResource($this->sellable)
+                : new MarketSpaceAccountResource($this->sellable)),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
