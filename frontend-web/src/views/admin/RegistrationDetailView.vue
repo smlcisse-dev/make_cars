@@ -8,7 +8,7 @@ import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationDocument } from '@/types/registration'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { registrationStatusTone } from '@/utils/registrationStatusTone'
+import { reviewStatusTone } from '@/utils/reviewStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -130,7 +130,7 @@ function formatDate(iso: string): string {
             <h2 class="text-lg font-semibold text-slate-900">{{ registration.structure_name }}</h2>
             <p class="mt-1 text-sm text-slate-500">{{ registration.account_type_label }}</p>
           </div>
-          <StatusBadge :label="registration.status_label" :tone="registrationStatusTone(registration.status)" />
+          <StatusBadge :label="registration.status_label" :tone="reviewStatusTone(registration.status)" />
         </div>
 
         <dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

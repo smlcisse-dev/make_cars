@@ -2,105 +2,101 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { fetchRegistrations } from '@/api/registrations'
+import { fetchServices } from '@/api/services'
 import AppButton from '@/shared/components/AppButton.vue'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import AppTable from '@/shared/components/AppTable.vue'
 import type { TableColumn } from '@/shared/components/AppTable.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
-import type { ProfessionalRegistration, RegistrationStatus } from '@/types/registration'
+import type { Service } from '@/types/service'
+import type { ReviewStatus } from '@/types/review'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { reviewStatusTone } from '@/utils/reviewStatus'
+import { reviewStatusLabel, reviewStatusTone } from '@/utils/reviewStatus'
 
-const STATUS_FILTERS: { value: RegistrationStatus; label: string }[] = [
+const STATUS_FILTERS: { value: ReviewStatus; label: string }[] = [
   { value: 'pending', label: 'En attente' },
   { value: 'approved', label: 'Approuvé' },
   { value: 'rejected', label: 'Rejeté' },
 ]
 
-// Colonnes déclaratives passées au tableau générique (src/shared/components/
-// AppTable.vue) : ce composant n'a besoin que de ça pour afficher l'entête,
-// le contenu de chaque cellule étant personnalisé via les slots `cell-*`
-// ci-dessous (badge de statut, date formatée...).
 const columns: TableColumn[] = [
-  { key: 'structure_name', label: 'Structure' },
-  { key: 'account_type_label', label: 'Type de compte' },
-  { key: 'created_at', label: 'Date de soumission' },
+  { key: 'name', label: 'Service' },
+  { key: 'garage', label: 'Garage' },
+  { key: 'category_label', label: 'Catégorie' },
+  { key: 'price', label: 'Prix' },
   { key: 'status', label: 'Statut' },
 ]
 
 const router = useRouter()
 const route = useRoute()
 
-const statusFilter = ref<RegistrationStatus>('pending')
-const registrations = ref<ProfessionalRegistration[]>([])
+const statusFilter = ref<ReviewStatus>('pending')
+const services = ref<Service[]>([])
 const currentPage = ref(1)
 const lastPage = ref(1)
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
 
 // Message de confirmation transmis depuis la vue détail après une action
-// (approbation/rejet) via les query params de la navigation retour — voir
-// RegistrationDetailView.vue. Affiché une fois puis nettoyé de l'URL.
+// (approbation/rejet) via les query params de la navigation retour — même
+// mécanisme que RegistrationsView.vue.
 const flashMessage = ref<string | null>(null)
 
-async function loadRegistrations(): Promise<void> {
+async function loadServices(): Promise<void> {
   isLoading.value = true
   errorMessage.value = null
 
   try {
-    const response = await fetchRegistrations({ status: statusFilter.value, page: currentPage.value })
-    registrations.value = response.data
+    const response = await fetchServices({ status: statusFilter.value, page: currentPage.value })
+    services.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
   } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, 'Impossible de charger les inscriptions. Réessayez.')
+    errorMessage.value = extractApiErrorMessage(error, 'Impossible de charger les services. Réessayez.')
   } finally {
     isLoading.value = false
   }
 }
 
-function selectStatus(status: RegistrationStatus): void {
+function selectStatus(status: ReviewStatus): void {
   if (status === statusFilter.value) {
     return
   }
   statusFilter.value = status
   currentPage.value = 1
-  loadRegistrations()
+  loadServices()
 }
 
 function goToPage(page: number): void {
   currentPage.value = page
-  loadRegistrations()
+  loadServices()
 }
 
-function goToDetail(registration: ProfessionalRegistration): void {
-  router.push({ name: 'admin.registrations.show', params: { id: registration.id } })
+function goToDetail(service: Service): void {
+  router.push({ name: 'admin.services.show', params: { id: service.id } })
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+function formatPrice(price: string): string {
+  return `${Number(price).toLocaleString('fr-FR')} FCFA`
 }
 
 onMounted(() => {
   const flash = route.query.flash
   if (typeof flash === 'string') {
     flashMessage.value = flash
-    // Nettoie l'URL pour que le message ne réapparaisse pas sur un rechargement
-    // ou un retour arrière du navigateur.
     router.replace({ query: {} })
   }
 
-  loadRegistrations()
+  loadServices()
 })
 </script>
 
 <template>
   <div class="space-y-4">
     <div>
-      <h2 class="text-lg font-semibold text-slate-900">Inscriptions professionnelles</h2>
+      <h2 class="text-lg font-semibold text-slate-900">Services de réparation</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Dossiers Garagiste et Market Space soumis à validation avant d'être visibles côté mobile.
+        Catalogue des garages, soumis à validation avant d'être visible côté mobile (CLAUDE.md §5, règle 5).
       </p>
     </div>
 
@@ -123,18 +119,21 @@ onMounted(() => {
     <p v-else-if="isLoading" class="text-sm text-slate-500">Chargement...</p>
 
     <template v-else>
-      <AppTable :items="registrations" :columns="columns" @row-click="goToDetail">
-        <template #empty>Aucun dossier {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
-        <template #cell-created_at="{ item }">
-          {{ formatDate(item.created_at) }}
+      <AppTable :items="services" :columns="columns" @row-click="goToDetail">
+        <template #empty>Aucun service {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
+        <template #cell-garage="{ item }">
+          {{ item.garage.name }}
+        </template>
+        <template #cell-price="{ item }">
+          {{ formatPrice(item.price) }}
         </template>
         <template #cell-status="{ item }">
-          <StatusBadge :label="item.status_label" :tone="reviewStatusTone(item.status)" />
+          <StatusBadge :label="reviewStatusLabel(item.status)" :tone="reviewStatusTone(item.status)" />
         </template>
       </AppTable>
 
       <AppPagination
-        v-if="registrations.length > 0"
+        v-if="services.length > 0"
         :current-page="currentPage"
         :last-page="lastPage"
         @update:current-page="goToPage"

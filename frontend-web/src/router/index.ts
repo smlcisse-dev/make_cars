@@ -49,6 +49,26 @@ const router = createRouter({
           name: 'admin.registrations.show',
           component: () => import('@/views/admin/RegistrationDetailView.vue'),
         },
+        {
+          path: 'services',
+          name: 'admin.services',
+          component: () => import('@/views/admin/ServicesView.vue'),
+        },
+        {
+          path: 'services/:id',
+          name: 'admin.services.show',
+          component: () => import('@/views/admin/ServiceDetailView.vue'),
+        },
+        {
+          path: 'products',
+          name: 'admin.products',
+          component: () => import('@/views/admin/ProductsView.vue'),
+        },
+        {
+          path: 'products/:id',
+          name: 'admin.products.show',
+          component: () => import('@/views/admin/ProductDetailView.vue'),
+        },
       ],
     },
     {

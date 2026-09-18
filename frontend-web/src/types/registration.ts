@@ -1,7 +1,9 @@
+import type { ReviewStatus } from '@/types/review'
 import type { AccountType } from '@/types/user'
 
-// Reflète App\Enums\RegistrationStatus côté backend.
-export type RegistrationStatus = 'pending' | 'approved' | 'rejected'
+// Reflète App\Enums\RegistrationStatus côté backend — mêmes valeurs que
+// ReviewStatus (partagé avec les services et produits, voir src/types/review.ts).
+export type RegistrationStatus = ReviewStatus
 
 // Reflète App\Enums\RegistrationDocumentType côté backend.
 export type RegistrationDocumentType = 'business_registration' | 'premises_photo'
