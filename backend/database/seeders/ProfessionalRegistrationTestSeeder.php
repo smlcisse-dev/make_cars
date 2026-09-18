@@ -5,8 +5,8 @@ namespace Database\Seeders;
 use App\Enums\AccountType;
 use App\Models\User;
 use App\Services\ProfessionalRegistrationService;
+use Database\Seeders\Concerns\GeneratesFakeKycDocuments;
 use Illuminate\Database\Seeder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class ProfessionalRegistrationTestSeeder extends Seeder
 {
+    use GeneratesFakeKycDocuments;
+
     private const TEST_EMAILS = [
         'garage.etoile.pending@makecars.test',
         'pieces.express.pending@makecars.test',
@@ -139,63 +141,5 @@ class ProfessionalRegistrationTestSeeder extends Seeder
 
             $user->delete();
         }
-    }
-
-    /**
-     * UploadedFile::fake()->create() ne produit qu'un fichier de taille
-     * donnée rempli de contenu arbitraire (pas un vrai PDF, malgré le
-     * mimeType forcé) — un lecteur PDF strict (ex. Firefox) l'ouvre avec
-     * « 0 sur 0 pages ». On génère ici un vrai PDF minimal mais
-     * structurellement valide (objets, table xref aux offsets corrects,
-     * trailer) via createWithContent().
-     */
-    private function fakeBusinessRegistrationDocument(): UploadedFile
-    {
-        return UploadedFile::fake()->createWithContent(
-            'registre-commerce.pdf',
-            $this->minimalPdfContent('Registre de commerce - Document de test (Make Cars)'),
-        );
-    }
-
-    private function fakePremisesPhoto(): UploadedFile
-    {
-        return UploadedFile::fake()->image('photo-local.jpg', 640, 480);
-    }
-
-    /**
-     * Construit un PDF 1.4 minimal (une page, un bloc de texte) : catalogue,
-     * arbre de pages, page, police, flux de contenu, puis table xref dont
-     * les offsets sont calculés à partir de la position réelle de chaque
-     * objet dans le flux généré, plutôt que codés en dur.
-     */
-    private function minimalPdfContent(string $text): string
-    {
-        $stream = "BT /F1 12 Tf 20 100 Td ({$text}) Tj ET";
-
-        $objects = [
-            1 => '<< /Type /Catalog /Pages 2 0 R >>',
-            2 => '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-            3 => '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-            4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-            5 => '<< /Length '.strlen($stream).' >>'."\nstream\n{$stream}\nendstream",
-        ];
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [];
-
-        foreach ($objects as $id => $body) {
-            $offsets[$id] = strlen($pdf);
-            $pdf .= "{$id} 0 obj\n{$body}\nendobj\n";
-        }
-
-        $xrefOffset = strlen($pdf);
-        $entryCount = count($objects) + 1;
-
-        $xref = "xref\n0 {$entryCount}\n0000000000 65535 f \n";
-        foreach ($objects as $id => $body) {
-            $xref .= sprintf("%010d 00000 n \n", $offsets[$id]);
-        }
-
-        return $pdf.$xref."trailer\n<< /Size {$entryCount} /Root 1 0 R >>\nstartxref\n{$xrefOffset}\n%%EOF";
     }
 }
