@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Un produit appartient soit à un profil Garage (mini-boutique), soit à un
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * mutualise catalogue/commande/paiement entre les deux cas plutôt que de
  * dupliquer la logique (CLAUDE.md §5, ajout v0.4).
  */
-#[Fillable(['name', 'description', 'sku', 'price', 'stock_quantity', 'low_stock_threshold', 'low_stock_alert_sent_at', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])]
+#[Fillable(['name', 'description', 'sku', 'price', 'stock_quantity', 'low_stock_threshold', 'low_stock_alert_sent_at', 'image_disk', 'image_path', 'status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -43,6 +44,11 @@ class Product extends Model
     public function sellable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function imageUrl(): ?string
+    {
+        return $this->image_path ? Storage::disk($this->image_disk)->url($this->image_path) : null;
     }
 
     /**

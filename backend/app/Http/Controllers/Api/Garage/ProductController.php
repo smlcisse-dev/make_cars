@@ -33,7 +33,11 @@ class ProductController extends Controller
 
     public function store(StoreProductRequest $request): JsonResponse
     {
-        $product = $this->productService->create($this->authenticatedGarage($request), $request->validated());
+        $product = $this->productService->create(
+            $this->authenticatedGarage($request),
+            $request->safe()->except('image'),
+            $request->file('image'),
+        );
 
         return $this->success(new ProductResource($product), 'Produit ajouté, en attente de validation admin.', 201);
     }
@@ -43,7 +47,7 @@ class ProductController extends Controller
         $garage = $this->authenticatedGarage($request);
         abort_unless($product->sellable_id === $garage->id && $product->sellable_type === $garage->getMorphClass(), 404);
 
-        $product = $this->productService->update($product, $request->validated());
+        $product = $this->productService->update($product, $request->safe()->except('image'), $request->file('image'));
 
         return $this->success(new ProductResource($product), 'Produit mis à jour, en attente de validation admin.');
     }

@@ -7,6 +7,8 @@ use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Logique produit mutualisée entre mini-boutique Garage et Market Space : un
@@ -18,15 +20,26 @@ class ProductService
 {
     public function __construct(private readonly PushNotificationService $notificationService) {}
 
+    private function disk(): string
+    {
+        return config('filesystems.public_media_disk', 'public');
+    }
+
     /**
      * @param  array{name: string, description: ?string, sku: ?string, price: float, stock_quantity: int}  $data
      */
-    public function create(Garage|MarketSpaceAccount $sellable, array $data): Product
+    public function create(Garage|MarketSpaceAccount $sellable, array $data, ?UploadedFile $image = null): Product
     {
-        return $sellable->products()->create([
+        $product = $sellable->products()->create([
             ...$data,
             'status' => ProductStatus::Pending,
         ]);
+
+        if ($image) {
+            $this->storeImage($product, $image);
+        }
+
+        return $product;
     }
 
     /**
@@ -35,7 +48,7 @@ class ProductService
      *
      * @param  array{name: string, description: ?string, sku: ?string, price: float}  $data
      */
-    public function update(Product $product, array $data): Product
+    public function update(Product $product, array $data, ?UploadedFile $image = null): Product
     {
         $product->update([
             ...$data,
@@ -45,7 +58,23 @@ class ProductService
             'reviewed_at' => null,
         ]);
 
+        if ($image) {
+            $this->storeImage($product, $image);
+        }
+
         return $product;
+    }
+
+    private function storeImage(Product $product, UploadedFile $image): void
+    {
+        if ($product->image_path) {
+            Storage::disk($product->image_disk)->delete($product->image_path);
+        }
+
+        $disk = $this->disk();
+        $path = $image->store('products/'.class_basename($product->sellable_type).'-'.$product->sellable_id, $disk);
+
+        $product->update(['image_disk' => $disk, 'image_path' => $path]);
     }
 
     /**

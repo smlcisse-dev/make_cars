@@ -77,7 +77,7 @@ class CatalogTestSeeder extends Seeder
             'category' => 'entretien_courant',
             'price' => 15000,
             'duration_minutes' => 45,
-        ], null);
+        ], $this->fakeCatalogImage('vidange-complete.jpg'));
 
         $garage->products()->where('name', self::GARAGE_PRODUCT_NAME)->delete();
         $productService->create($garage, [
@@ -86,7 +86,7 @@ class CatalogTestSeeder extends Seeder
             'sku' => 'HUILE-5W30-5L-TEST',
             'price' => 12000,
             'stock_quantity' => 20,
-        ]);
+        ], $this->fakeCatalogImage('huile-moteur-5w30.jpg'));
 
         $marketSpaceAccount = $this->ensureApprovedMarketSpaceAccount($registrationService, $admin);
 
@@ -97,7 +97,7 @@ class CatalogTestSeeder extends Seeder
             'sku' => 'PLAQ-FREIN-AV-TEST',
             'price' => 18000,
             'stock_quantity' => 10,
-        ]);
+        ], $this->fakeCatalogImage('plaquettes-frein-avant.jpg'));
 
         $this->command?->info(
             'CatalogTestSeeder : 1 service pending (garage) + 2 produits pending (mini-boutique garage + Market Space) créés.',

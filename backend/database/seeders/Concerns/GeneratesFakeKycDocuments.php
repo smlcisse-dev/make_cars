@@ -26,6 +26,11 @@ trait GeneratesFakeKycDocuments
         return UploadedFile::fake()->image('photo-local.jpg', 640, 480);
     }
 
+    private function fakeCatalogImage(string $filename): UploadedFile
+    {
+        return UploadedFile::fake()->image($filename, 640, 480);
+    }
+
     /**
      * Construit un PDF 1.4 minimal (une page, un bloc de texte) : catalogue,
      * arbre de pages, page, police, flux de contenu, puis table xref dont

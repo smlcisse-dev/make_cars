@@ -26,6 +26,7 @@ export interface Product {
   price: string
   stock_quantity: number
   low_stock_threshold: number | null
+  image_url: string | null
   status: ReviewStatus
   rejection_reason: string | null
   is_publicly_visible: boolean

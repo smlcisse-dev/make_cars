@@ -114,6 +114,13 @@ function formatDate(iso: string): string {
           <StatusBadge :label="reviewStatusLabel(product.status)" :tone="reviewStatusTone(product.status)" />
         </div>
 
+        <img
+          v-if="product.image_url"
+          :src="product.image_url"
+          :alt="product.name"
+          class="mt-4 h-48 w-full rounded-md object-cover sm:w-64"
+        />
+
         <dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">SKU</dt>
