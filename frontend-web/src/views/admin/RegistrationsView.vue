@@ -9,6 +9,7 @@ import AppTable from '@/shared/components/AppTable.vue'
 import type { TableColumn } from '@/shared/components/AppTable.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationStatus } from '@/types/registration'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import { registrationStatusTone } from '@/utils/registrationStatusTone'
 
 const STATUS_FILTERS: { value: RegistrationStatus; label: string }[] = [
@@ -52,8 +53,8 @@ async function loadRegistrations(): Promise<void> {
     registrations.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
-  } catch {
-    errorMessage.value = 'Impossible de charger les inscriptions. Réessayez.'
+  } catch (error) {
+    errorMessage.value = extractApiErrorMessage(error, 'Impossible de charger les inscriptions. Réessayez.')
   } finally {
     isLoading.value = false
   }

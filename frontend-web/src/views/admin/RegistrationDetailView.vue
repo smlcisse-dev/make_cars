@@ -7,6 +7,7 @@ import AppButton from '@/shared/components/AppButton.vue'
 import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationDocument } from '@/types/registration'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import { registrationStatusTone } from '@/utils/registrationStatusTone'
 
 const route = useRoute()
@@ -35,8 +36,8 @@ async function loadRegistration(): Promise<void> {
 
   try {
     registration.value = await fetchRegistration(registrationId)
-  } catch {
-    loadErrorMessage.value = "Impossible de charger ce dossier. Réessayez."
+  } catch (error) {
+    loadErrorMessage.value = extractApiErrorMessage(error, 'Impossible de charger ce dossier. Réessayez.')
   } finally {
     isLoading.value = false
   }
@@ -59,8 +60,8 @@ async function handleApprove(): Promise<void> {
   try {
     const approved = await approveRegistration(registration.value.id)
     backToList(`Dossier "${approved.structure_name}" approuvé.`)
-  } catch {
-    actionErrorMessage.value = "L'approbation a échoué. Réessayez."
+  } catch (error) {
+    actionErrorMessage.value = extractApiErrorMessage(error, "L'approbation a échoué. Réessayez.")
   } finally {
     isApproving.value = false
   }
@@ -77,8 +78,8 @@ async function handleReject(reason: string): Promise<void> {
   try {
     const rejected = await rejectRegistration(registration.value.id, reason)
     backToList(`Dossier "${rejected.structure_name}" rejeté.`)
-  } catch {
-    actionErrorMessage.value = 'Le rejet a échoué. Réessayez.'
+  } catch (error) {
+    actionErrorMessage.value = extractApiErrorMessage(error, 'Le rejet a échoué. Réessayez.')
     isRejectModalOpen.value = false
   } finally {
     isRejecting.value = false
@@ -98,10 +99,10 @@ async function openDocument(document: RegistrationDocument): Promise<void> {
     const objectUrl = URL.createObjectURL(blob)
     window.open(objectUrl, '_blank')
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
-  } catch {
+  } catch (error) {
     documentErrorById.value = {
       ...documentErrorById.value,
-      [document.id]: 'Impossible de récupérer ce document.',
+      [document.id]: extractApiErrorMessage(error, 'Impossible de récupérer ce document.'),
     }
   } finally {
     isOpeningDocumentId.value = null
