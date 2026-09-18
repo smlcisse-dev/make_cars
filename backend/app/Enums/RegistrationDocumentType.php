@@ -10,4 +10,12 @@ enum RegistrationDocumentType: string
 {
     case BusinessRegistration = 'business_registration';
     case PremisesPhoto = 'premises_photo';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::BusinessRegistration => 'Registre de commerce / IFU-RCCM',
+            self::PremisesPhoto => 'Photo du local',
+        };
+    }
 }

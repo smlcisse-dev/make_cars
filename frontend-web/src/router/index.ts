@@ -39,6 +39,16 @@ const router = createRouter({
           name: 'admin.dashboard',
           component: () => import('@/views/admin/DashboardView.vue'),
         },
+        {
+          path: 'registrations',
+          name: 'admin.registrations',
+          component: () => import('@/views/admin/RegistrationsView.vue'),
+        },
+        {
+          path: 'registrations/:id',
+          name: 'admin.registrations.show',
+          component: () => import('@/views/admin/RegistrationDetailView.vue'),
+        },
       ],
     },
     {

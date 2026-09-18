@@ -22,6 +22,7 @@ class RegistrationDocumentResource extends JsonResource
         return [
             'id' => $this->id,
             'type' => $this->type->value,
+            'type_label' => $this->type->label(),
             'download_url' => route('admin.registrations.documents.download', [
                 'registration' => $this->professional_registration_id,
                 'document' => $this->id,

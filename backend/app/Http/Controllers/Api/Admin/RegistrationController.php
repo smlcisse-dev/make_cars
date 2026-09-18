@@ -31,7 +31,7 @@ class RegistrationController extends Controller
 
         $registrations = ProfessionalRegistration::query()
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->with('documents')
+            ->with(['documents', 'user'])
             ->latest()
             ->paginate();
 
@@ -42,7 +42,7 @@ class RegistrationController extends Controller
     {
         Gate::authorize('view', $registration);
 
-        return $this->success(new ProfessionalRegistrationResource($registration->load('documents')));
+        return $this->success(new ProfessionalRegistrationResource($registration->load(['documents', 'user'])));
     }
 
     public function approve(Request $request, ProfessionalRegistration $registration): JsonResponse

@@ -25,6 +25,21 @@ class RegistrationApprovalTest extends TestCase
         $response->assertOk()->assertJsonCount(2, 'data');
     }
 
+    public function test_the_registration_list_exposes_the_account_type_of_each_applicant(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+        ProfessionalRegistration::factory()->create();
+        ProfessionalRegistration::factory()->marketSpace()->create();
+
+        $response = $this->getJson('/api/admin/registrations');
+
+        $response->assertOk();
+        $this->assertEqualsCanonicalizing(
+            [AccountType::Garagiste->value, AccountType::MarketSpace->value],
+            collect($response->json('data'))->pluck('account_type')->all(),
+        );
+    }
+
     public function test_a_non_admin_cannot_list_registrations(): void
     {
         Sanctum::actingAs(User::factory()->garagiste()->create());
