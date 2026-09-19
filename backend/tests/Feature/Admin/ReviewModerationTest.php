@@ -32,7 +32,8 @@ class ReviewModerationTest extends TestCase
 
         $this->getJson("/api/admin/reviews/{$review->id}")
             ->assertOk()
-            ->assertJsonPath('data.id', $review->id);
+            ->assertJsonPath('data.id', $review->id)
+            ->assertJsonPath('data.reviewable.name', $review->reviewable->name);
     }
 
     public function test_an_admin_can_hide_a_review_with_a_reason(): void

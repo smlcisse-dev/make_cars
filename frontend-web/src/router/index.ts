@@ -69,6 +69,16 @@ const router = createRouter({
           name: 'admin.products.show',
           component: () => import('@/views/admin/ProductDetailView.vue'),
         },
+        {
+          path: 'avis',
+          name: 'admin.avis',
+          component: () => import('@/views/admin/AvisView.vue'),
+        },
+        {
+          path: 'avis/:id',
+          name: 'admin.avis.show',
+          component: () => import('@/views/admin/AvisDetailView.vue'),
+        },
       ],
     },
     {

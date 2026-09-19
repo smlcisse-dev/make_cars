@@ -22,6 +22,11 @@ class ReviewResource extends JsonResource
             'id' => $this->id,
             'reviewable_type' => $this->reviewable_type === Garage::class ? 'garage' : 'market_space',
             'reviewable_id' => $this->reviewable_id,
+            // Cible réelle (nom, ville...) pour l'affichage admin — même
+            // logique que ServiceResource->garage, jamais dupliquée en base.
+            'reviewable' => $this->whenLoaded('reviewable', fn () => $this->reviewable_type === Garage::class
+                ? new GarageResource($this->reviewable)
+                : new MarketSpaceAccountResource($this->reviewable)),
             'transaction_type' => $this->transaction_type === Order::class ? 'order' : 'quote',
             'transaction_id' => $this->transaction_id,
             'rating' => $this->rating,

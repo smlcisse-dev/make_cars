@@ -6,6 +6,7 @@ const navItems = [
   { label: 'Inscriptions', to: '/admin/registrations' },
   { label: 'Services', to: '/admin/services' },
   { label: 'Produits', to: '/admin/products' },
+  { label: 'Avis', to: '/admin/avis' },
 ]
 </script>
 
