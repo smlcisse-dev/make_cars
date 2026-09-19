@@ -42,6 +42,24 @@ export async function rejectRegistration(id: number, reason: string): Promise<Pr
 }
 
 /**
+ * Suspend un compte déjà approuvé (motif obligatoire, CLAUDE.md §5, ajout
+ * v0.6). Le statut d'inscription reste "approved" côté backend : seul
+ * `is_suspended` change, d'où l'absence de nouveau statut ici.
+ */
+export async function suspendRegistration(id: number, reason: string): Promise<ProfessionalRegistration> {
+  const response = await http.post<ApiEnvelope<ProfessionalRegistration>>(`/admin/registrations/${id}/suspend`, {
+    reason,
+  })
+  return response.data.data
+}
+
+// Réactivation : effet immédiat, aucun motif requis (CLAUDE.md §5, ajout v0.6).
+export async function reactivateRegistration(id: number): Promise<ProfessionalRegistration> {
+  const response = await http.post<ApiEnvelope<ProfessionalRegistration>>(`/admin/registrations/${id}/reactivate`)
+  return response.data.data
+}
+
+/**
  * Le fichier est privé (disque non public côté backend) : `download_url`
  * exige le token Sanctum, donc une simple balise <a href> échouerait (pas
  * d'en-tête Authorization sur une navigation classique). On le récupère en

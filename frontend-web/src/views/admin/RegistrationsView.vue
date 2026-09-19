@@ -129,7 +129,10 @@ onMounted(() => {
           {{ formatDate(item.created_at) }}
         </template>
         <template #cell-status="{ item }">
-          <StatusBadge :label="item.status_label" :tone="reviewStatusTone(item.status)" />
+          <div class="flex items-center gap-2">
+            <StatusBadge :label="item.status_label" :tone="reviewStatusTone(item.status)" />
+            <StatusBadge v-if="item.is_suspended" label="Suspendu" tone="danger" />
+          </div>
         </template>
       </AppTable>
 
