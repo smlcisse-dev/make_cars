@@ -28,12 +28,12 @@ async function handleLogout(): Promise<void> {
 
 <template>
   <div class="flex min-h-screen bg-slate-50">
-    <aside class="flex w-64 flex-col border-r border-slate-200 bg-white">
+    <aside class="sticky top-0 flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
       <div class="border-b border-slate-200 px-6 py-5">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Make Cars</p>
         <h1 class="text-lg font-semibold text-slate-900">{{ title }}</h1>
       </div>
-      <nav class="flex-1 space-y-1 px-3 py-4">
+      <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
@@ -44,23 +44,20 @@ async function handleLogout(): Promise<void> {
           {{ item.label }}
         </RouterLink>
       </nav>
-    </aside>
-
-    <div class="flex flex-1 flex-col">
-      <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-        <div>
-          <p class="text-sm font-medium text-slate-900">{{ auth.user?.name }}</p>
-          <p class="text-xs text-slate-500">{{ auth.user?.role_label }}</p>
-        </div>
+      <div class="border-t border-slate-200 px-4 py-4">
+        <p class="text-sm font-medium text-slate-900">{{ auth.user?.name }}</p>
+        <p class="text-xs text-slate-500">{{ auth.user?.role_label }}</p>
         <button
           type="button"
-          class="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          class="mt-3 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
           @click="handleLogout"
         >
           Se déconnecter
         </button>
-      </header>
+      </div>
+    </aside>
 
+    <div class="flex flex-1 flex-col">
       <main class="flex-1 p-6">
         <slot />
       </main>
