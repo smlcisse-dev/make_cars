@@ -16,7 +16,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_list_its_garages_appointments(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Appointment::factory()->forGarage($garage)->count(2)->create();
         Appointment::factory()->count(1)->create();
         Sanctum::actingAs($garage->user);
@@ -28,7 +28,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_filter_its_appointments_by_status(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Appointment::factory()->forGarage($garage)->confirmed()->create();
         Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
@@ -40,7 +40,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_confirm_a_pending_appointment(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -52,7 +52,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_reject_a_pending_appointment_with_a_reason(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -69,7 +69,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_reject_a_pending_appointment_without_a_reason(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -80,7 +80,7 @@ class AppointmentTest extends TestCase
 
     public function test_a_garagiste_can_propose_a_new_date_for_a_pending_appointment(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -96,7 +96,7 @@ class AppointmentTest extends TestCase
 
     public function test_confirming_an_already_confirmed_appointment_is_forbidden(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->confirmed()->create();
         Sanctum::actingAs($garage->user);
 
@@ -106,7 +106,7 @@ class AppointmentTest extends TestCase
     public function test_a_garagiste_cannot_manage_another_garages_appointment(): void
     {
         $appointment = Appointment::factory()->create();
-        $otherGarage = Garage::factory()->create();
+        $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 
         $this->postJson("/api/garage/appointments/{$appointment->id}/confirm")->assertNotFound();

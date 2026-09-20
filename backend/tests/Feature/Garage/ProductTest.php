@@ -16,7 +16,7 @@ class ProductTest extends TestCase
 
     public function test_a_garagiste_can_list_its_own_products(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Product::factory()->forGarage($garage)->count(2)->create();
         Product::factory()->forGarage()->count(1)->create();
         Sanctum::actingAs($garage->user);
@@ -28,7 +28,7 @@ class ProductTest extends TestCase
 
     public function test_a_garagiste_can_add_a_product_pending_validation(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
         $response = $this->postJson('/api/garage/products', [
@@ -50,7 +50,7 @@ class ProductTest extends TestCase
 
     public function test_updating_a_product_resets_its_validation_status(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $product = Product::factory()->forGarage($garage)->approved()->create();
         Sanctum::actingAs($garage->user);
 
@@ -72,7 +72,7 @@ class ProductTest extends TestCase
 
     public function test_updating_stock_does_not_reset_validation_status(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $product = Product::factory()->forGarage($garage)->approved()->create(['stock_quantity' => 5]);
         Sanctum::actingAs($garage->user);
 
@@ -95,7 +95,7 @@ class ProductTest extends TestCase
      */
     public function test_a_garagiste_can_set_a_low_stock_alert_threshold_via_the_stock_endpoint(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $product = Product::factory()->forGarage($garage)->approved()->create(['stock_quantity' => 5, 'low_stock_threshold' => null]);
         Sanctum::actingAs($garage->user);
 
@@ -110,7 +110,7 @@ class ProductTest extends TestCase
 
     public function test_a_garagiste_can_delete_its_own_product(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $product = Product::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -122,7 +122,7 @@ class ProductTest extends TestCase
     public function test_a_garagiste_cannot_modify_another_garages_product(): void
     {
         $product = Product::factory()->forGarage()->create();
-        $otherGarage = Garage::factory()->create();
+        $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 
         $this->putJson("/api/garage/products/{$product->id}", [

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-import { clearStoredSession, getStoredToken } from '@/lib/token'
+import { clearStoredSession, getStoredToken, getStoredUser, setStoredUser } from '@/lib/token'
 
 // Client HTTP unique pour toute l'app : les trois espaces (Admin/Garage/
 // Market Space) consomment la même API REST Laravel (CLAUDE.md §4).
@@ -50,6 +50,32 @@ http.interceptors.response.use(
         window.location.href = '/login'
       }
     }
+
+    // 403 `profile_incomplete` : le backend refuse l'accès tant que le profil
+    // du professionnel n'est pas complet (CLAUDE.md §5, ajout v0.20). Filet de
+    // sécurité si l'état local est périmé (ex. session ouverte avant cette
+    // règle) : on mémorise l'état d'incomplétude puis on recharge sur la
+    // page de profil, où le garde de navigation prend le relais.
+    const data = error.response?.data
+    if (error.response?.status === 403 && data?.code === 'profile_incomplete') {
+      const user = getStoredUser()
+      const profilePath =
+        user?.role === 'garagiste'
+          ? '/garage/profile'
+          : user?.role === 'market_space'
+            ? '/market-space/profile'
+            : null
+      if (user && profilePath) {
+        setStoredUser({
+          ...user,
+          profile_status: { is_complete: false, missing_fields: data.missing_fields ?? [] },
+        })
+        if (window.location.pathname !== profilePath) {
+          window.location.href = profilePath
+        }
+      }
+    }
+
     return Promise.reject(error)
   },
 )

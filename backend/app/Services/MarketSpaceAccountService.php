@@ -8,6 +8,7 @@ use App\Models\MarketSpaceImage;
 use App\Models\ProfessionalRegistration;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Même structure que GarageService, adaptée à MarketSpaceAccount (module
@@ -25,6 +26,7 @@ class MarketSpaceAccountService
         return $registration->user->marketSpaceAccount()->create([
             'name' => $registration->structure_name,
             'address' => $registration->address,
+            'phone' => $registration->user->phone,
         ]);
     }
 
@@ -79,6 +81,10 @@ class MarketSpaceAccountService
 
     public function removeImage(MarketSpaceImage $image): void
     {
+        if ($image->marketSpaceAccount->images()->count() <= 1) {
+            throw ValidationException::withMessages(['image' => 'Un profil doit garder au moins une photo : ajoutez-en une autre avant de supprimer celle-ci.']);
+        }
+
         Storage::disk($image->disk)->delete($image->path);
         $image->delete();
     }

@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests\MarketSpace;
 
+use App\Http\Requests\Concerns\NormalizesBeninPhone;
 use App\Http\Requests\Concerns\ValidatesAdministrativeLocation;
+use App\Rules\BeninPhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateMarketSpaceProfileRequest extends FormRequest
 {
+    use NormalizesBeninPhone;
     use ValidatesAdministrativeLocation;
 
     /**
@@ -28,9 +31,9 @@ class UpdateMarketSpaceProfileRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'address' => ['required', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'phone' => ['required', 'string', new BeninPhoneNumber],
         ];
     }
 

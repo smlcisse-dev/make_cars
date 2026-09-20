@@ -62,6 +62,19 @@ class User extends Authenticatable
     }
 
     /**
+     * Profil public du professionnel (Garage ou Market Space selon le rôle),
+     * null pour les autres rôles ou tant que le dossier n'est pas approuvé.
+     */
+    public function professionalProfile(): Garage|MarketSpaceAccount|null
+    {
+        return match ($this->role) {
+            AccountType::Garagiste => $this->garage,
+            AccountType::MarketSpace => $this->marketSpaceAccount,
+            default => null,
+        };
+    }
+
+    /**
      * RDV demandés par cet automobiliste (CLAUDE.md §5, ajout v0.7).
      *
      * @return HasMany<Appointment, $this>

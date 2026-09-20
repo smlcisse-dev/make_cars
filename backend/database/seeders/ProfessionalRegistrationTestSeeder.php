@@ -89,7 +89,7 @@ class ProfessionalRegistrationTestSeeder extends Seeder
      */
     private function garagisteData(string $structureName, string $emailPrefix): array
     {
-        return $this->registrationData(AccountType::Garagiste, $structureName, $emailPrefix, '229 90 01 02 '.random_int(10, 99));
+        return $this->registrationData(AccountType::Garagiste, $structureName, $emailPrefix, '+229 01 90 01 02 '.random_int(10, 99));
     }
 
     /**
@@ -97,7 +97,7 @@ class ProfessionalRegistrationTestSeeder extends Seeder
      */
     private function marketSpaceData(string $structureName, string $emailPrefix): array
     {
-        return $this->registrationData(AccountType::MarketSpace, $structureName, $emailPrefix, '229 90 02 03 '.random_int(10, 99));
+        return $this->registrationData(AccountType::MarketSpace, $structureName, $emailPrefix, '+229 01 90 02 03 '.random_int(10, 99));
     }
 
     /**

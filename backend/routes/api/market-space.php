@@ -18,25 +18,29 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     Route::post('profile/images', [MarketSpaceImageController::class, 'store']);
     Route::delete('profile/images/{image}', [MarketSpaceImageController::class, 'destroy']);
 
-    Route::get('products', [ProductController::class, 'index']);
-    Route::post('products', [ProductController::class, 'store']);
-    Route::put('products/{product}', [ProductController::class, 'update']);
-    Route::put('products/{product}/stock', [ProductController::class, 'updateStock']);
-    Route::delete('products/{product}', [ProductController::class, 'destroy']);
+    // Tout le reste de l'espace pro exige un profil complet (CLAUDE.md §5,
+    // ajout v0.20).
+    Route::middleware('profile.complete')->group(function () {
+        Route::get('products', [ProductController::class, 'index']);
+        Route::post('products', [ProductController::class, 'store']);
+        Route::put('products/{product}', [ProductController::class, 'update']);
+        Route::put('products/{product}/stock', [ProductController::class, 'updateStock']);
+        Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
-    Route::get('orders', [OrderController::class, 'index']);
-    Route::get('orders/{order}', [OrderController::class, 'show']);
-    Route::post('orders/{order}/mark-paid', [OrderController::class, 'markPaid']);
-    Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
+        Route::get('orders', [OrderController::class, 'index']);
+        Route::get('orders/{order}', [OrderController::class, 'show']);
+        Route::post('orders/{order}/mark-paid', [OrderController::class, 'markPaid']);
+        Route::get('orders/{order}/pdf', [OrderController::class, 'downloadPdf']);
 
-    Route::get('reviews', [ReviewController::class, 'index']);
+        Route::get('reviews', [ReviewController::class, 'index']);
 
-    Route::get('disputes', [DisputeController::class, 'index']);
-    Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
-    Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
-    Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+        Route::get('disputes', [DisputeController::class, 'index']);
+        Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
+        Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
+        Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
 
-    Route::get('notifications', [NotificationController::class, 'index']);
-    Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
-    Route::put('device-tokens', [DeviceTokenController::class, 'store']);
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
+        Route::put('device-tokens', [DeviceTokenController::class, 'store']);
+    });
 });

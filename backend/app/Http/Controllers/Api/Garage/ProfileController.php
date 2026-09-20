@@ -20,7 +20,7 @@ class ProfileController extends Controller
     {
         $garage = $this->authenticatedGarage($request)->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']);
 
-        return $this->success(new GarageResource($garage));
+        return $this->success(new GarageResource($garage), meta: ['profile_status' => $garage->profileStatus()]);
     }
 
     public function update(UpdateGarageProfileRequest $request): JsonResponse
@@ -30,6 +30,6 @@ class ProfileController extends Controller
             $request->validated(),
         );
 
-        return $this->success(new GarageResource($garage->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil garage mis à jour.');
+        return $this->success(new GarageResource($garage->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil garage mis à jour.', meta: ['profile_status' => $garage->profileStatus()]);
     }
 }

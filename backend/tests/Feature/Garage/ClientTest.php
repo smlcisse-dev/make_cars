@@ -21,7 +21,7 @@ class ClientTest extends TestCase
     {
         $registration = ProfessionalRegistration::factory()->approved()->create();
 
-        return Garage::factory()->for($registration->user)->create();
+        return Garage::factory()->complete()->for($registration->user)->create();
     }
 
     public function test_a_garagiste_can_create_an_express_client(): void
@@ -32,13 +32,13 @@ class ClientTest extends TestCase
         $response = $this->postJson('/api/garage/clients/express', [
             'name' => 'Client Walk-in',
             'email' => 'walkin@example.com',
-            'phone' => '+22900000001',
+            'phone' => '+2290100000001',
         ]);
 
         $response->assertCreated();
         $this->assertDatabaseHas('users', [
             'email' => 'walkin@example.com',
-            'phone' => '+22900000001',
+            'phone' => '+2290100000001',
             'role' => 'automobiliste',
             'is_express' => true,
         ]);
@@ -53,7 +53,7 @@ class ClientTest extends TestCase
         $response = $this->postJson('/api/garage/clients/express', [
             'name' => 'Nom Différent',
             'email' => 'known@example.com',
-            'phone' => '+22900000002',
+            'phone' => '+2290100000002',
         ]);
 
         $response->assertOk()->assertJsonPath('data.id', $existing->id);
@@ -64,13 +64,13 @@ class ClientTest extends TestCase
     public function test_creating_an_express_client_attaches_to_an_existing_automobiliste_by_phone(): void
     {
         $garage = $this->approvedGarage();
-        $existing = User::factory()->create(['phone' => '+22900000003']);
+        $existing = User::factory()->create(['phone' => '+2290100000003']);
         Sanctum::actingAs($garage->user);
 
         $response = $this->postJson('/api/garage/clients/express', [
             'name' => 'Nom Différent',
             'email' => 'unmatched@example.com',
-            'phone' => '+22900000003',
+            'phone' => '+2290100000003',
         ]);
 
         $response->assertOk()->assertJsonPath('data.id', $existing->id);
@@ -85,7 +85,7 @@ class ClientTest extends TestCase
         $this->postJson('/api/garage/clients/express', [
             'name' => 'Tentative',
             'email' => 'pro@example.com',
-            'phone' => '+22900000004',
+            'phone' => '+2290100000004',
         ])->assertUnprocessable();
     }
 

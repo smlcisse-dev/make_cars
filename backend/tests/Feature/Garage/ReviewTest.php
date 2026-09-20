@@ -21,7 +21,7 @@ class ReviewTest extends TestCase
     {
         $registration = ProfessionalRegistration::factory()->approved()->create();
 
-        return Garage::factory()->for($registration->user)->create();
+        return Garage::factory()->complete()->for($registration->user)->create();
     }
 
     public function test_a_garagiste_can_list_its_received_reviews(): void

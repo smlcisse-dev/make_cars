@@ -24,6 +24,7 @@ class UserResource extends JsonResource
             'role' => $this->role->value,
             'role_label' => $this->role->label(),
             'is_express' => $this->is_express,
+            'profile_status' => $this->professionalProfile()?->profileStatus(),
             'professional_registration' => $this->whenLoaded(
                 'professionalRegistration',
                 fn () => $this->professionalRegistration ? new ProfessionalRegistrationResource($this->professionalRegistration) : null,

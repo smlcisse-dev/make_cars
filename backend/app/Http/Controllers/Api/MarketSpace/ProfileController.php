@@ -20,7 +20,7 @@ class ProfileController extends Controller
     {
         $account = $this->authenticatedMarketSpaceAccount($request)->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']);
 
-        return $this->success(new MarketSpaceAccountResource($account));
+        return $this->success(new MarketSpaceAccountResource($account), meta: ['profile_status' => $account->profileStatus()]);
     }
 
     public function update(UpdateMarketSpaceProfileRequest $request): JsonResponse
@@ -30,6 +30,6 @@ class ProfileController extends Controller
             $request->validated(),
         );
 
-        return $this->success(new MarketSpaceAccountResource($account->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil Market Space mis à jour.');
+        return $this->success(new MarketSpaceAccountResource($account->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil Market Space mis à jour.', meta: ['profile_status' => $account->profileStatus()]);
     }
 }

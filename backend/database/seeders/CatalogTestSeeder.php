@@ -125,7 +125,7 @@ class CatalogTestSeeder extends Seeder
             [
                 'name' => self::MARKET_SPACE_STRUCTURE_NAME,
                 'email' => self::MARKET_SPACE_EMAIL,
-                'phone' => '229 90 04 05 '.random_int(10, 99),
+                'phone' => '+229 01 90 04 05 '.random_int(10, 99),
                 'password' => Hash::make('password'),
                 'account_type' => AccountType::MarketSpace->value,
                 'structure_name' => self::MARKET_SPACE_STRUCTURE_NAME,

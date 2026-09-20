@@ -22,7 +22,7 @@ class DisputeTest extends TestCase
     {
         $registration = ProfessionalRegistration::factory()->approved()->create();
 
-        return Garage::factory()->for($registration->user)->create();
+        return Garage::factory()->complete()->for($registration->user)->create();
     }
 
     public function test_a_garagiste_can_list_disputes_concerning_it(): void

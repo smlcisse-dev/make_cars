@@ -16,7 +16,7 @@ class ProductTest extends TestCase
 
     public function test_a_market_space_account_can_list_its_own_products(): void
     {
-        $account = MarketSpaceAccount::factory()->create();
+        $account = MarketSpaceAccount::factory()->complete()->create();
         Product::factory()->forMarketSpace($account)->count(2)->create();
         Product::factory()->forMarketSpace()->count(1)->create();
         Sanctum::actingAs($account->user);
@@ -28,7 +28,7 @@ class ProductTest extends TestCase
 
     public function test_a_market_space_account_can_add_a_product_pending_validation(): void
     {
-        $account = MarketSpaceAccount::factory()->create();
+        $account = MarketSpaceAccount::factory()->complete()->create();
         Sanctum::actingAs($account->user);
 
         $response = $this->postJson('/api/market-space/products', [
@@ -50,7 +50,7 @@ class ProductTest extends TestCase
     public function test_a_market_space_account_cannot_modify_another_accounts_product(): void
     {
         $product = Product::factory()->forMarketSpace()->create();
-        $otherAccount = MarketSpaceAccount::factory()->create();
+        $otherAccount = MarketSpaceAccount::factory()->complete()->create();
         Sanctum::actingAs($otherAccount->user);
 
         $this->deleteJson("/api/market-space/products/{$product->id}")->assertNotFound();

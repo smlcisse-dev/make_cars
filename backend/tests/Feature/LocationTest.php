@@ -58,6 +58,7 @@ class LocationTest extends TestCase
         $this->putJson('/api/garage/profile', $this->profilePayload([
             'department_id' => $borgou->id,
             'commune_id' => $cotonou->id,
+            'arrondissement_id' => $cotonou->arrondissements()->firstOrFail()->id,
         ]))->assertUnprocessable()->assertJsonValidationErrors('commune_id');
     }
 
@@ -69,51 +70,40 @@ class LocationTest extends TestCase
         $foreign = Arrondissement::where('commune_id', '!=', $cotonou->id)->firstOrFail();
 
         $this->putJson('/api/garage/profile', $this->profilePayload([
-            'department_id' => $cotonou->department_id,
-            'commune_id' => $cotonou->id,
             'arrondissement_id' => $foreign->id,
         ]))->assertUnprocessable()->assertJsonValidationErrors('arrondissement_id');
     }
 
-    public function test_a_child_level_requires_its_parent(): void
+    public function test_every_location_level_and_the_neighborhood_are_required(): void
     {
         $account = MarketSpaceAccount::factory()->create();
         Sanctum::actingAs($account->user);
-        $cotonou = Commune::where('slug', 'cotonou')->firstOrFail();
 
-        $this->putJson('/api/market-space/profile', $this->profilePayload([
-            'commune_id' => $cotonou->id,
-        ]))->assertUnprocessable()->assertJsonValidationErrors('department_id');
-    }
-
-    public function test_changing_the_department_clears_the_levels_below_when_they_are_not_sent(): void
-    {
-        $littoral = Department::where('slug', 'littoral')->firstOrFail();
-        $cotonou = $littoral->communes()->firstOrFail();
-        $garage = Garage::factory()->create([
-            'department_id' => $littoral->id,
-            'commune_id' => $cotonou->id,
-        ]);
-        Sanctum::actingAs($garage->user);
-        $borgou = Department::where('slug', 'borgou')->firstOrFail();
-
-        $this->putJson('/api/garage/profile', $this->profilePayload(['department_id' => $borgou->id]))
-            ->assertOk();
-
-        $this->assertDatabaseHas('garages', [
-            'id' => $garage->id,
-            'department_id' => $borgou->id,
-            'commune_id' => null,
-            'arrondissement_id' => null,
-        ]);
+        $this->putJson('/api/market-space/profile', ['name' => 'Boutique', 'address' => 'Quelque part'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['department_id', 'commune_id', 'arrondissement_id', 'neighborhood']);
     }
 
     /**
+     * Payload valide (Cotonou, 1er arrondissement), écrasable niveau par niveau.
+     *
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
-    private function profilePayload(array $overrides): array
+    private function profilePayload(array $overrides = []): array
     {
-        return array_merge(['name' => 'Garage Test', 'address' => 'Quelque part'], $overrides);
+        $cotonou = Commune::where('slug', 'cotonou')->firstOrFail();
+
+        return array_merge([
+            'name' => 'Garage Test',
+            'address' => 'Quelque part',
+            'phone' => '+2290197000000',
+            'latitude' => 6.37,
+            'longitude' => 2.39,
+            'department_id' => $cotonou->department_id,
+            'commune_id' => $cotonou->id,
+            'arrondissement_id' => $cotonou->arrondissements()->firstOrFail()->id,
+            'neighborhood' => 'Akpakpa',
+        ], $overrides);
     }
 }

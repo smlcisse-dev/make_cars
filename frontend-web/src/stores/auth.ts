@@ -2,8 +2,14 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import * as authApi from '@/api/auth'
-import { clearStoredSession, getStoredToken, getStoredUser, setStoredToken, setStoredUser } from '@/lib/token'
-import type { AccountType, User } from '@/types/user'
+import {
+  clearStoredSession,
+  getStoredToken,
+  getStoredUser,
+  setStoredToken,
+  setStoredUser,
+} from '@/lib/token'
+import type { AccountType, ProfileStatus, User } from '@/types/user'
 
 // Chemin d'accueil de chaque espace, une fois connecté (CLAUDE.md §3) —
 // l'app mobile Flutter reste le seul accès pour un automobiliste, ce SPA ne
@@ -12,6 +18,17 @@ const HOME_PATH_BY_ROLE: Record<Exclude<AccountType, 'automobiliste'>, string> =
   admin: '/admin',
   garagiste: '/garage',
   market_space: '/market-space',
+}
+
+// Page de profil de chaque espace professionnel : seule route accessible tant
+// que le profil est incomplet (CLAUDE.md §5, ajout v0.20).
+const PROFILE_PATH_BY_ROLE: Partial<Record<AccountType, string>> = {
+  garagiste: '/garage/profile',
+  market_space: '/market-space/profile',
+}
+
+export function profilePathForRole(role: AccountType): string | null {
+  return PROFILE_PATH_BY_ROLE[role] ?? null
 }
 
 export function homePathForRole(role: AccountType): string {
@@ -38,6 +55,19 @@ export const useAuthStore = defineStore('auth', () => {
     setStoredUser(newUser)
   }
 
+  // Vrai pour un professionnel approuvé dont le profil est incomplet : tout
+  // son espace est alors verrouillé sauf la page de profil (le backend
+  // applique la même règle, cette redirection n'est qu'un confort).
+  const mustCompleteProfile = computed(
+    () => user.value?.profile_status != null && !user.value.profile_status.is_complete,
+  )
+
+  function updateProfileStatus(status: ProfileStatus): void {
+    if (!user.value) return
+    user.value = { ...user.value, profile_status: status }
+    setStoredUser(user.value)
+  }
+
   function clearSession(): void {
     user.value = null
     token.value = null
@@ -60,5 +90,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isAuthenticated, login, logout, setSession, clearSession }
+  return {
+    token,
+    user,
+    isAuthenticated,
+    mustCompleteProfile,
+    login,
+    logout,
+    setSession,
+    clearSession,
+    updateProfileStatus,
+  }
 })

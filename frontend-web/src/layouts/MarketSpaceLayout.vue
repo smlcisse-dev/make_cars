@@ -1,7 +1,21 @@
 <script setup lang="ts">
-import DashboardShell from '@/layouts/DashboardShell.vue'
+import { computed } from 'vue'
 
-const navItems = [{ label: 'Tableau de bord', to: '/market-space' }]
+import DashboardShell from '@/layouts/DashboardShell.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+// Profil incomplet : seul « Mon profil » est proposé (CLAUDE.md §5, ajout
+// v0.20) — `computed` recalcule le menu dès que le profil devient complet.
+const navItems = computed(() =>
+  auth.mustCompleteProfile
+    ? [{ label: 'Mon profil', to: '/market-space/profile' }]
+    : [
+        { label: 'Tableau de bord', to: '/market-space' },
+        { label: 'Mon profil', to: '/market-space/profile' },
+      ],
+)
 </script>
 
 <template>

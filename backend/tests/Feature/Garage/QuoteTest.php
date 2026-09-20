@@ -26,7 +26,7 @@ class QuoteTest extends TestCase
     {
         $registration = ProfessionalRegistration::factory()->approved()->create();
 
-        return Garage::factory()->for($registration->user)->create();
+        return Garage::factory()->complete()->for($registration->user)->create();
     }
 
     private function confirmedAppointment(Garage $garage): Appointment

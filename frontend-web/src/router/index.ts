@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import { homePathForRole, useAuthStore } from '@/stores/auth'
+import { homePathForRole, profilePathForRole, useAuthStore } from '@/stores/auth'
 import type { AccountType } from '@/types/user'
 
 // Étend le type `RouteMeta` de vue-router (module augmentation TypeScript) :
@@ -102,9 +102,10 @@ const router = createRouter({
           component: () => import('@/views/garage/DashboardView.vue'),
         },
         {
-          path: 'location-test',
-          name: 'garage.location-test',
-          component: () => import('@/views/garage/LocationTestView.vue'),
+          path: 'profile',
+          name: 'garage.profile',
+          component: () => import('@/views/shared/ProfessionalProfileView.vue'),
+          props: { space: 'garage' },
         },
       ],
     },
@@ -117,6 +118,12 @@ const router = createRouter({
           path: '',
           name: 'market-space.dashboard',
           component: () => import('@/views/market-space/DashboardView.vue'),
+        },
+        {
+          path: 'profile',
+          name: 'market-space.profile',
+          component: () => import('@/views/shared/ProfessionalProfileView.vue'),
+          props: { space: 'market-space' },
         },
       ],
     },
@@ -171,6 +178,14 @@ router.beforeEach((to) => {
 
   if (auth.user?.role !== requiredRole) {
     return { name: 'forbidden' }
+  }
+
+  // Profil professionnel incomplet : aucune autre page que celle du profil
+  // (CLAUDE.md §5, ajout v0.20). La déconnexion n'est pas une route, elle
+  // reste toujours possible depuis la barre latérale.
+  const profilePath = profilePathForRole(auth.user.role)
+  if (auth.mustCompleteProfile && profilePath && to.path !== profilePath) {
+    return { path: profilePath }
   }
 
   return true

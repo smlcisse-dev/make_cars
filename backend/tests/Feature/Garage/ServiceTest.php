@@ -18,7 +18,7 @@ class ServiceTest extends TestCase
 
     public function test_a_garagiste_can_list_its_own_services(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         RepairService::factory()->forGarage($garage)->count(2)->create();
         RepairService::factory()->count(1)->create();
         Sanctum::actingAs($garage->user);
@@ -30,7 +30,7 @@ class ServiceTest extends TestCase
 
     public function test_a_garagiste_can_add_a_service_pending_validation(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
         $response = $this->postJson('/api/garage/services', [
@@ -55,7 +55,7 @@ class ServiceTest extends TestCase
     public function test_a_garagiste_can_add_a_service_with_an_illustrative_image(): void
     {
         Storage::fake('public');
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
         $response = $this->post('/api/garage/services', [
@@ -73,7 +73,7 @@ class ServiceTest extends TestCase
 
     public function test_creating_a_service_rejects_a_category_outside_the_fixed_list(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
         $response = $this->postJson('/api/garage/services', [
@@ -89,7 +89,7 @@ class ServiceTest extends TestCase
 
     public function test_updating_a_service_resets_its_validation_status(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $service = RepairService::factory()->forGarage($garage)->approved()->create();
         Sanctum::actingAs($garage->user);
 
@@ -111,7 +111,7 @@ class ServiceTest extends TestCase
 
     public function test_updating_availability_does_not_reset_validation_status(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $service = RepairService::factory()->forGarage($garage)->approved()->create(['is_active' => true]);
         Sanctum::actingAs($garage->user);
 
@@ -131,7 +131,7 @@ class ServiceTest extends TestCase
 
     public function test_a_garagiste_can_delete_its_own_service(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $service = RepairService::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -143,7 +143,7 @@ class ServiceTest extends TestCase
     public function test_a_garagiste_cannot_modify_another_garages_service(): void
     {
         $service = RepairService::factory()->create();
-        $otherGarage = Garage::factory()->create();
+        $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 
         $this->putJson("/api/garage/services/{$service->id}", [

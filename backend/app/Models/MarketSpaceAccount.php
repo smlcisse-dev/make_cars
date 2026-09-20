@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\RegistrationStatus;
 use App\Models\Concerns\HasAdministrativeLocation;
 use App\Models\Concerns\HasOpeningHours;
+use App\Models\Concerns\HasProfileCompleteness;
 use Database\Factories\MarketSpaceAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class MarketSpaceAccount extends Model
 {
     /** @use HasFactory<MarketSpaceAccountFactory> */
-    use HasAdministrativeLocation, HasFactory, HasOpeningHours;
+    use HasAdministrativeLocation, HasFactory, HasOpeningHours, HasProfileCompleteness;
 
     /**
      * @return array<string, string>

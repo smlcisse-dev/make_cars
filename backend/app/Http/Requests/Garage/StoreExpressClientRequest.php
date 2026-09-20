@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Garage;
 
+use App\Http\Requests\Concerns\NormalizesBeninPhone;
+use App\Rules\BeninPhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,6 +16,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreExpressClientRequest extends FormRequest
 {
+    use NormalizesBeninPhone;
+
     /**
      * Réservé aux garagistes via le middleware de route (role:garagiste).
      */
@@ -30,7 +34,7 @@ class StoreExpressClientRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['required', 'string', 'max:30'],
+            'phone' => ['required', 'string', new BeninPhoneNumber],
         ];
     }
 }

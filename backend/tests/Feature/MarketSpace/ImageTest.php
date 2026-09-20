@@ -48,6 +48,7 @@ class ImageTest extends TestCase
     {
         Storage::fake('public');
         $account = MarketSpaceAccount::factory()->create();
+        MarketSpaceImage::factory()->for($account)->create();
         $image = MarketSpaceImage::factory()->for($account)->create();
         Sanctum::actingAs($account->user);
 
@@ -55,6 +56,19 @@ class ImageTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseMissing('market_space_images', ['id' => $image->id]);
+    }
+
+    public function test_the_last_remaining_image_cannot_be_deleted(): void
+    {
+        Storage::fake('public');
+        $account = MarketSpaceAccount::factory()->create();
+        $image = MarketSpaceImage::factory()->for($account)->create();
+        Sanctum::actingAs($account->user);
+
+        $response = $this->deleteJson("/api/market-space/profile/images/{$image->id}");
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
+        $this->assertDatabaseHas('market_space_images', ['id' => $image->id]);
     }
 
     public function test_a_market_space_account_cannot_delete_another_accounts_image(): void

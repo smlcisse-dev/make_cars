@@ -22,7 +22,7 @@ class ConversationTest extends TestCase
 
     public function test_a_garagiste_can_list_its_conversations(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         Conversation::factory()->between($garage, User::factory()->create())->create();
         Conversation::factory()->create();
         Sanctum::actingAs($garage->user);
@@ -34,7 +34,7 @@ class ConversationTest extends TestCase
 
     public function test_a_garagiste_can_reply_in_a_conversation(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->complete()->create();
         $conversation = Conversation::factory()->between($garage, User::factory()->create())->create();
         Sanctum::actingAs($garage->user);
 
@@ -49,7 +49,7 @@ class ConversationTest extends TestCase
     public function test_a_garagiste_cannot_access_another_garages_conversation(): void
     {
         $conversation = Conversation::factory()->create();
-        $otherGarage = Garage::factory()->create();
+        $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 
         $this->getJson("/api/garage/conversations/{$conversation->id}/messages")->assertNotFound();

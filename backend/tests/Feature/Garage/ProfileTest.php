@@ -52,7 +52,7 @@ class ProfileTest extends TestCase
             'neighborhood' => 'Fidjrossè Plage',
             'latitude' => 6.3703,
             'longitude' => 2.3912,
-            'phone' => '+22997000000',
+            'phone' => '+2290197000000',
         ]);
 
         $response->assertOk()

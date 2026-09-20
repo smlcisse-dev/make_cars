@@ -20,7 +20,7 @@ class NotificationTest extends TestCase
             'user_id' => User::factory()->marketSpace(),
         ]);
 
-        return MarketSpaceAccount::factory()->for($registration->user)->create();
+        return MarketSpaceAccount::factory()->complete()->for($registration->user)->create();
     }
 
     public function test_a_market_space_account_can_list_only_its_own_notifications(): void

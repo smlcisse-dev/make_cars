@@ -48,6 +48,7 @@ class GarageImageTest extends TestCase
     {
         Storage::fake('public');
         $garage = Garage::factory()->create();
+        GarageImage::factory()->for($garage)->create();
         $image = GarageImage::factory()->for($garage)->create();
         Sanctum::actingAs($garage->user);
 
@@ -55,6 +56,19 @@ class GarageImageTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseMissing('garage_images', ['id' => $image->id]);
+    }
+
+    public function test_the_last_remaining_image_cannot_be_deleted(): void
+    {
+        Storage::fake('public');
+        $garage = Garage::factory()->create();
+        $image = GarageImage::factory()->for($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->deleteJson("/api/garage/profile/images/{$image->id}");
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
+        $this->assertDatabaseHas('garage_images', ['id' => $image->id]);
     }
 
     public function test_a_garagiste_cannot_delete_another_garages_image(): void
