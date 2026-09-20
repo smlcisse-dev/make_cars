@@ -101,6 +101,11 @@ const router = createRouter({
           name: 'garage.dashboard',
           component: () => import('@/views/garage/DashboardView.vue'),
         },
+        {
+          path: 'location-test',
+          name: 'garage.location-test',
+          component: () => import('@/views/garage/LocationTestView.vue'),
+        },
       ],
     },
     {
