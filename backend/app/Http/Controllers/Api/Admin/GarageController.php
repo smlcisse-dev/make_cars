@@ -22,6 +22,6 @@ class GarageController extends Controller
 
     public function show(Garage $garage): GarageResource
     {
-        return new GarageResource($garage->load(['openingHours', 'images']));
+        return new GarageResource($garage->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']));
     }
 }

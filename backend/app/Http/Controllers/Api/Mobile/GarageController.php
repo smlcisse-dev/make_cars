@@ -44,6 +44,9 @@ class GarageController extends Controller
         $garage->load([
             'openingHours',
             'images',
+            'department',
+            'commune',
+            'arrondissement',
             'products' => fn ($query) => $query->where('status', ProductStatus::Approved),
             'services' => fn ($query) => $query->where('status', RepairServiceStatus::Approved)->where('is_active', true),
         ]);

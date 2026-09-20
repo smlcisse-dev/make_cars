@@ -29,7 +29,7 @@ class MarketSpaceAccountService
     }
 
     /**
-     * @param  array{name?: string, description?: ?string, address?: string, city?: ?string, region?: ?string, latitude?: ?float, longitude?: ?float, phone?: ?string}  $data
+     * @param  array{name?: string, description?: ?string, address?: string, department_id?: ?int, commune_id?: ?int, arrondissement_id?: ?int, neighborhood?: ?string, latitude?: ?float, longitude?: ?float, phone?: ?string}  $data
      */
     public function update(MarketSpaceAccount $account, array $data): MarketSpaceAccount
     {

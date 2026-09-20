@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Public\ExpressClientClaimController;
+use App\Http\Controllers\Api\Public\LocationController;
 use App\Http\Controllers\Api\Public\QuoteEmailDecisionController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,14 @@ Route::get('/health', function () {
         'app' => config('app.name'),
     ]);
 });
+
+/**
+ * Référentiel du découpage administratif, pour les selects en cascade
+ * (CLAUDE.md §5, ajout v0.19).
+ */
+Route::get('locations/departments', [LocationController::class, 'departments']);
+Route::get('locations/departments/{department}/communes', [LocationController::class, 'communes']);
+Route::get('locations/communes/{commune}/arrondissements', [LocationController::class, 'arrondissements']);
 
 /**
  * Décision d'un devis par lien signé, pour un client "compte express" sans

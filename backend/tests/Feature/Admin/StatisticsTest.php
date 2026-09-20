@@ -3,11 +3,10 @@
 namespace Tests\Feature\Admin;
 
 use App\Enums\AccountType;
-use App\Enums\City;
 use App\Enums\DisputeStatus;
 use App\Enums\OrderStatus;
-use App\Enums\Region;
 use App\Models\Appointment;
+use App\Models\Department;
 use App\Models\Dispute;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
@@ -62,21 +61,28 @@ class StatisticsTest extends TestCase
         $response->assertJsonPath('data.structures.'.AccountType::MarketSpace->value.'.approved', 1);
     }
 
-    public function test_it_breaks_down_geography_by_city_and_region(): void
+    public function test_it_breaks_down_geography_by_department_separately_for_garages_and_market_space(): void
     {
-        Garage::factory()->create(['city' => City::Cotonou, 'region' => Region::Littoral]);
-        Garage::factory()->create(['city' => City::Cotonou, 'region' => Region::Littoral]);
-        MarketSpaceAccount::factory()->create(['city' => City::Parakou, 'region' => Region::Borgou]);
-        Garage::factory()->create(['city' => null, 'region' => null]);
+        $littoral = Department::where('slug', 'littoral')->firstOrFail();
+        $borgou = Department::where('slug', 'borgou')->firstOrFail();
+
+        Garage::factory()->count(2)->create(['department_id' => $littoral->id]);
+        Garage::factory()->create(['department_id' => null]);
+        MarketSpaceAccount::factory()->create(['department_id' => $borgou->id]);
         Sanctum::actingAs($this->admin());
 
         $response = $this->getJson('/api/admin/statistics');
 
         $response->assertOk();
-        $byCity = collect($response->json('data.geography.by_city'))->keyBy('city');
-        $this->assertSame(2, $byCity[City::Cotonou->value]['count']);
-        $this->assertSame(1, $byCity[City::Parakou->value]['count']);
-        $this->assertSame(1, $byCity[null]['count']);
+        $garages = collect($response->json('data.geography.'.AccountType::Garagiste->value));
+        $marketSpace = collect($response->json('data.geography.'.AccountType::MarketSpace->value));
+
+        $this->assertSame(2, $garages->firstWhere('department_id', $littoral->id)['count']);
+        $this->assertNull($garages->firstWhere('department_id', $borgou->id));
+        $this->assertSame(1, $garages->firstWhere('department_id', null)['count']);
+        $this->assertNull($garages->last()['department_id']);
+        $this->assertSame(1, $marketSpace->firstWhere('department_id', $borgou->id)['count']);
+        $this->assertCount(1, $marketSpace);
     }
 
     public function test_it_reports_activity_volume_within_a_period(): void

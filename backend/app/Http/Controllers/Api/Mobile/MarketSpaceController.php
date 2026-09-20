@@ -38,6 +38,9 @@ class MarketSpaceController extends Controller
         $marketSpaceAccount->load([
             'openingHours',
             'images',
+            'department',
+            'commune',
+            'arrondissement',
             'products' => fn ($query) => $query->where('status', ProductStatus::Approved),
         ]);
 

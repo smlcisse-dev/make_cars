@@ -22,6 +22,6 @@ class MarketSpaceController extends Controller
 
     public function show(MarketSpaceAccount $marketSpaceAccount): MarketSpaceAccountResource
     {
-        return new MarketSpaceAccountResource($marketSpaceAccount->load(['openingHours', 'images']));
+        return new MarketSpaceAccountResource($marketSpaceAccount->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']));
     }
 }

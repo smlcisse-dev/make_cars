@@ -3,12 +3,10 @@
 namespace App\Services;
 
 use App\Enums\AccountType;
-use App\Enums\City;
 use App\Enums\DisputeStatus;
 use App\Enums\OrderStatus;
 use App\Enums\QuoteDocumentType;
 use App\Enums\QuoteStatus;
-use App\Enums\Region;
 use App\Enums\RegistrationStatus;
 use App\Models\Appointment;
 use App\Models\Dispute;
@@ -19,7 +17,6 @@ use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Review;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -87,60 +84,40 @@ class AdminStatisticsService
     }
 
     /**
-     * Répartition géographique par ville et par région, sur les structures
-     * approuvées (seules à porter ces champs — CLAUDE.md §5, ajout v0.17),
-     * garages et Market Space confondus. Une entrée à `city`/`region` null
-     * ("Non renseigné") regroupe les profils qui n'ont pas encore renseigné
-     * le champ.
+     * Répartition géographique par département, séparément pour les garages
+     * et pour les Market Space (structures approuvées, seules à porter ce
+     * champ — CLAUDE.md §5, ajouts v0.17 et v0.19). Une entrée à
+     * `department_id` null ("Non renseigné") regroupe les profils qui n'ont
+     * pas encore renseigné leur localisation ; elle est toujours en dernier.
      *
-     * @return array{by_city: array<int, array{city: ?string, city_label: string, count: int}>, by_region: array<int, array{region: ?string, region_label: string, count: int}>}
+     * @return array<string, array<int, array{department_id: ?int, department_name: string, count: int}>>
      */
     private function geography(): array
     {
-        $cityCounts = $this->mergeCounts(
-            Garage::query()->selectRaw('city, count(*) as aggregate')->groupBy('city')->pluck('aggregate', 'city'),
-            MarketSpaceAccount::query()->selectRaw('city, count(*) as aggregate')->groupBy('city')->pluck('aggregate', 'city'),
-        );
-
-        $regionCounts = $this->mergeCounts(
-            Garage::query()->selectRaw('region, count(*) as aggregate')->groupBy('region')->pluck('aggregate', 'region'),
-            MarketSpaceAccount::query()->selectRaw('region, count(*) as aggregate')->groupBy('region')->pluck('aggregate', 'region'),
-        );
-
         return [
-            'by_city' => collect($cityCounts)->map(fn (int $count, string $city) => [
-                'city' => $city !== '' ? $city : null,
-                'city_label' => $city !== '' ? City::from($city)->label() : 'Non renseigné',
-                'count' => $count,
-            ])->values()->all(),
-            'by_region' => collect($regionCounts)->map(fn (int $count, string $region) => [
-                'region' => $region !== '' ? $region : null,
-                'region_label' => $region !== '' ? Region::from($region)->label() : 'Non renseigné',
-                'count' => $count,
-            ])->values()->all(),
+            AccountType::Garagiste->value => $this->departmentBreakdown('garages'),
+            AccountType::MarketSpace->value => $this->departmentBreakdown('market_space_accounts'),
         ];
     }
 
     /**
-     * Fusionne les comptages Garage/Market Space pour une même colonne
-     * (city ou region) — une valeur absente (SQL NULL) revient comme clé ''
-     * (PHP convertit toute clé de tableau `null` en chaîne vide).
-     *
-     * @param  Collection<string, int>  $garageCounts
-     * @param  Collection<string, int>  $marketSpaceCounts
-     * @return array<string, int>
+     * @return array<int, array{department_id: ?int, department_name: string, count: int}>
      */
-    private function mergeCounts(Collection $garageCounts, Collection $marketSpaceCounts): array
+    private function departmentBreakdown(string $profileTable): array
     {
-        $merged = [];
-
-        foreach ([$garageCounts, $marketSpaceCounts] as $counts) {
-            foreach ($counts as $key => $count) {
-                $merged[$key] = ($merged[$key] ?? 0) + (int) $count;
-            }
-        }
-
-        return $merged;
+        return DB::table($profileTable)
+            ->leftJoin('departments', 'departments.id', '=', "{$profileTable}.department_id")
+            ->selectRaw('departments.id as department_id, departments.name as department_name, count(*) as aggregate')
+            ->groupBy('departments.id', 'departments.name')
+            ->get()
+            ->map(fn (object $row) => [
+                'department_id' => $row->department_id !== null ? (int) $row->department_id : null,
+                'department_name' => $row->department_name ?? 'Non renseigné',
+                'count' => (int) $row->aggregate,
+            ])
+            ->sortBy(fn (array $row) => [$row['department_id'] === null ? 1 : 0, $row['department_name']])
+            ->values()
+            ->all();
     }
 
     /**

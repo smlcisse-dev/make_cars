@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\MarketSpace;
 
-use App\Enums\City;
-use App\Enums\Region;
+use App\Models\Commune;
+use App\Models\Department;
 use App\Models\MarketSpaceAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,12 +38,18 @@ class ProfileTest extends TestCase
         $account = MarketSpaceAccount::factory()->create();
         Sanctum::actingAs($account->user);
 
+        $department = Department::where('slug', 'littoral')->firstOrFail();
+        $commune = Commune::where('slug', 'cotonou')->firstOrFail();
+        $arrondissement = $commune->arrondissements()->firstOrFail();
+
         $response = $this->putJson('/api/market-space/profile', [
             'name' => 'Pièces Auto Fidjrossè',
             'description' => 'Grand choix de pièces neuves et d\'occasion.',
             'address' => 'Fidjrossè, Cotonou',
-            'city' => City::Cotonou->value,
-            'region' => Region::Littoral->value,
+            'department_id' => $department->id,
+            'commune_id' => $commune->id,
+            'arrondissement_id' => $arrondissement->id,
+            'neighborhood' => 'Fidjrossè Plage',
             'latitude' => 6.3703,
             'longitude' => 2.3912,
             'phone' => '+22997000000',
@@ -51,14 +57,18 @@ class ProfileTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.name', 'Pièces Auto Fidjrossè')
-            ->assertJsonPath('data.city', City::Cotonou->value)
-            ->assertJsonPath('data.region', Region::Littoral->value);
+            ->assertJsonPath('data.department_name', 'Littoral')
+            ->assertJsonPath('data.commune_name', 'Cotonou')
+            ->assertJsonPath('data.arrondissement_name', $arrondissement->name)
+            ->assertJsonPath('data.neighborhood', 'Fidjrossè Plage');
         $this->assertDatabaseHas('market_space_accounts', [
             'id' => $account->id,
             'name' => 'Pièces Auto Fidjrossè',
             'address' => 'Fidjrossè, Cotonou',
-            'city' => City::Cotonou->value,
-            'region' => Region::Littoral->value,
+            'department_id' => $department->id,
+            'commune_id' => $commune->id,
+            'arrondissement_id' => $arrondissement->id,
+            'neighborhood' => 'Fidjrossè Plage',
         ]);
     }
 
