@@ -8,13 +8,16 @@ use App\Http\Controllers\Api\Controller;
 use App\Http\Requests\Admin\RejectDisputeRequest;
 use App\Http\Requests\Admin\RequestDisputeResponseRequest;
 use App\Http\Requests\Admin\ResolveDisputeRequest;
+use App\Http\Requests\Dispute\RespondDisputeRequest;
 use App\Http\Resources\ConversationResource;
+use App\Http\Resources\DisputeMessageResource;
 use App\Http\Resources\DisputeResource;
 use App\Http\Resources\ReviewResource;
 use App\Models\Conversation;
 use App\Models\Dispute;
 use App\Models\DisputeAttachment;
 use App\Models\Garage;
+use App\Models\Order;
 use App\Services\DisputeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +52,7 @@ class DisputeController extends Controller
     public function show(Dispute $dispute): JsonResponse
     {
         $dispute->load(['respondent', 'transaction', 'user', 'attachments', 'messages.author', 'decidedBy', 'responseRequestedBy']);
+        $dispute->transaction->load($dispute->transaction instanceof Order ? ['lines'] : ['versions.lines']);
 
         $conversation = $dispute->respondent instanceof Garage
             ? Conversation::where('garage_id', $dispute->respondent_id)->where('user_id', $dispute->user_id)->with('garage')->first()
@@ -74,6 +78,20 @@ class DisputeController extends Controller
         $dispute = $this->disputeService->requestResponse($dispute, $request->user(), $request->filled('message') ? $request->string('message')->toString() : null);
 
         return $this->success(new DisputeResource($dispute), 'Réponse demandée au professionnel.');
+    }
+
+    /**
+     * Message libre de l'admin dans l'espace d'échange, en plus du message
+     * optionnel de `requestResponse` — les deux parties peuvent s'exprimer à
+     * plusieurs reprises avant la décision (CLAUDE.md §5, ajout v0.11).
+     */
+    public function respond(RespondDisputeRequest $request, Dispute $dispute): JsonResponse
+    {
+        abort_if($dispute->isDecided(), 403, 'Cette réclamation est déjà tranchée.');
+
+        $message = $this->disputeService->respond($dispute, $request->user(), $request->string('body')->toString());
+
+        return $this->success(new DisputeMessageResource($message->load('author')), 'Message envoyé.', 201);
     }
 
     /**

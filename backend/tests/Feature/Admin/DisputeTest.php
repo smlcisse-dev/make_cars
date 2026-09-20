@@ -55,6 +55,8 @@ class DisputeTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.dispute.id', $dispute->id)
+            ->assertJsonPath('data.dispute.respondent.name', $garage->name)
+            ->assertJsonPath('data.dispute.transaction.id', $dispute->transaction_id)
             ->assertJsonPath('data.conversation.id', $conversation->id)
             ->assertJsonCount(1, 'data.reviews');
     }
@@ -82,6 +84,31 @@ class DisputeTest extends TestCase
         $dispute = Dispute::factory()->underReview()->create();
 
         $this->postJson("/api/admin/disputes/{$dispute->id}/request-response")->assertForbidden();
+    }
+
+    public function test_an_admin_can_post_several_messages_in_the_exchange_space(): void
+    {
+        $admin = User::factory()->admin()->create();
+        Sanctum::actingAs($admin);
+        $dispute = Dispute::factory()->underReview()->create();
+
+        $this->postJson("/api/admin/disputes/{$dispute->id}/messages", ['body' => 'Une relance de l\'admin.'])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('dispute_messages', [
+            'dispute_id' => $dispute->id,
+            'author_id' => $admin->id,
+            'body' => 'Une relance de l\'admin.',
+        ]);
+    }
+
+    public function test_an_admin_cannot_message_an_already_decided_dispute(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+        $dispute = Dispute::factory()->resolvedRejected()->create();
+
+        $this->postJson("/api/admin/disputes/{$dispute->id}/messages", ['body' => 'Trop tard.'])
+            ->assertForbidden();
     }
 
     public function test_an_admin_can_reject_a_dispute_with_a_reason_and_notifies_the_client(): void

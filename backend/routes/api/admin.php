@@ -59,6 +59,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('disputes', [DisputeController::class, 'index']);
     Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
     Route::post('disputes/{dispute}/request-response', [DisputeController::class, 'requestResponse']);
+    Route::post('disputes/{dispute}/messages', [DisputeController::class, 'respond']);
     Route::post('disputes/{dispute}/reject', [DisputeController::class, 'reject']);
     Route::post('disputes/{dispute}/resolve', [DisputeController::class, 'resolve']);
     Route::post('disputes/{dispute}/close', [DisputeController::class, 'close']);

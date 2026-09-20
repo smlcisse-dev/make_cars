@@ -79,6 +79,16 @@ const router = createRouter({
           name: 'admin.avis.show',
           component: () => import('@/views/admin/AvisDetailView.vue'),
         },
+        {
+          path: 'litiges',
+          name: 'admin.litiges',
+          component: () => import('@/views/admin/LitigesView.vue'),
+        },
+        {
+          path: 'litiges/:id',
+          name: 'admin.litiges.show',
+          component: () => import('@/views/admin/LitigeDetailView.vue'),
+        },
       ],
     },
     {

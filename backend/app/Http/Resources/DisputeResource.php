@@ -22,8 +22,16 @@ class DisputeResource extends JsonResource
             'id' => $this->id,
             'respondent_type' => $this->respondent_type === Garage::class ? 'garage' : 'market_space',
             'respondent_id' => $this->respondent_id,
+            // Cible réelle (nom, ville...) pour l'affichage admin — même
+            // logique que ReviewResource->reviewable, jamais dupliquée en base.
+            'respondent' => $this->whenLoaded('respondent', fn () => $this->respondent_type === Garage::class
+                ? new GarageResource($this->respondent)
+                : new MarketSpaceAccountResource($this->respondent)),
             'transaction_type' => $this->transaction_type === Order::class ? 'order' : 'quote',
             'transaction_id' => $this->transaction_id,
+            'transaction' => $this->whenLoaded('transaction', fn () => $this->transaction_type === Order::class
+                ? new OrderResource($this->transaction)
+                : new QuoteResource($this->transaction)),
             'reason' => $this->reason,
             'status' => $this->status,
             'response_requested_at' => $this->response_requested_at,
