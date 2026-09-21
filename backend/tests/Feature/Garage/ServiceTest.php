@@ -155,6 +155,66 @@ class ServiceTest extends TestCase
         ])->assertNotFound();
     }
 
+    public function test_the_catalog_never_embeds_the_garage_in_its_responses(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $service = RepairService::factory()->forGarage($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $listed = $this->getJson('/api/garage/services')->assertOk();
+        $this->assertArrayNotHasKey('garage', $listed->json('data.0'));
+        $listed->assertJsonPath('data.0.id', $service->id)->assertJsonPath('data.0.garage_id', $garage->id);
+
+        $availability = $this->putJson("/api/garage/services/{$service->id}/availability", ['is_active' => false])->assertOk();
+        $this->assertArrayNotHasKey('garage', $availability->json('data'));
+    }
+
+    public function test_a_garagiste_can_update_a_service_with_a_new_image_through_method_spoofing(): void
+    {
+        Storage::fake('public');
+        $garage = Garage::factory()->complete()->create();
+        $service = RepairService::factory()->forGarage($garage)->approved()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->post("/api/garage/services/{$service->id}", [
+            '_method' => 'PUT',
+            'name' => 'Vidange premium',
+            'description' => 'Vidange complète avec huile synthétique.',
+            'category' => 'entretien_courant',
+            'price' => 30000,
+            'duration_minutes' => 50,
+            'image' => UploadedFile::fake()->image('nouvelle.png'),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk()
+            ->assertJsonPath('data.id', $service->id)
+            ->assertJsonPath('data.name', 'Vidange premium')
+            ->assertJsonPath('data.status', RepairServiceStatus::Pending->value);
+        $this->assertNotNull($response->json('data.image_url'));
+        $this->assertArrayNotHasKey('garage', $response->json('data'));
+        $this->assertNotNull($service->fresh()->image_path);
+    }
+
+    public function test_a_garagiste_cannot_toggle_the_availability_of_another_garages_service(): void
+    {
+        $service = RepairService::factory()->create(['is_active' => true]);
+        Sanctum::actingAs(Garage::factory()->complete()->create()->user);
+
+        $this->putJson("/api/garage/services/{$service->id}/availability", ['is_active' => false])->assertNotFound();
+
+        $this->assertTrue($service->fresh()->is_active);
+    }
+
+    public function test_a_garagiste_cannot_delete_another_garages_service(): void
+    {
+        $service = RepairService::factory()->create();
+        Sanctum::actingAs(Garage::factory()->complete()->create()->user);
+
+        $this->deleteJson("/api/garage/services/{$service->id}")->assertNotFound();
+
+        $this->assertDatabaseHas('repair_services', ['id' => $service->id]);
+    }
+
     public function test_a_non_garagiste_cannot_access_the_garage_service_catalog(): void
     {
         Sanctum::actingAs(User::factory()->create());
