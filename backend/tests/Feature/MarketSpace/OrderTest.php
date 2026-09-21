@@ -60,7 +60,9 @@ class OrderTest extends TestCase
 
         $response = $this->postJson("/api/market-space/orders/{$order->id}/mark-paid");
 
-        $response->assertOk()->assertJsonPath('data.status', OrderStatus::Paid->value);
+        $response->assertOk()
+            ->assertJsonPath('data.status', OrderStatus::Paid->value)
+            ->assertJsonPath('data.client.id', $order->user_id);
         $this->assertSame(3, $product->fresh()->stock_quantity);
         $this->assertNotNull($order->fresh()->pdf_path);
         $conversation = Conversation::where('sellable_type', $account->getMorphClass())

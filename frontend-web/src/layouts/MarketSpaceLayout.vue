@@ -13,6 +13,8 @@ const navItems = computed(() =>
     ? [{ label: 'Mon profil', to: '/market-space/profile' }]
     : [
         { label: 'Tableau de bord', to: '/market-space' },
+        { label: 'Produits', to: '/market-space/products' },
+        { label: 'Commandes', to: '/market-space/orders' },
         { label: 'Messages', to: '/market-space/conversations' },
         { label: 'Mon profil', to: '/market-space/profile' },
       ],

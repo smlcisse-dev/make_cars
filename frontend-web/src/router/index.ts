@@ -201,6 +201,21 @@ const router = createRouter({
           name: 'market-space.conversations',
           component: () => import('@/views/market-space/ConversationsView.vue'),
         },
+        {
+          path: 'products',
+          name: 'market-space.products',
+          component: () => import('@/views/market-space/ProductsView.vue'),
+        },
+        {
+          path: 'orders',
+          name: 'market-space.orders',
+          component: () => import('@/views/market-space/OrdersView.vue'),
+        },
+        {
+          path: 'orders/:id',
+          name: 'market-space.orders.show',
+          component: () => import('@/views/market-space/OrderDetailView.vue'),
+        },
       ],
     },
     {
