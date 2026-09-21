@@ -35,6 +35,31 @@ class DisputeTest extends TestCase
         $this->getJson('/api/garage/disputes')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_the_disputes_list_exposes_the_client(): void
+    {
+        $garage = $this->approvedGarage();
+        $dispute = Dispute::factory()->forGarage($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/disputes')
+            ->assertOk()
+            ->assertJsonPath('data.0.client.id', $dispute->user_id);
+    }
+
+    public function test_a_garagiste_can_filter_its_disputes_by_status(): void
+    {
+        $garage = $this->approvedGarage();
+        $submitted = Dispute::factory()->forGarage($garage)->create();
+        Dispute::factory()->forGarage($garage)->resolvedRejected()->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/disputes?status=submitted')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $submitted->id);
+        $this->getJson('/api/garage/disputes')->assertOk()->assertJsonCount(2, 'data');
+    }
+
     public function test_a_garagiste_can_respond_to_a_dispute(): void
     {
         $garage = $this->approvedGarage();

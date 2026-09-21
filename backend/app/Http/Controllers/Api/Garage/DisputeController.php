@@ -34,7 +34,11 @@ class DisputeController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $disputes = $this->authenticatedGarage($request)->disputes()->latest()->paginate();
+        $disputes = $this->authenticatedGarage($request)->disputes()
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->with('user')
+            ->latest()
+            ->paginate();
 
         return DisputeResource::collection($disputes);
     }
