@@ -107,6 +107,26 @@ const router = createRouter({
           component: () => import('@/views/shared/ProfessionalProfileView.vue'),
           props: { space: 'garage' },
         },
+        {
+          path: 'services',
+          name: 'garage.services',
+          component: () => import('@/views/garage/ServicesView.vue'),
+        },
+        {
+          path: 'products',
+          name: 'garage.products',
+          component: () => import('@/views/garage/ProductsView.vue'),
+        },
+        {
+          path: 'appointments',
+          name: 'garage.appointments',
+          component: () => import('@/views/garage/AppointmentsView.vue'),
+        },
+        {
+          path: 'appointments/:id',
+          name: 'garage.appointments.show',
+          component: () => import('@/views/garage/AppointmentDetailView.vue'),
+        },
       ],
     },
     {
