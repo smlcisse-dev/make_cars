@@ -51,7 +51,8 @@ class ReviewController extends Controller
     {
         abort_if($review->status === ReviewStatus::Hidden, 403, 'Cet avis est déjà masqué.');
 
-        $review = $this->reviewService->moderate($review, $request->user(), $request->string('reason')->toString());
+        $review = $this->reviewService->moderate($review, $request->user(), $request->string('reason')->toString())
+            ->load(['reviewable', 'user', 'moderatedBy']);
 
         return $this->success(new ReviewResource($review), 'Avis masqué.');
     }

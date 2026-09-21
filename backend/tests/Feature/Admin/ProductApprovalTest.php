@@ -45,6 +45,7 @@ class ProductApprovalTest extends TestCase
         $response = $this->postJson("/api/admin/products/{$product->id}/approve");
 
         $response->assertOk()->assertJsonPath('data.status', ProductStatus::Approved->value);
+        $response->assertJsonPath('data.sellable.id', $product->sellable_id);
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
             'status' => ProductStatus::Approved->value,
@@ -62,6 +63,7 @@ class ProductApprovalTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', ProductStatus::Rejected->value);
+        $response->assertJsonPath('data.sellable.id', $product->sellable_id);
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
             'status' => ProductStatus::Rejected->value,

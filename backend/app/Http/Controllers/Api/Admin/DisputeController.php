@@ -51,8 +51,7 @@ class DisputeController extends Controller
      */
     public function show(Dispute $dispute): JsonResponse
     {
-        $dispute->load(['respondent', 'transaction', 'user', 'attachments', 'messages.author', 'decidedBy', 'responseRequestedBy']);
-        $dispute->transaction->load($dispute->transaction instanceof Order ? ['lines'] : ['versions.lines']);
+        $this->loadDisputeRelations($dispute);
 
         $conversation = $dispute->respondent instanceof Garage
             ? Conversation::where('garage_id', $dispute->respondent_id)->where('user_id', $dispute->user_id)->with('garage')->first()
@@ -76,6 +75,7 @@ class DisputeController extends Controller
         abort_unless($dispute->status === DisputeStatus::Submitted, 403, 'Une réponse a déjà été demandée, ou le dossier est déjà tranché.');
 
         $dispute = $this->disputeService->requestResponse($dispute, $request->user(), $request->filled('message') ? $request->string('message')->toString() : null);
+        $dispute = $this->loadDisputeRelations($dispute);
 
         return $this->success(new DisputeResource($dispute), 'Réponse demandée au professionnel.');
     }
@@ -103,6 +103,7 @@ class DisputeController extends Controller
         abort_if($dispute->isDecided(), 403, 'Cette réclamation est déjà tranchée.');
 
         $dispute = $this->disputeService->resolveRejected($dispute, $request->user(), $request->string('reason')->toString());
+        $dispute = $this->loadDisputeRelations($dispute);
 
         return $this->success(new DisputeResource($dispute), 'Réclamation rejetée.');
     }
@@ -122,6 +123,7 @@ class DisputeController extends Controller
             $request->string('reason')->toString(),
             DisputeResolutionAction::from($request->string('action')->toString()),
         );
+        $dispute = $this->loadDisputeRelations($dispute);
 
         return $this->success(new DisputeResource($dispute), 'Réclamation jugée fondée.');
     }
@@ -139,6 +141,7 @@ class DisputeController extends Controller
         );
 
         $dispute = $this->disputeService->close($dispute);
+        $dispute = $this->loadDisputeRelations($dispute);
 
         return $this->success(new DisputeResource($dispute), 'Réclamation clôturée.');
     }
@@ -148,5 +151,18 @@ class DisputeController extends Controller
         abort_unless($attachment->dispute_id === $dispute->id, 404);
 
         return $attachment->download();
+    }
+
+    /**
+     * Charge explicitement les relations utilisées par DisputeResource : le
+     * service termine par `fresh()`, qui efface toute relation déjà chargée,
+     * et `whenLoaded()` ferait alors disparaître silencieusement les clés.
+     */
+    private function loadDisputeRelations(Dispute $dispute): Dispute
+    {
+        $dispute->load(['respondent', 'transaction', 'user', 'attachments', 'messages.author', 'decidedBy', 'responseRequestedBy']);
+        $dispute->transaction->load($dispute->transaction instanceof Order ? ['lines'] : ['versions.lines']);
+
+        return $dispute;
     }
 }

@@ -44,14 +44,14 @@ class ProductController extends Controller
     {
         Gate::authorize('review', $product);
 
-        $product = $this->productService->approve($product, $request->user());
+        $product = $this->productService->approve($product, $request->user())->load('sellable');
 
         return $this->success(new ProductResource($product), 'Produit validé.');
     }
 
     public function reject(RejectProductRequest $request, Product $product): JsonResponse
     {
-        $product = $this->productService->reject($product, $request->user(), $request->string('reason')->toString());
+        $product = $this->productService->reject($product, $request->user(), $request->string('reason')->toString())->load('sellable');
 
         return $this->success(new ProductResource($product), 'Produit rejeté.');
     }

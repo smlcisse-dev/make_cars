@@ -23,6 +23,8 @@ class RegistrationSuspensionTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.is_suspended', true);
+        $response->assertJsonPath('data.account_type', $registration->user->role->value);
+        $response->assertJsonPath('data.documents', fn ($documents) => is_array($documents));
         $this->assertDatabaseHas('professional_registrations', [
             'id' => $registration->id,
             'suspension_reason' => 'Plaintes répétées de clients pour pièces défectueuses.',
@@ -78,6 +80,8 @@ class RegistrationSuspensionTest extends TestCase
         $response = $this->postJson("/api/admin/registrations/{$registration->id}/reactivate");
 
         $response->assertOk()->assertJsonPath('data.is_suspended', false);
+        $response->assertJsonPath('data.account_type', $registration->user->role->value);
+        $response->assertJsonPath('data.documents', fn ($documents) => is_array($documents));
         $this->assertDatabaseHas('professional_registrations', [
             'id' => $registration->id,
             'suspension_reason' => null,

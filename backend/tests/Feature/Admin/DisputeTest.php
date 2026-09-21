@@ -72,6 +72,10 @@ class DisputeTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', 'under_review');
+        $response->assertJsonPath('data.attachments', fn ($attachments) => is_array($attachments));
+        $response->assertJsonPath('data.messages', fn ($messages) => is_array($messages));
+        $response->assertJsonPath('data.respondent.name', $dispute->respondent->name);
+        $response->assertJsonPath('data.client.id', $dispute->user_id);
         $this->assertDatabaseHas('dispute_messages', [
             'dispute_id' => $dispute->id,
             'author_id' => $admin->id,
@@ -124,6 +128,10 @@ class DisputeTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', 'resolved_rejected');
+        $response->assertJsonPath('data.attachments', fn ($attachments) => is_array($attachments));
+        $response->assertJsonPath('data.messages', fn ($messages) => is_array($messages));
+        $response->assertJsonPath('data.respondent.name', $dispute->respondent->name);
+        $response->assertJsonPath('data.client.id', $dispute->user_id);
         $this->assertDatabaseHas('disputes', [
             'id' => $dispute->id,
             'status' => 'resolved_rejected',
@@ -156,6 +164,10 @@ class DisputeTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', 'resolved_founded');
+        $response->assertJsonPath('data.attachments', fn ($attachments) => is_array($attachments));
+        $response->assertJsonPath('data.messages', fn ($messages) => is_array($messages));
+        $response->assertJsonPath('data.respondent.name', $dispute->respondent->name);
+        $response->assertJsonPath('data.client.id', $dispute->user_id);
         $this->assertSame('approved', $garage->user->professionalRegistration->fresh()->status->value);
         $this->assertFalse($garage->user->professionalRegistration->fresh()->isSuspended());
         Mail::assertSent(DisputeDecisionMail::class);
@@ -207,6 +219,10 @@ class DisputeTest extends TestCase
         $response = $this->postJson("/api/admin/disputes/{$dispute->id}/close");
 
         $response->assertOk()->assertJsonPath('data.status', 'closed');
+        $response->assertJsonPath('data.attachments', fn ($attachments) => is_array($attachments));
+        $response->assertJsonPath('data.messages', fn ($messages) => is_array($messages));
+        $response->assertJsonPath('data.respondent.name', $dispute->respondent->name);
+        $response->assertJsonPath('data.client.id', $dispute->user_id);
     }
 
     public function test_a_dispute_not_yet_resolved_cannot_be_closed(): void

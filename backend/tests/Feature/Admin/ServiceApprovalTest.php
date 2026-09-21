@@ -43,6 +43,7 @@ class ServiceApprovalTest extends TestCase
         $response = $this->postJson("/api/admin/services/{$service->id}/approve");
 
         $response->assertOk()->assertJsonPath('data.status', RepairServiceStatus::Approved->value);
+        $response->assertJsonPath('data.garage.id', $service->garage_id);
         $this->assertDatabaseHas('repair_services', [
             'id' => $service->id,
             'status' => RepairServiceStatus::Approved->value,
@@ -60,6 +61,7 @@ class ServiceApprovalTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', RepairServiceStatus::Rejected->value);
+        $response->assertJsonPath('data.garage.id', $service->garage_id);
         $this->assertDatabaseHas('repair_services', [
             'id' => $service->id,
             'status' => RepairServiceStatus::Rejected->value,

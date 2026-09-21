@@ -43,14 +43,14 @@ class ServiceController extends Controller
     {
         Gate::authorize('review', $service);
 
-        $service = $this->serviceService->approve($service, $request->user());
+        $service = $this->serviceService->approve($service, $request->user())->load('garage');
 
         return $this->success(new ServiceResource($service), 'Service validé.');
     }
 
     public function reject(RejectServiceRequest $request, RepairService $service): JsonResponse
     {
-        $service = $this->serviceService->reject($service, $request->user(), $request->string('reason')->toString());
+        $service = $this->serviceService->reject($service, $request->user(), $request->string('reason')->toString())->load('garage');
 
         return $this->success(new ServiceResource($service), 'Service rejeté.');
     }

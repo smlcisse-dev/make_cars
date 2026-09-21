@@ -49,14 +49,16 @@ class RegistrationController extends Controller
     {
         Gate::authorize('review', $registration);
 
-        $registration = $this->registrationService->approve($registration, $request->user());
+        $registration = $this->registrationService->approve($registration, $request->user())
+            ->load(['documents', 'user']);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Inscription validée.');
     }
 
     public function reject(RejectRegistrationRequest $request, ProfessionalRegistration $registration): JsonResponse
     {
-        $registration = $this->registrationService->reject($registration, $request->user(), $request->string('reason')->toString());
+        $registration = $this->registrationService->reject($registration, $request->user(), $request->string('reason')->toString())
+            ->load(['documents', 'user']);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Inscription rejetée.');
     }
@@ -67,7 +69,8 @@ class RegistrationController extends Controller
      */
     public function suspend(SuspendRegistrationRequest $request, ProfessionalRegistration $registration): JsonResponse
     {
-        $registration = $this->registrationService->suspend($registration, $request->user(), $request->string('reason')->toString());
+        $registration = $this->registrationService->suspend($registration, $request->user(), $request->string('reason')->toString())
+            ->load(['documents', 'user']);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Compte suspendu.');
     }
@@ -76,7 +79,7 @@ class RegistrationController extends Controller
     {
         Gate::authorize('reactivate', $registration);
 
-        $registration = $this->registrationService->reactivate($registration);
+        $registration = $this->registrationService->reactivate($registration)->load(['documents', 'user']);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Compte réactivé.');
     }

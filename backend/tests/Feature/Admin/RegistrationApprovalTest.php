@@ -58,6 +58,8 @@ class RegistrationApprovalTest extends TestCase
         $response = $this->postJson("/api/admin/registrations/{$registration->id}/approve");
 
         $response->assertOk()->assertJsonPath('data.status', RegistrationStatus::Approved->value);
+        $response->assertJsonPath('data.account_type', $registration->user->role->value);
+        $response->assertJsonPath('data.documents', fn ($documents) => is_array($documents));
         $this->assertDatabaseHas('professional_registrations', [
             'id' => $registration->id,
             'status' => RegistrationStatus::Approved->value,
@@ -114,6 +116,8 @@ class RegistrationApprovalTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', RegistrationStatus::Rejected->value);
+        $response->assertJsonPath('data.account_type', $registration->user->role->value);
+        $response->assertJsonPath('data.documents', fn ($documents) => is_array($documents));
         $this->assertDatabaseHas('professional_registrations', [
             'id' => $registration->id,
             'status' => RegistrationStatus::Rejected->value,

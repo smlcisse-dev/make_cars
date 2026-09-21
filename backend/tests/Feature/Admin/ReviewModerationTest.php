@@ -47,6 +47,8 @@ class ReviewModerationTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('data.status', 'hidden');
+        $response->assertJsonPath('data.client.id', $review->user_id);
+        $response->assertJsonPath('data.reviewable.id', $review->reviewable_id);
         $this->assertDatabaseHas('reviews', [
             'id' => $review->id,
             'status' => 'hidden',
