@@ -4,6 +4,9 @@ namespace Tests\Feature\Garage;
 
 use App\Models\Conversation;
 use App\Models\Garage;
+use App\Models\Message;
+use App\Models\Quote;
+use App\Models\QuoteVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -42,8 +45,25 @@ class ConversationTest extends TestCase
             'body' => 'Bonjour, pouvez-vous passer demain matin ?',
         ]);
 
-        $response->assertCreated();
+        $response->assertCreated()->assertJsonPath('data.sender.id', $garage->user_id);
         $this->assertDatabaseHas('messages', ['conversation_id' => $conversation->id, 'sender_id' => $garage->user_id]);
+    }
+
+    public function test_system_message_exposes_quote_id_and_normal_message_does_not(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $client = User::factory()->create();
+        $conversation = Conversation::factory()->between($garage, $client)->create();
+        $quote = Quote::factory()->create(['garage_id' => $garage->id, 'user_id' => $client->id]);
+        $version = QuoteVersion::factory()->forQuote($quote)->sent()->create();
+        $system = Message::factory()->inConversation($conversation)->system()->create(['quote_version_id' => $version->id]);
+        $normal = Message::factory()->inConversation($conversation)->from($client)->create();
+        Sanctum::actingAs($garage->user);
+
+        $data = collect($this->getJson("/api/garage/conversations/{$conversation->id}/messages")->assertOk()->json('data'))->keyBy('id');
+
+        $this->assertSame($quote->id, $data[$system->id]['quote_id']);
+        $this->assertArrayNotHasKey('quote_id', $data[$normal->id]);
     }
 
     public function test_a_garagiste_cannot_access_another_garages_conversation(): void

@@ -54,7 +54,7 @@ class ConversationController extends Controller
     {
         $this->authorizeConversation($request, $conversation);
 
-        $messages = $conversation->messages()->with('sender')->latest()->paginate();
+        $messages = $conversation->messages()->with(['sender', 'quoteVersion'])->latest()->paginate();
 
         return MessageResource::collection($messages);
     }

@@ -44,7 +44,7 @@ class ConversationController extends Controller
     {
         $this->authorizeConversation($request, $conversation);
 
-        $messages = $conversation->messages()->with('sender')->latest()->paginate();
+        $messages = $conversation->messages()->with(['sender', 'quoteVersion'])->latest()->paginate();
 
         return MessageResource::collection($messages);
     }
@@ -55,7 +55,7 @@ class ConversationController extends Controller
 
         $message = $this->chatService->sendMessage($conversation, $request->user(), $request->validated(), $request->file('image'));
 
-        return $this->success(new MessageResource($message), 'Message envoyé.', 201);
+        return $this->success(new MessageResource($message->load('sender')), 'Message envoyé.', 201);
     }
 
     public function downloadImage(Request $request, Conversation $conversation, Message $message): StreamedResponse

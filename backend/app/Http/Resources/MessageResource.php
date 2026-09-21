@@ -25,6 +25,8 @@ class MessageResource extends JsonResource
             'has_image' => $this->hasImage(),
             'attachment_type' => $this->attachment_type,
             'quote_version_id' => $this->quote_version_id,
+            // Pas de whenLoaded : la relation est chargée à la demande, jamais absente par oubli de `with()`.
+            'quote_id' => $this->when($this->quote_version_id !== null, fn () => $this->quoteVersion?->quote_id),
             'created_at' => $this->created_at,
         ];
     }
