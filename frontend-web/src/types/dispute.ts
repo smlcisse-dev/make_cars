@@ -16,7 +16,9 @@ export interface DisputeMessage {
 }
 
 // Reflète DisputeResource pour l'espace Garagiste. `respondent` (whenLoaded)
-// n'est jamais chargé ici (le garage lui-même), omis.
+// n'est jamais chargé ici (le garage lui-même), omis. `attachments` et
+// `messages` sont optionnels : DisputeController::index() ne les charge pas,
+// seul show() le fait.
 export interface Dispute {
   id: number
   transaction_type: 'order' | 'quote'
@@ -29,7 +31,7 @@ export interface Dispute {
   decided_at: string | null
   closed_at: string | null
   client: User
-  attachments: DisputeAttachment[]
-  messages: DisputeMessage[]
+  attachments?: DisputeAttachment[]
+  messages?: DisputeMessage[]
   created_at: string
 }

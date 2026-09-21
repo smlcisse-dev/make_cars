@@ -78,7 +78,7 @@ async function handleReply(): Promise<void> {
 
   try {
     const message = await respondToDispute(disputeId, replyBody.value.trim())
-    dispute.value.messages.push(message)
+    dispute.value.messages = [...(dispute.value.messages ?? []), message]
     // Une réponse fait passer la réclamation « en instruction » côté backend.
     if (dispute.value.status === 'submitted') {
       dispute.value.status = 'under_review'
@@ -126,10 +126,10 @@ onMounted(loadDispute)
         </p>
       </section>
 
-      <section v-if="dispute.attachments.length > 0" class="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+      <section v-if="(dispute.attachments ?? []).length > 0" class="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
         <h3 class="text-sm font-semibold text-slate-900">Photos jointes</h3>
         <div class="flex flex-wrap gap-2">
-          <div v-for="(attachment, index) in dispute.attachments" :key="attachment.id">
+          <div v-for="(attachment, index) in dispute.attachments ?? []" :key="attachment.id">
             <AppButton
               variant="secondary"
               :loading="isOpeningAttachmentId === attachment.id"
@@ -161,9 +161,9 @@ onMounted(loadDispute)
       <section class="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
         <h3 class="text-sm font-semibold text-slate-900">Espace d'échange avec l'administrateur</h3>
 
-        <p v-if="dispute.messages.length === 0" class="text-sm text-slate-500">Aucun message pour l'instant.</p>
+        <p v-if="(dispute.messages ?? []).length === 0" class="text-sm text-slate-500">Aucun message pour l'instant.</p>
         <ul v-else class="space-y-3">
-          <li v-for="message in dispute.messages" :key="message.id" class="rounded-md bg-slate-50 px-3 py-2">
+          <li v-for="message in dispute.messages ?? []" :key="message.id" class="rounded-md bg-slate-50 px-3 py-2">
             <p class="text-xs text-slate-500">
               {{ message.author?.name ?? 'Système' }} — {{ formatDateTime(message.created_at) }}
             </p>
