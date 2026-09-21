@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\AccountType;
+use App\Models\Arrondissement;
+use App\Models\Garage;
 use App\Models\User;
 use App\Services\ProfessionalRegistrationService;
 use Database\Seeders\Concerns\GeneratesFakeKycDocuments;
@@ -29,6 +31,8 @@ use Illuminate\Support\Facades\Storage;
 class ProfessionalRegistrationTestSeeder extends Seeder
 {
     use GeneratesFakeKycDocuments;
+
+    private const GARAGE_IMAGE_DIRECTORY = 'garages/registration-test-seeder';
 
     private const TEST_EMAILS = [
         'garage.etoile.pending@makecars.test',
@@ -68,6 +72,7 @@ class ProfessionalRegistrationTestSeeder extends Seeder
             [$this->fakePremisesPhoto(), $this->fakePremisesPhoto()],
         );
         $registrationService->approve($approvedGaragisteUser->professionalRegistration, $admin);
+        $this->completeProfile($approvedGaragisteUser->garage()->firstOrFail());
 
         // 4. Market Space, rejected (inscription puis rejet via le service, motif réaliste)
         $rejectedMarketSpaceUser = $registrationService->register(
@@ -82,6 +87,44 @@ class ProfessionalRegistrationTestSeeder extends Seeder
         );
 
         $this->command?->info('ProfessionalRegistrationTestSeeder : 4 dossiers créés (1 pending garagiste, 1 pending market_space, 1 approved garagiste, 1 rejected market_space).');
+    }
+
+    /**
+     * Complète le profil du garage approuvé de test (CLAUDE.md §5, ajout
+     * v0.20) pour qu'il accède à tout son espace sans passer par l'écran de
+     * profil. Même modèle que CatalogTestSeeder : photo à chemin fixe,
+     * écrasée à chaque passage.
+     */
+    private function completeProfile(Garage $garage): void
+    {
+        $arrondissement = Arrondissement::query()->with('commune')->orderBy('id')->firstOrFail();
+
+        $garage->update([
+            'phone' => '+2290190010299',
+            'latitude' => 6.3654,
+            'longitude' => 2.4183,
+            'department_id' => $arrondissement->commune->department_id,
+            'commune_id' => $arrondissement->commune_id,
+            'arrondissement_id' => $arrondissement->id,
+            'neighborhood' => 'Akpakpa',
+        ]);
+
+        $garage->openingHours()->delete();
+        $garage->openingHours()->createMany(
+            array_map(fn (int $day) => [
+                'day_of_week' => $day,
+                'is_closed' => $day === 7,
+                'opens_at' => $day === 7 ? null : '08:00',
+                'closes_at' => $day === 7 ? null : '18:00',
+            ], range(1, 7)),
+        );
+
+        $garage->images()->delete();
+        $garage->images()->create([
+            'disk' => 'public',
+            'path' => $this->fakeCatalogImage('garage.jpg')->storeAs(self::GARAGE_IMAGE_DIRECTORY, 'garage.jpg', 'public'),
+            'position' => 1,
+        ]);
     }
 
     /**
