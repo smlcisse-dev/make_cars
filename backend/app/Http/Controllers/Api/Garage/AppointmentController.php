@@ -37,7 +37,7 @@ class AppointmentController extends Controller
         $garage = $this->authenticatedGarage($request);
         abort_unless($appointment->garage_id === $garage->id, 404);
 
-        return $this->success(new AppointmentResource($appointment->load(['repairService', 'user'])));
+        return $this->success(new AppointmentResource($this->loadAppointmentRelations($appointment)));
     }
 
     public function confirm(Request $request, Appointment $appointment): JsonResponse
@@ -46,7 +46,7 @@ class AppointmentController extends Controller
         abort_unless($appointment->garage_id === $garage->id, 404);
         abort_unless($appointment->status === AppointmentStatus::Pending, 403, 'Ce rendez-vous n\'est plus en attente.');
 
-        $appointment = $this->appointmentService->confirm($appointment);
+        $appointment = $this->loadAppointmentRelations($this->appointmentService->confirm($appointment));
 
         return $this->success(new AppointmentResource($appointment), 'Rendez-vous confirmé.');
     }
@@ -57,7 +57,9 @@ class AppointmentController extends Controller
         abort_unless($appointment->garage_id === $garage->id, 404);
         abort_unless($appointment->status === AppointmentStatus::Pending, 403, 'Ce rendez-vous n\'est plus en attente.');
 
-        $appointment = $this->appointmentService->reject($appointment, $request->string('reason')->toString() ?: null);
+        $appointment = $this->loadAppointmentRelations(
+            $this->appointmentService->reject($appointment, $request->string('reason')->toString() ?: null),
+        );
 
         return $this->success(new AppointmentResource($appointment), 'Rendez-vous refusé.');
     }
@@ -68,8 +70,19 @@ class AppointmentController extends Controller
         abort_unless($appointment->garage_id === $garage->id, 404);
         abort_unless($appointment->status === AppointmentStatus::Pending, 403, 'Ce rendez-vous n\'est plus en attente.');
 
-        $appointment = $this->appointmentService->reschedule($appointment, Carbon::parse($request->string('proposed_at')->toString()));
+        $appointment = $this->loadAppointmentRelations(
+            $this->appointmentService->reschedule($appointment, Carbon::parse($request->string('proposed_at')->toString())),
+        );
 
         return $this->success(new AppointmentResource($appointment), 'Nouvelle date proposée au client.');
+    }
+
+    /**
+     * Recharge les relations lues par AppointmentResource (`whenLoaded`) : les
+     * actions du service renvoient le modèle tel quel, sans ces relations.
+     */
+    private function loadAppointmentRelations(Appointment $appointment): Appointment
+    {
+        return $appointment->load(['repairService', 'user']);
     }
 }
