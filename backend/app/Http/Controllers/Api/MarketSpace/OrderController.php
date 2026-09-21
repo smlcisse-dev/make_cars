@@ -46,9 +46,8 @@ class OrderController extends Controller
 
     /**
      * Paiement manuel V1 (espèces ou autre, en attendant l'agrégateur en
-     * ligne — CLAUDE.md §7) : décrémente le stock et génère la facture. Pas
-     * de notification chat pour le Market Space (chat non construit pour
-     * cette paire — CLAUDE.md §5, ajout v0.8).
+     * ligne — CLAUDE.md §7) : décrémente le stock et génère la facture, postée
+     * dans la conversation de chat avec l'automobiliste.
      */
     public function markPaid(Request $request, Order $order): JsonResponse
     {

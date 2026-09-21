@@ -23,7 +23,8 @@ class ConversationController extends Controller
 
     private function authorizeConversation(Request $request, Conversation $conversation): void
     {
-        abort_unless($conversation->garage_id === $this->authenticatedGarage($request)->id, 404);
+        $garage = $this->authenticatedGarage($request);
+        abort_unless($conversation->sellable_type === $garage->getMorphClass() && $conversation->sellable_id === $garage->id, 404);
     }
 
     /**

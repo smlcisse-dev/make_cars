@@ -94,11 +94,11 @@ class Garage extends Model
     }
 
     /**
-     * @return HasMany<Conversation, $this>
+     * @return MorphMany<Conversation, $this>
      */
-    public function conversations(): HasMany
+    public function conversations(): MorphMany
     {
-        return $this->hasMany(Conversation::class);
+        return $this->morphMany(Conversation::class, 'sellable');
     }
 
     /**

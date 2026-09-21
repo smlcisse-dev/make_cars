@@ -3,7 +3,9 @@
 namespace Tests\Feature\MarketSpace;
 
 use App\Enums\OrderStatus;
+use App\Models\Conversation;
 use App\Models\MarketSpaceAccount;
+use App\Models\Message;
 use App\Models\Order;
 use App\Models\OrderLine;
 use App\Models\Product;
@@ -48,7 +50,7 @@ class OrderTest extends TestCase
         $this->getJson('/api/market-space/orders')->assertOk()->assertJsonCount(1, 'data');
     }
 
-    public function test_marking_an_order_paid_decrements_stock_and_generates_invoice_without_chat(): void
+    public function test_marking_an_order_paid_decrements_stock_and_generates_invoice_and_posts_it_in_chat(): void
     {
         $account = $this->approvedMarketSpaceAccount();
         $product = Product::factory()->forMarketSpace($account)->approved()->create(['stock_quantity' => 5]);
@@ -61,7 +63,16 @@ class OrderTest extends TestCase
         $response->assertOk()->assertJsonPath('data.status', OrderStatus::Paid->value);
         $this->assertSame(3, $product->fresh()->stock_quantity);
         $this->assertNotNull($order->fresh()->pdf_path);
-        $this->assertDatabaseCount('messages', 0);
+        $conversation = Conversation::where('sellable_type', $account->getMorphClass())
+            ->where('sellable_id', $account->id)
+            ->where('user_id', $order->user_id)
+            ->firstOrFail();
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'sender_id' => null,
+            'attachment_type' => Message::ATTACHMENT_ORDER_PDF,
+            'order_id' => $order->id,
+        ]);
     }
 
     public function test_a_market_space_account_cannot_manage_anothers_order(): void

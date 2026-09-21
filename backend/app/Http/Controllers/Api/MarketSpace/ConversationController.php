@@ -1,15 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api\Mobile;
+namespace App\Http\Controllers\Api\MarketSpace;
 
 use App\Http\Controllers\Api\Controller;
+use App\Http\Controllers\Concerns\ResolvesAuthenticatedMarketSpaceAccount;
 use App\Http\Requests\Chat\SendMessageRequest;
-use App\Http\Requests\Mobile\StoreConversationRequest;
 use App\Http\Resources\ConversationResource;
 use App\Http\Resources\MessageResource;
 use App\Models\Conversation;
-use App\Models\Garage;
-use App\Models\MarketSpaceAccount;
 use App\Models\Message;
 use App\Services\ChatService;
 use Illuminate\Http\JsonResponse;
@@ -19,39 +17,28 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ConversationController extends Controller
 {
+    use ResolvesAuthenticatedMarketSpaceAccount;
+
     public function __construct(private readonly ChatService $chatService) {}
 
     private function authorizeConversation(Request $request, Conversation $conversation): void
     {
-        abort_unless($conversation->user_id === $request->user()->id, 404);
+        $account = $this->authenticatedMarketSpaceAccount($request);
+        abort_unless($conversation->sellable_type === $account->getMorphClass() && $conversation->sellable_id === $account->id, 404);
     }
 
+    /**
+     * Le garagiste voit les conversations déjà initiées par des
+     * automobilistes — pas de création côté garage (CLAUDE.md §5, ajout v0.8).
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $conversations = $request->user()->conversations()
-            ->with('sellable')
+        $conversations = $this->authenticatedMarketSpaceAccount($request)->conversations()
+            ->with('user')
             ->orderByRaw('last_message_at IS NULL, last_message_at DESC')
             ->paginate();
 
         return ConversationResource::collection($conversations);
-    }
-
-    /**
-     * Un automobiliste peut contacter un garage ou une boutique Market Space
-     * à tout moment, y compris sans RDV existant (panne d'urgence) —
-     * CLAUDE.md §5, ajout v0.8. Idempotent : une seule conversation par trio
-     * (vendeur, automobiliste).
-     */
-    public function store(StoreConversationRequest $request): JsonResponse
-    {
-        $sellable = $request->filled('garage_id')
-            ? Garage::find($request->integer('garage_id'))
-            : MarketSpaceAccount::find($request->integer('market_space_account_id'));
-        abort_unless($sellable && $sellable->isPubliclyVisible(), 404, 'Vendeur introuvable.');
-
-        $conversation = $this->chatService->findOrCreateConversation($sellable, $request->user());
-
-        return $this->success(new ConversationResource($conversation->load('sellable')), 'Conversation prête.', 201);
     }
 
     public function messages(Request $request, Conversation $conversation): AnonymousResourceCollection
@@ -69,7 +56,7 @@ class ConversationController extends Controller
 
         $message = $this->chatService->sendMessage($conversation, $request->user(), $request->validated(), $request->file('image'));
 
-        return $this->success(new MessageResource($message), 'Message envoyé.', 201);
+        return $this->success(new MessageResource($message->load('sender')), 'Message envoyé.', 201);
     }
 
     public function downloadImage(Request $request, Conversation $conversation, Message $message): StreamedResponse

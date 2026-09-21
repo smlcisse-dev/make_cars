@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Conversation;
 use App\Models\Garage;
+use App\Models\MarketSpaceAccount;
 use App\Models\Message;
 use App\Models\Order;
 use App\Models\QuoteVersion;
@@ -11,9 +12,10 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 
 /**
- * Une conversation regroupe tous les échanges entre UN garage et UN
- * automobiliste, pas rattachée à un RDV précis — un automobiliste peut
- * contacter un garage à tout moment (CLAUDE.md §5, ajout v0.8).
+ * Une conversation regroupe tous les échanges entre UN garage ou UNE
+ * boutique Market Space et UN automobiliste, pas rattachée à un RDV précis —
+ * un automobiliste peut contacter un vendeur à tout moment (CLAUDE.md §5,
+ * ajout v0.8).
  */
 class ChatService
 {
@@ -24,10 +26,11 @@ class ChatService
         return config('filesystems.private_media_disk', 'local');
     }
 
-    public function findOrCreateConversation(Garage $garage, User $automobiliste): Conversation
+    public function findOrCreateConversation(Garage|MarketSpaceAccount $sellable, User $automobiliste): Conversation
     {
         return Conversation::firstOrCreate([
-            'garage_id' => $garage->id,
+            'sellable_type' => $sellable->getMorphClass(),
+            'sellable_id' => $sellable->id,
             'user_id' => $automobiliste->id,
         ]);
     }
@@ -79,16 +82,13 @@ class ChatService
     }
 
     /**
-     * Message système posté à la génération de la facture d'une commande de
-     * mini-boutique Garage (CLAUDE.md §5, ajout v0.9) — même mécanisme que
-     * pour les devis/factures. Le Market Space n'a pas encore de chat
-     * (portée de l'ajout v0.8 limitée à Garage ↔ Automobiliste) : cette
-     * méthode n'est appelée que pour une commande dont le vendeur est un
-     * Garage.
+     * Message système posté à la génération de la facture d'une commande,
+     * qu'elle vienne de la mini-boutique d'un Garage ou d'un Market Space
+     * (CLAUDE.md §5, ajout v0.9) — même mécanisme que pour les devis/factures.
      */
-    public function postOrderMessage(Garage $garage, User $automobiliste, Order $order, string $body): Message
+    public function postOrderMessage(Garage|MarketSpaceAccount $sellable, User $automobiliste, Order $order, string $body): Message
     {
-        $conversation = $this->findOrCreateConversation($garage, $automobiliste);
+        $conversation = $this->findOrCreateConversation($sellable, $automobiliste);
 
         $message = $conversation->messages()->create([
             'sender_id' => null,

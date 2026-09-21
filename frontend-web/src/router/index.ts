@@ -196,6 +196,11 @@ const router = createRouter({
           component: () => import('@/views/shared/ProfessionalProfileView.vue'),
           props: { space: 'market-space' },
         },
+        {
+          path: 'conversations',
+          name: 'market-space.conversations',
+          component: () => import('@/views/market-space/ConversationsView.vue'),
+        },
       ],
     },
     {

@@ -210,7 +210,7 @@ class PushNotificationService
 
         $conversation = $message->conversation;
         $recipient = $message->sender_id === $conversation->user_id
-            ? $conversation->garage->user
+            ? $conversation->sellable->user
             : $conversation->user;
 
         $this->notify(

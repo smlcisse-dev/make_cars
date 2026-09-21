@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\ProductStatus;
-use App\Models\Garage;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -88,9 +87,8 @@ class OrderService
     /**
      * Paiement manuel (V1 — pas encore d'agrégateur en ligne, CLAUDE.md §7) :
      * décrémente le stock (même mécanisme unique que le module Devis —
-     * CLAUDE.md §5, ajout v0.4) puis génère la facture. Le chat n'est notifié
-     * que pour la mini-boutique Garage (le Market Space n'a pas encore de
-     * chat — ajout v0.8).
+     * CLAUDE.md §5, ajout v0.4) puis génère la facture, postée dans le chat du
+     * vendeur (Garage ou Market Space) avec l'automobiliste.
      */
     public function markPaid(Order $order): Order
     {
@@ -102,9 +100,7 @@ class OrderService
             $order->update(['status' => OrderStatus::Paid, 'paid_at' => now()]);
             $this->pdfService->generate($order);
 
-            if ($order->sellable instanceof Garage) {
-                $this->chatService->postOrderMessage($order->sellable, $order->user, $order, 'Facture disponible pour votre commande.');
-            }
+            $this->chatService->postOrderMessage($order->sellable, $order->user, $order, 'Facture disponible pour votre commande.');
 
             $this->notificationService->notifyOrderStatusChanged($order);
 

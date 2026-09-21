@@ -17,11 +17,13 @@ export interface ChatMessage {
   created_at: string
 }
 
-// Reflète ConversationResource pour l'espace Garagiste. `garage`
-// (whenLoaded) n'est jamais chargé ici (son propre garage), omis.
+// Reflète ConversationResource pour un espace professionnel. `sellable`
+// (whenLoaded, Garage ou Market Space) n'est jamais chargé ici (son propre
+// vendeur), omis.
 export interface Conversation {
   id: number
-  garage_id: number
+  sellable_type: string
+  sellable_id: number
   user_id: number
   last_message_at: string | null
   user: User

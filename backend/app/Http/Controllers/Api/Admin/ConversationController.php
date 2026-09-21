@@ -15,7 +15,7 @@ class ConversationController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $conversations = Conversation::query()
-            ->with(['garage', 'user'])
+            ->with(['sellable', 'user'])
             ->orderByRaw('last_message_at IS NULL, last_message_at DESC')
             ->paginate();
 
@@ -24,6 +24,6 @@ class ConversationController extends Controller
 
     public function show(Conversation $conversation): ConversationResource
     {
-        return new ConversationResource($conversation->load(['garage', 'user', 'messages.sender']));
+        return new ConversationResource($conversation->load(['sellable', 'user', 'messages.sender']));
     }
 }

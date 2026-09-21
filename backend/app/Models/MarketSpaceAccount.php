@@ -105,6 +105,17 @@ class MarketSpaceAccount extends Model
     }
 
     /**
+     * Conversations de chat avec les automobilistes (CLAUDE.md §5, ajout
+     * v0.8, généralisé au Market Space).
+     *
+     * @return MorphMany<Conversation, $this>
+     */
+    public function conversations(): MorphMany
+    {
+        return $this->morphMany(Conversation::class, 'sellable');
+    }
+
+    /**
      * Avis laissés après un achat confirmé (CLAUDE.md §5, règle 7 et ajout
      * v0.10).
      *

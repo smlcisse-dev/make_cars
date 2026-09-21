@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Conversation;
 use App\Models\Garage;
+use App\Models\MarketSpaceAccount;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,15 +21,33 @@ class ConversationFactory extends Factory
     public function definition(): array
     {
         return [
-            'garage_id' => Garage::factory(),
+            'sellable_type' => Garage::class,
+            'sellable_id' => Garage::factory(),
             'user_id' => User::factory(),
         ];
     }
 
-    public function between(Garage $garage, User $user): static
+    public function forGarage(?Garage $garage = null): static
     {
         return $this->state(fn (array $attributes) => [
-            'garage_id' => $garage->id,
+            'sellable_type' => Garage::class,
+            'sellable_id' => $garage?->id ?? Garage::factory(),
+        ]);
+    }
+
+    public function forMarketSpace(?MarketSpaceAccount $account = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'sellable_type' => MarketSpaceAccount::class,
+            'sellable_id' => $account?->id ?? MarketSpaceAccount::factory(),
+        ]);
+    }
+
+    public function between(Garage|MarketSpaceAccount $sellable, User $user): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'sellable_type' => $sellable->getMorphClass(),
+            'sellable_id' => $sellable->id,
             'user_id' => $user->id,
         ]);
     }

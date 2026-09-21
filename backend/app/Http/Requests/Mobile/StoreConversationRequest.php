@@ -21,7 +21,9 @@ class StoreConversationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'garage_id' => ['required', 'integer', 'exists:garages,id'],
+            // Exactement l'un des deux : garage OU boutique Market Space.
+            'garage_id' => ['required_without:market_space_account_id', 'prohibits:market_space_account_id', 'integer', 'exists:garages,id'],
+            'market_space_account_id' => ['required_without:garage_id', 'prohibits:garage_id', 'integer', 'exists:market_space_accounts,id'],
         ];
     }
 }

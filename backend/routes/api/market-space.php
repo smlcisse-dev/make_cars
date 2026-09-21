@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MarketSpace\ConversationController;
 use App\Http\Controllers\Api\MarketSpace\DeviceTokenController;
 use App\Http\Controllers\Api\MarketSpace\DisputeController;
 use App\Http\Controllers\Api\MarketSpace\MarketSpaceImageController;
@@ -38,6 +39,11 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
         Route::get('disputes/{dispute}', [DisputeController::class, 'show']);
         Route::post('disputes/{dispute}/respond', [DisputeController::class, 'respond']);
         Route::get('disputes/{dispute}/attachments/{attachment}/download', [DisputeController::class, 'downloadAttachment']);
+
+        Route::get('conversations', [ConversationController::class, 'index']);
+        Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages']);
+        Route::post('conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
+        Route::get('conversations/{conversation}/messages/{message}/image', [ConversationController::class, 'downloadImage']);
 
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);

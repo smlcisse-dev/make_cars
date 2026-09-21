@@ -4,6 +4,7 @@ namespace Tests\Feature\Mobile;
 
 use App\Models\Conversation;
 use App\Models\Garage;
+use App\Models\MarketSpaceAccount;
 use App\Models\Message;
 use App\Models\ProfessionalRegistration;
 use App\Models\User;
@@ -39,6 +40,62 @@ class ConversationTest extends TestCase
 
         $response->assertCreated();
         $this->assertDatabaseCount('conversations', 1);
+    }
+
+    private function approvedMarketSpaceAccount(): MarketSpaceAccount
+    {
+        $registration = ProfessionalRegistration::factory()->approved()->create([
+            'user_id' => User::factory()->marketSpace(),
+        ]);
+
+        return MarketSpaceAccount::factory()->for($registration->user)->create();
+    }
+
+    public function test_an_automobiliste_can_start_a_conversation_with_a_market_space_account(): void
+    {
+        $account = $this->approvedMarketSpaceAccount();
+        Sanctum::actingAs(User::factory()->create());
+
+        $response = $this->postJson('/api/mobile/conversations', ['market_space_account_id' => $account->id]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.sellable_type', $account->getMorphClass())
+            ->assertJsonPath('data.sellable_id', $account->id)
+            ->assertJsonPath('data.sellable.id', $account->id);
+    }
+
+    public function test_an_automobiliste_has_distinct_conversations_with_a_garage_and_a_market_space_account(): void
+    {
+        $garage = $this->approvedGarage();
+        $account = $this->approvedMarketSpaceAccount();
+        // Même identifiant numérique des deux côtés : seul le type distingue.
+        $this->assertSame($garage->id, $account->id);
+        Sanctum::actingAs(User::factory()->create());
+
+        $withGarage = $this->postJson('/api/mobile/conversations', ['garage_id' => $garage->id])->json('data.id');
+        $withShop = $this->postJson('/api/mobile/conversations', ['market_space_account_id' => $account->id])->json('data.id');
+
+        $this->assertNotSame($withGarage, $withShop);
+        $this->assertDatabaseCount('conversations', 2);
+        $this->getJson('/api/mobile/conversations')->assertJsonCount(2, 'data');
+    }
+
+    public function test_starting_a_conversation_with_an_unapproved_market_space_account_is_rejected(): void
+    {
+        $account = MarketSpaceAccount::factory()->for(User::factory()->marketSpace())->create();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/mobile/conversations', ['market_space_account_id' => $account->id])->assertNotFound();
+    }
+
+    public function test_exactly_one_of_garage_or_market_space_account_is_required(): void
+    {
+        $garage = $this->approvedGarage();
+        $account = $this->approvedMarketSpaceAccount();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/mobile/conversations', [])->assertUnprocessable();
+        $this->postJson('/api/mobile/conversations', ['garage_id' => $garage->id, 'market_space_account_id' => $account->id])->assertUnprocessable();
     }
 
     public function test_starting_a_conversation_twice_returns_the_same_one(): void

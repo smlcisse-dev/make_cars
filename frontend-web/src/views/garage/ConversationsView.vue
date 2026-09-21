@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 
-import { fetchConversations, fetchMessageImageBlob, fetchMessages, sendMessage } from '@/api/conversations'
+import { type ChatSpace, fetchConversations, fetchMessageImageBlob, fetchMessages, sendMessage } from '@/api/conversations'
 import AppButton from '@/shared/components/AppButton.vue'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import type { ChatMessage, Conversation } from '@/types/conversation'
 import { extractApiErrorMessage } from '@/utils/apiError'
+
+// Même écran pour les deux espaces : `space` choisit le préfixe des endpoints
+// (Composition API : `defineProps` déclare les entrées typées du composant).
+const props = withDefaults(defineProps<{ space?: ChatSpace }>(), { space: 'garage' })
 
 // `ref` rend une valeur réactive : quand elle change, le template qui la lit
 // est redessiné automatiquement (Composition API, CLAUDE.md §4).
@@ -33,7 +37,7 @@ async function loadConversations(): Promise<void> {
   listError.value = null
 
   try {
-    const response = await fetchConversations(currentPage.value)
+    const response = await fetchConversations(currentPage.value, props.space)
     conversations.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -64,7 +68,7 @@ async function selectConversation(conversation: Conversation): Promise<void> {
   isLoadingThread.value = true
 
   try {
-    const response = await fetchMessages(conversation.id)
+    const response = await fetchMessages(conversation.id, 1, props.space)
     // L'API renvoie les plus récents d'abord : on inverse pour l'affichage.
     // Garde-fou : ignore la réponse si une autre conversation a été choisie entre-temps.
     if (selected.value?.id === conversation.id) {
@@ -106,7 +110,7 @@ async function submitMessage(): Promise<void> {
   sendError.value = null
 
   try {
-    const message = await sendMessage(conversation.id, draftBody.value.trim() || null, draftImage.value)
+    const message = await sendMessage(conversation.id, draftBody.value.trim() || null, draftImage.value, props.space)
     if (selected.value?.id === conversation.id) {
       messages.value.push(message)
       scrollToEnd()
@@ -126,7 +130,7 @@ async function openImage(message: ChatMessage): Promise<void> {
   sendError.value = null
 
   try {
-    const blob = await fetchMessageImageBlob(message.conversation_id, message.id)
+    const blob = await fetchMessageImageBlob(message.conversation_id, message.id, props.space)
     const objectUrl = URL.createObjectURL(blob)
     window.open(objectUrl, '_blank')
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)

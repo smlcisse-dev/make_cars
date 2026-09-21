@@ -8,16 +8,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Une conversation regroupe tous les échanges entre UN garage et UN
- * automobiliste, indépendamment de tout RDV précis (contrainte unique sur
- * la paire) — un automobiliste peut contacter un garage à tout moment, y
- * compris sans RDV (ex. panne d'urgence). Jamais de messagerie de groupe,
- * jamais de contact entre automobilistes ou entre garages (CLAUDE.md §5,
- * ajout v0.8).
+ * Une conversation regroupe tous les échanges entre UN garage ou UNE
+ * boutique Market Space (`sellable`, relation polymorphe comme `Product`/
+ * `Order`) et UN automobiliste, indépendamment de tout RDV précis
+ * (contrainte unique sur le trio) — un automobiliste peut contacter un
+ * vendeur à tout moment, y compris sans RDV (ex. panne d'urgence). Jamais de
+ * messagerie de groupe, jamais de contact entre automobilistes ou entre
+ * professionnels (CLAUDE.md §5, ajout v0.8).
  */
-#[Fillable(['garage_id', 'user_id', 'last_message_at'])]
+#[Fillable(['sellable_type', 'sellable_id', 'user_id', 'last_message_at'])]
 class Conversation extends Model
 {
     /** @use HasFactory<ConversationFactory> */
@@ -34,11 +36,11 @@ class Conversation extends Model
     }
 
     /**
-     * @return BelongsTo<Garage, $this>
+     * @return MorphTo<Model, $this>
      */
-    public function garage(): BelongsTo
+    public function sellable(): MorphTo
     {
-        return $this->belongsTo(Garage::class);
+        return $this->morphTo();
     }
 
     /**

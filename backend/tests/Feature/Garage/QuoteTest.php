@@ -154,7 +154,7 @@ class QuoteTest extends TestCase
             'quote_version_id' => $version->id,
             'sender_id' => null,
         ]);
-        $this->assertDatabaseHas('conversations', ['garage_id' => $garage->id, 'user_id' => $appointment->user_id]);
+        $this->assertDatabaseHas('conversations', ['sellable_type' => $garage->getMorphClass(), 'sellable_id' => $garage->id, 'user_id' => $appointment->user_id]);
     }
 
     public function test_sending_an_already_sent_version_is_forbidden(): void

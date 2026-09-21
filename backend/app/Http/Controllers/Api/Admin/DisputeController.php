@@ -16,7 +16,6 @@ use App\Http\Resources\ReviewResource;
 use App\Models\Conversation;
 use App\Models\Dispute;
 use App\Models\DisputeAttachment;
-use App\Models\Garage;
 use App\Models\Order;
 use App\Services\DisputeService;
 use Illuminate\Http\JsonResponse;
@@ -45,7 +44,7 @@ class DisputeController extends Controller
 
     /**
      * Instruction du dossier : la transaction concernée, la conversation de
-     * chat associée (Garage↔Automobiliste, quand elle existe) et les avis
+     * chat associée (vendeur↔Automobiliste, quand elle existe) et les avis
      * déjà laissés sur le professionnel visé — tout l'historique lié
      * nécessaire pour trancher (CLAUDE.md §5, ajout v0.11).
      */
@@ -53,9 +52,11 @@ class DisputeController extends Controller
     {
         $this->loadDisputeRelations($dispute);
 
-        $conversation = $dispute->respondent instanceof Garage
-            ? Conversation::where('garage_id', $dispute->respondent_id)->where('user_id', $dispute->user_id)->with('garage')->first()
-            : null;
+        $conversation = Conversation::where('sellable_type', $dispute->respondent->getMorphClass())
+            ->where('sellable_id', $dispute->respondent_id)
+            ->where('user_id', $dispute->user_id)
+            ->with('sellable')
+            ->first();
 
         $reviews = $dispute->respondent->reviews()->visible()->with('user')->latest()->get();
 
