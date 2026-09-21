@@ -65,3 +65,14 @@ export async function updateGarageServiceAvailability(id: number, isActive: bool
 export async function deleteGarageService(id: number): Promise<void> {
   await http.delete(`/garage/services/${id}`)
 }
+
+// Catalogue complet (sans pagination visible) pour le sélecteur de lignes de
+// devis — le backend plafonne `per_page` à 100. Le filtrage par statut
+// (`approved`, actif) se fait côté appelant : le backend renvoie tout ce qui
+// appartient au garage.
+export async function fetchAllGarageServices(): Promise<GarageService[]> {
+  const response = await http.get<PaginatedResponse<GarageService>>('/garage/services', {
+    params: { per_page: 100 },
+  })
+  return response.data.data
+}

@@ -127,6 +127,22 @@ const router = createRouter({
           name: 'garage.appointments.show',
           component: () => import('@/views/garage/AppointmentDetailView.vue'),
         },
+        {
+          path: 'quotes',
+          name: 'garage.quotes',
+          component: () => import('@/views/garage/QuotesView.vue'),
+        },
+        // `new` avant `:id` : sinon « new » serait lu comme un identifiant de devis.
+        {
+          path: 'quotes/new',
+          name: 'garage.quotes.new',
+          component: () => import('@/views/garage/QuoteCreateView.vue'),
+        },
+        {
+          path: 'quotes/:id',
+          name: 'garage.quotes.show',
+          component: () => import('@/views/garage/QuoteDetailView.vue'),
+        },
       ],
     },
     {
