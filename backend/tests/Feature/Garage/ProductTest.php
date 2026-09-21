@@ -28,6 +28,17 @@ class ProductTest extends TestCase
         $response->assertOk()->assertJsonCount(2, 'data');
     }
 
+    public function test_the_products_list_honours_per_page_capped_at_100(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        Product::factory()->forGarage($garage)->count(101)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/products')->assertOk()->assertJsonCount(15, 'data');
+        $this->getJson('/api/garage/products?per_page=100')->assertOk()->assertJsonCount(100, 'data');
+        $this->getJson('/api/garage/products?per_page=9999')->assertOk()->assertJsonCount(100, 'data');
+    }
+
     public function test_a_garagiste_can_add_a_product_pending_validation(): void
     {
         $garage = Garage::factory()->complete()->create();

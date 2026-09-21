@@ -28,6 +28,17 @@ class ServiceTest extends TestCase
         $response->assertOk()->assertJsonCount(2, 'data');
     }
 
+    public function test_the_services_list_honours_per_page_capped_at_100(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        RepairService::factory()->forGarage($garage)->count(101)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/services')->assertOk()->assertJsonCount(15, 'data');
+        $this->getJson('/api/garage/services?per_page=100')->assertOk()->assertJsonCount(100, 'data');
+        $this->getJson('/api/garage/services?per_page=9999')->assertOk()->assertJsonCount(100, 'data');
+    }
+
     public function test_a_garagiste_can_add_a_service_pending_validation(): void
     {
         $garage = Garage::factory()->complete()->create();

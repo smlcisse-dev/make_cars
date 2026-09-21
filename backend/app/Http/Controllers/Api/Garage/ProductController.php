@@ -26,7 +26,8 @@ class ProductController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $products = $this->authenticatedGarage($request)->products()->latest()->paginate();
+        $perPage = min($request->integer('per_page', 15), 100);
+        $products = $this->authenticatedGarage($request)->products()->latest()->paginate($perPage);
 
         return ProductResource::collection($products);
     }

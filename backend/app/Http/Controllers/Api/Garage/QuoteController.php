@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\QuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -37,6 +38,17 @@ class QuoteController extends Controller
     }
 
     /**
+     * Relations lues par QuoteResource (`client` via `user`, `versions`) :
+     * plusieurs actions du service renvoient un modèle rafraîchi (`fresh()`)
+     * ou nu, sans relations — même correctif centralisé que
+     * AppointmentController::loadAppointmentRelations().
+     */
+    private function loadQuoteRelations(Quote $quote): Quote
+    {
+        return $quote->load(['versions.lines', 'user']);
+    }
+
+    /**
      * Création directe, sans RDV (CLAUDE.md §5, ajout v0.9) : un devis est
      * nécessaire dès qu'il y a une prestation, que le client se soit présenté
      * avec ou sans RDV préalable. `client_id` peut être un compte
@@ -54,7 +66,7 @@ class QuoteController extends Controller
 
         $quote = $this->quoteService->createDraft($garage, $client, null, $request->array('lines'));
 
-        return $this->success(new QuoteResource($quote->load('versions.lines')), 'Devis créé en brouillon.', 201);
+        return $this->success(new QuoteResource($this->loadQuoteRelations($quote)), 'Devis créé en brouillon.', 201);
     }
 
     /**
@@ -71,34 +83,34 @@ class QuoteController extends Controller
 
         $quote = $this->quoteService->createDraft($appointment->garage, $appointment->user, $appointment, $request->array('lines'));
 
-        return $this->success(new QuoteResource($quote->load('versions.lines')), 'Devis créé en brouillon.', 201);
+        return $this->success(new QuoteResource($this->loadQuoteRelations($quote)), 'Devis créé en brouillon.', 201);
     }
 
     /**
      * Liste de tous les devis du garage, avec ou sans RDV associé
      * (CLAUDE.md §5, ajout v0.9).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $quotes = $this->authenticatedGarage($request)->quotes()
             ->with(['user', 'appointment', 'versions.lines'])
             ->latest()
             ->paginate();
 
-        return $this->success(QuoteResource::collection($quotes));
+        return QuoteResource::collection($quotes);
     }
 
     public function show(Request $request, Quote $quote): JsonResponse
     {
         $this->authorizeQuote($request, $quote);
 
-        return $this->success(new QuoteResource($quote->load('versions.lines', 'user', 'appointment')));
+        return $this->success(new QuoteResource($this->loadQuoteRelations($quote)));
     }
 
     public function showForAppointment(Request $request, Appointment $appointment): JsonResponse
     {
         $this->authorizeAppointment($request, $appointment);
-        $quote = $appointment->quote()->with('versions.lines')->firstOrFail();
+        $quote = $this->loadQuoteRelations($appointment->quote()->firstOrFail());
 
         return $this->success(new QuoteResource($quote));
     }
@@ -144,7 +156,7 @@ class QuoteController extends Controller
         $this->authorizeQuote($request, $quote);
         abort_unless($quote->status === QuoteStatus::Accepted, 403, 'Le devis n\'a pas été validé par le client.');
 
-        $quote = $this->quoteService->start($quote);
+        $quote = $this->loadQuoteRelations($this->quoteService->start($quote));
 
         return $this->success(new QuoteResource($quote), 'Prestation démarrée.');
     }
@@ -158,9 +170,9 @@ class QuoteController extends Controller
         $this->authorizeQuote($request, $quote);
         abort_unless($quote->status === QuoteStatus::InProgress, 403, 'La prestation n\'est pas en cours.');
 
-        $quote = $this->quoteService->markPaid($quote);
+        $quote = $this->loadQuoteRelations($this->quoteService->markPaid($quote));
 
-        return $this->success(new QuoteResource($quote->load('versions.lines')), 'Paiement enregistré, facture générée.');
+        return $this->success(new QuoteResource($quote), 'Paiement enregistré, facture générée.');
     }
 
     /**
@@ -172,7 +184,7 @@ class QuoteController extends Controller
         $this->authorizeQuote($request, $quote);
         abort_unless($quote->status === QuoteStatus::Rejected, 403, 'Le devis n\'a pas été refusé.');
 
-        $quote = $this->quoteService->abandon($quote);
+        $quote = $this->loadQuoteRelations($this->quoteService->abandon($quote));
 
         return $this->success(new QuoteResource($quote), 'RDV clôturé sans suite.');
     }

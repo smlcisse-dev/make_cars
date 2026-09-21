@@ -56,7 +56,9 @@ class QuoteTest extends TestCase
             ],
         ]);
 
-        $response->assertCreated()->assertJsonPath('data.status', QuoteStatus::Draft->value);
+        $response->assertCreated()
+            ->assertJsonPath('data.status', QuoteStatus::Draft->value)
+            ->assertJsonPath('data.client.id', $appointment->user_id);
         $this->assertDatabaseHas('quotes', ['appointment_id' => $appointment->id, 'status' => QuoteStatus::Draft->value]);
         $this->assertDatabaseCount('quote_lines', 3);
         $this->assertDatabaseHas('quote_lines', ['type' => 'product', 'unit_price' => 5000, 'quantity' => 2, 'line_total' => 10000]);
@@ -212,11 +214,14 @@ class QuoteTest extends TestCase
         $garage = $this->approvedGarage();
         $appointment = $this->confirmedAppointment($garage);
         $quote = Quote::factory()->forAppointment($appointment)->accepted()->create();
+        QuoteVersion::factory()->forQuote($quote, 1)->sent()->accepted()->create();
         Sanctum::actingAs($garage->user);
 
         $this->postJson("/api/garage/quotes/{$quote->id}/start")
             ->assertOk()
-            ->assertJsonPath('data.status', QuoteStatus::InProgress->value);
+            ->assertJsonPath('data.status', QuoteStatus::InProgress->value)
+            ->assertJsonPath('data.client.id', $quote->user_id)
+            ->assertJsonCount(1, 'data.versions');
     }
 
     public function test_starting_without_acceptance_is_forbidden(): void
@@ -242,7 +247,10 @@ class QuoteTest extends TestCase
 
         $response = $this->postJson("/api/garage/quotes/{$quote->id}/mark-paid");
 
-        $response->assertOk()->assertJsonPath('data.status', QuoteStatus::Invoiced->value);
+        $response->assertOk()
+            ->assertJsonPath('data.status', QuoteStatus::Invoiced->value)
+            ->assertJsonPath('data.client.id', $quote->user_id)
+            ->assertJsonCount(2, 'data.versions');
         $this->assertSame(AppointmentStatus::Completed, $appointment->fresh()->status);
         $this->assertTrue($appointment->fresh()->wasCompletedWithService());
         $this->assertDatabaseHas('quote_versions', ['quote_id' => $quote->id, 'version' => 2, 'document_type' => 'invoice']);
@@ -264,11 +272,15 @@ class QuoteTest extends TestCase
         $garage = $this->approvedGarage();
         $appointment = $this->confirmedAppointment($garage);
         $quote = Quote::factory()->forAppointment($appointment)->create(['status' => QuoteStatus::Rejected]);
+        QuoteVersion::factory()->forQuote($quote, 1)->sent()->rejected()->create();
         Sanctum::actingAs($garage->user);
 
         $response = $this->postJson("/api/garage/quotes/{$quote->id}/abandon");
 
-        $response->assertOk()->assertJsonPath('data.status', QuoteStatus::Abandoned->value);
+        $response->assertOk()
+            ->assertJsonPath('data.status', QuoteStatus::Abandoned->value)
+            ->assertJsonPath('data.client.id', $quote->user_id)
+            ->assertJsonCount(1, 'data.versions');
         $this->assertSame(AppointmentStatus::Completed, $appointment->fresh()->status);
         $this->assertFalse($appointment->fresh()->wasCompletedWithService());
     }
@@ -328,7 +340,9 @@ class QuoteTest extends TestCase
             ],
         ]);
 
-        $response->assertCreated()->assertJsonPath('data.appointment_id', null);
+        $response->assertCreated()
+            ->assertJsonPath('data.appointment_id', null)
+            ->assertJsonPath('data.client.id', $client->id);
         $this->assertDatabaseHas('quotes', [
             'garage_id' => $garage->id,
             'user_id' => $client->id,
@@ -366,5 +380,113 @@ class QuoteTest extends TestCase
 
         $this->getJson('/api/garage/quotes')->assertOk()->assertJsonCount(1, 'data');
         $this->getJson("/api/garage/quotes/{$quote->id}")->assertOk()->assertJsonPath('data.id', $quote->id);
+    }
+
+    public function test_the_quote_list_is_paginated_with_meta(): void
+    {
+        $garage = $this->approvedGarage();
+        Quote::factory()->forGarage($garage)->count(16)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson('/api/garage/quotes')
+            ->assertOk()
+            ->assertJsonCount(15, 'data')
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.total', 16);
+    }
+
+    public function test_show_exposes_the_client_and_versions(): void
+    {
+        $garage = $this->approvedGarage();
+        $quote = Quote::factory()->forGarage($garage)->create();
+        QuoteVersion::factory()->forQuote($quote, 1)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->getJson("/api/garage/quotes/{$quote->id}")
+            ->assertOk()
+            ->assertJsonPath('data.client.id', $quote->user_id)
+            ->assertJsonCount(1, 'data.versions');
+    }
+
+    public function test_full_cycle_decrements_stock_once_at_acceptance_and_copies_lines_to_the_invoice(): void
+    {
+        $garage = $this->approvedGarage();
+        $client = User::factory()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create(['price' => 5000, 'stock_quantity' => 10]);
+        Sanctum::actingAs($garage->user);
+
+        $created = $this->postJson('/api/garage/quotes', [
+            'client_id' => $client->id,
+            'lines' => [['type' => 'product', 'product_id' => $product->id, 'quantity' => 3]],
+        ])->assertCreated();
+        $quoteId = $created->json('data.id');
+        $versionId = $created->json('data.versions.0.id');
+        $this->assertSame(10, $product->fresh()->stock_quantity);
+
+        $this->postJson("/api/garage/quotes/{$quoteId}/versions/{$versionId}/send")->assertOk();
+        $this->assertSame(10, $product->fresh()->stock_quantity);
+
+        Sanctum::actingAs($client);
+        $this->postJson("/api/mobile/quotes/{$quoteId}/versions/{$versionId}/accept")->assertOk();
+        $this->assertSame(7, $product->fresh()->stock_quantity);
+
+        Sanctum::actingAs($garage->user);
+        $this->postJson("/api/garage/quotes/{$quoteId}/start")->assertOk();
+        $this->postJson("/api/garage/quotes/{$quoteId}/mark-paid")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuoteStatus::Invoiced->value);
+
+        $this->assertSame(7, $product->fresh()->stock_quantity);
+        $invoice = Quote::findOrFail($quoteId)->versions()->where('document_type', 'invoice')->firstOrFail();
+        $this->assertDatabaseHas('quote_lines', [
+            'quote_version_id' => $invoice->id, 'product_id' => $product->id, 'quantity' => 3, 'unit_price' => 5000,
+        ]);
+    }
+
+    public function test_refusal_then_new_version_can_be_sent(): void
+    {
+        $garage = $this->approvedGarage();
+        $client = User::factory()->create();
+        Sanctum::actingAs($garage->user);
+
+        $created = $this->postJson('/api/garage/quotes', [
+            'client_id' => $client->id,
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 5000, 'quantity' => 1]],
+        ])->assertCreated();
+        $quoteId = $created->json('data.id');
+        $v1 = $created->json('data.versions.0.id');
+        $this->postJson("/api/garage/quotes/{$quoteId}/versions/{$v1}/send")->assertOk();
+
+        Sanctum::actingAs($client);
+        $this->postJson("/api/mobile/quotes/{$quoteId}/versions/{$v1}/reject")->assertOk();
+
+        Sanctum::actingAs($garage->user);
+        $v2 = $this->postJson("/api/garage/quotes/{$quoteId}/versions", [
+            'lines' => [['type' => 'diagnosis_fee', 'unit_price' => 3000, 'quantity' => 1]],
+        ])->assertCreated()->json('data.id');
+        $this->postJson("/api/garage/quotes/{$quoteId}/versions/{$v2}/send")
+            ->assertOk()
+            ->assertJsonPath('data.version', 2);
+        $this->assertSame(QuoteStatus::Negotiating, Quote::findOrFail($quoteId)->status);
+    }
+
+    public function test_a_garagiste_cannot_touch_another_garages_quote_on_any_action(): void
+    {
+        $garage = $this->approvedGarage();
+        $quote = Quote::factory()->forGarage($garage)->create();
+        $version = QuoteVersion::factory()->forQuote($quote, 1)->create(['pdf_disk' => 'local', 'pdf_path' => 'quotes/x.pdf']);
+        $other = $this->approvedGarage();
+        $lines = ['lines' => [['type' => 'diagnosis_fee', 'unit_price' => 1, 'quantity' => 1]]];
+        Sanctum::actingAs($other->user);
+
+        $this->getJson("/api/garage/quotes/{$quote->id}")->assertNotFound();
+        $this->putJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}", $lines)->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/versions/{$version->id}/send")->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/versions", $lines)->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/start")->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/mark-paid")->assertNotFound();
+        $this->postJson("/api/garage/quotes/{$quote->id}/abandon")->assertNotFound();
+        $this->get("/api/garage/quotes/{$quote->id}/versions/{$version->id}/pdf")->assertNotFound();
+        $this->getJson('/api/garage/quotes')->assertJsonCount(0, 'data');
     }
 }

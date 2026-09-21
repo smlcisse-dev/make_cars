@@ -22,7 +22,8 @@ class ServiceController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $services = $this->authenticatedGarage($request)->services()->latest()->paginate();
+        $perPage = min($request->integer('per_page', 15), 100);
+        $services = $this->authenticatedGarage($request)->services()->latest()->paginate($perPage);
 
         return ServiceResource::collection($services);
     }
