@@ -158,6 +158,26 @@ const router = createRouter({
           name: 'garage.conversations',
           component: () => import('@/views/garage/ConversationsView.vue'),
         },
+        {
+          path: 'reviews',
+          name: 'garage.reviews',
+          component: () => import('@/views/garage/ReviewsView.vue'),
+        },
+        {
+          path: 'disputes',
+          name: 'garage.disputes',
+          component: () => import('@/views/garage/DisputesView.vue'),
+        },
+        {
+          path: 'disputes/:id',
+          name: 'garage.disputes.show',
+          component: () => import('@/views/garage/DisputeDetailView.vue'),
+        },
+        {
+          path: 'notifications',
+          name: 'garage.notifications',
+          component: () => import('@/views/garage/NotificationsView.vue'),
+        },
       ],
     },
     {
