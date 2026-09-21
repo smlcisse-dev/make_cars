@@ -55,7 +55,7 @@ class OrderController extends Controller
 
         $order = $this->orderService->markPaid($order);
 
-        return $this->success(new OrderResource($order->load('lines')), 'Paiement enregistré, facture générée.');
+        return $this->success(new OrderResource($order->load(['lines', 'user'])), 'Paiement enregistré, facture générée.');
     }
 
     public function downloadPdf(Request $request, Order $order): StreamedResponse

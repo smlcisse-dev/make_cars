@@ -55,7 +55,8 @@ class OrderTest extends TestCase
 
         $response = $this->postJson("/api/garage/orders/{$order->id}/mark-paid");
 
-        $response->assertOk()->assertJsonPath('data.status', OrderStatus::Paid->value);
+        $response->assertOk()->assertJsonPath('data.status', OrderStatus::Paid->value)
+            ->assertJsonPath('data.client.id', $order->user_id);
         $this->assertSame(7, $product->fresh()->stock_quantity);
         $this->assertNotNull($order->fresh()->pdf_path);
         $this->assertDatabaseHas('messages', [
