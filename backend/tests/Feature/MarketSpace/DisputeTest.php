@@ -37,6 +37,31 @@ class DisputeTest extends TestCase
         $this->getJson('/api/market-space/disputes')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_the_disputes_list_exposes_the_client(): void
+    {
+        $account = $this->approvedMarketSpaceAccount();
+        $dispute = Dispute::factory()->forMarketSpace($account)->create();
+        Sanctum::actingAs($account->user);
+
+        $this->getJson('/api/market-space/disputes')
+            ->assertOk()
+            ->assertJsonPath('data.0.client.id', $dispute->user_id);
+    }
+
+    public function test_a_market_space_account_can_filter_its_disputes_by_status(): void
+    {
+        $account = $this->approvedMarketSpaceAccount();
+        $submitted = Dispute::factory()->forMarketSpace($account)->create();
+        Dispute::factory()->forMarketSpace($account)->resolvedRejected()->create();
+        Sanctum::actingAs($account->user);
+
+        $this->getJson('/api/market-space/disputes?status=submitted')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $submitted->id);
+        $this->getJson('/api/market-space/disputes')->assertOk()->assertJsonCount(2, 'data');
+    }
+
     public function test_a_market_space_account_can_respond_to_a_dispute(): void
     {
         $account = $this->approvedMarketSpaceAccount();

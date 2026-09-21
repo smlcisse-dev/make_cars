@@ -16,6 +16,9 @@ const navItems = computed(() =>
         { label: 'Produits', to: '/market-space/products' },
         { label: 'Commandes', to: '/market-space/orders' },
         { label: 'Messages', to: '/market-space/conversations' },
+        { label: 'Avis', to: '/market-space/reviews' },
+        { label: 'Réclamations', to: '/market-space/disputes' },
+        { label: 'Notifications', to: '/market-space/notifications' },
         { label: 'Mon profil', to: '/market-space/profile' },
       ],
 )

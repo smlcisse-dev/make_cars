@@ -216,6 +216,26 @@ const router = createRouter({
           name: 'market-space.orders.show',
           component: () => import('@/views/market-space/OrderDetailView.vue'),
         },
+        {
+          path: 'reviews',
+          name: 'market-space.reviews',
+          component: () => import('@/views/market-space/ReviewsView.vue'),
+        },
+        {
+          path: 'disputes',
+          name: 'market-space.disputes',
+          component: () => import('@/views/market-space/DisputesView.vue'),
+        },
+        {
+          path: 'disputes/:id',
+          name: 'market-space.disputes.show',
+          component: () => import('@/views/market-space/DisputeDetailView.vue'),
+        },
+        {
+          path: 'notifications',
+          name: 'market-space.notifications',
+          component: () => import('@/views/market-space/NotificationsView.vue'),
+        },
       ],
     },
     {
