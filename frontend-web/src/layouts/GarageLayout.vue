@@ -15,6 +15,7 @@ const navItems = computed(() =>
         { label: 'Tableau de bord', to: '/garage' },
         { label: 'Services', to: '/garage/services' },
         { label: 'Produits', to: '/garage/products' },
+        { label: 'Commandes', to: '/garage/orders' },
         { label: 'Rendez-vous', to: '/garage/appointments' },
         { label: 'Devis', to: '/garage/quotes' },
         { label: 'Messages', to: '/garage/conversations' },

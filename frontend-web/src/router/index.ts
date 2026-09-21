@@ -118,6 +118,16 @@ const router = createRouter({
           component: () => import('@/views/garage/ProductsView.vue'),
         },
         {
+          path: 'orders',
+          name: 'garage.orders',
+          component: () => import('@/views/garage/OrdersView.vue'),
+        },
+        {
+          path: 'orders/:id',
+          name: 'garage.orders.show',
+          component: () => import('@/views/garage/OrderDetailView.vue'),
+        },
+        {
           path: 'appointments',
           name: 'garage.appointments',
           component: () => import('@/views/garage/AppointmentsView.vue'),
