@@ -17,6 +17,7 @@ const navItems = computed(() =>
         { label: 'Produits', to: '/garage/products' },
         { label: 'Rendez-vous', to: '/garage/appointments' },
         { label: 'Devis', to: '/garage/quotes' },
+        { label: 'Messages', to: '/garage/conversations' },
         { label: 'Mon profil', to: '/garage/profile' },
       ],
 )

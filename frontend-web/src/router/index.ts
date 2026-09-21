@@ -143,6 +143,11 @@ const router = createRouter({
           name: 'garage.quotes.show',
           component: () => import('@/views/garage/QuoteDetailView.vue'),
         },
+        {
+          path: 'conversations',
+          name: 'garage.conversations',
+          component: () => import('@/views/garage/ConversationsView.vue'),
+        },
       ],
     },
     {
