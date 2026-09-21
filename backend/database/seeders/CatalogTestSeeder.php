@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\AccountType;
+use App\Models\Arrondissement;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Models\User;
@@ -45,6 +46,12 @@ class CatalogTestSeeder extends Seeder
     private const MARKET_SPACE_EMAIL = 'marche.pieces.approved@makecars.test';
 
     private const MARKET_SPACE_STRUCTURE_NAME = 'Marché Pièces Cotonou';
+
+    /**
+     * Chemin fixe (pas d'id de compte, recréé à chaque passage) : la photo
+     * générée est écrasée par le passage suivant au lieu de s'accumuler.
+     */
+    private const MARKET_SPACE_IMAGE_DIRECTORY = 'market-space/catalog-test-seeder';
 
     private const MARKET_SPACE_PRODUCT_NAME = 'Kit plaquettes de frein avant (test validation admin)';
 
@@ -138,6 +145,47 @@ class CatalogTestSeeder extends Seeder
 
         $registrationService->approve($user->professionalRegistration, $admin);
 
-        return $user->marketSpaceAccount()->firstOrFail();
+        $account = $user->marketSpaceAccount()->firstOrFail();
+        $this->completeProfile($account);
+
+        return $account;
+    }
+
+    /**
+     * Complète le profil du compte Market Space de test (CLAUDE.md §5, ajout
+     * v0.20) pour qu'il puisse accéder à tout son espace sans passer par
+     * l'écran de profil : téléphone, position, localisation administrative,
+     * 7 jours d'horaires et une photo.
+     */
+    private function completeProfile(MarketSpaceAccount $account): void
+    {
+        $arrondissement = Arrondissement::query()->with('commune')->orderBy('id')->firstOrFail();
+
+        $account->update([
+            'phone' => '+2290190040599',
+            'latitude' => 6.3654,
+            'longitude' => 2.4183,
+            'department_id' => $arrondissement->commune->department_id,
+            'commune_id' => $arrondissement->commune_id,
+            'arrondissement_id' => $arrondissement->id,
+            'neighborhood' => 'Ganhi',
+        ]);
+
+        $account->openingHours()->delete();
+        $account->openingHours()->createMany(
+            array_map(fn (int $day) => [
+                'day_of_week' => $day,
+                'is_closed' => $day === 7,
+                'opens_at' => $day === 7 ? null : '08:00',
+                'closes_at' => $day === 7 ? null : '18:00',
+            ], range(1, 7)),
+        );
+
+        $account->images()->delete();
+        $account->images()->create([
+            'disk' => 'public',
+            'path' => $this->fakeCatalogImage('boutique.jpg')->storeAs(self::MARKET_SPACE_IMAGE_DIRECTORY, 'boutique.jpg', 'public'),
+            'position' => 1,
+        ]);
     }
 }
