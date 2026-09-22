@@ -14,6 +14,20 @@ trait HasProfileCompleteness
     public const REQUIRED_OPENING_HOURS_DAYS = 7;
 
     /**
+     * Mémoïsée pour la durée de vie de l'instance : `isProfileComplete()` et
+     * `profileStatus()` appellent toutes deux cette méthode, qui interroge
+     * les relations `openingHours`/`images` — sans ce cache, une même
+     * requête HTTP finissait par les exécuter deux fois (ex.
+     * `EnsureProfileIsComplete`, qui appelle `isProfileComplete()` puis
+     * `missingProfileFields()` sur le même profil). Chaque requête vers le
+     * pooler Supabase coûtant plusieurs centaines de ms de latence réseau
+     * incompressible, ce doublon valait la peine d'être éliminé.
+     *
+     * @var array<int, string>|null
+     */
+    private ?array $missingProfileFieldsCache = null;
+
+    /**
      * Clés des éléments manquants : champs du profil par leur nom de colonne,
      * plus `opening_hours` (les 7 jours enregistrés) et `images` (au moins
      * une photo).
@@ -22,6 +36,10 @@ trait HasProfileCompleteness
      */
     public function missingProfileFields(): array
     {
+        if ($this->missingProfileFieldsCache !== null) {
+            return $this->missingProfileFieldsCache;
+        }
+
         $missing = [];
 
         foreach (['name', 'address', 'phone', 'neighborhood'] as $field) {
@@ -44,7 +62,7 @@ trait HasProfileCompleteness
             $missing[] = 'images';
         }
 
-        return $missing;
+        return $this->missingProfileFieldsCache = $missing;
     }
 
     public function isProfileComplete(): bool
