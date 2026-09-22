@@ -71,13 +71,30 @@ class AppointmentTest extends TestCase
         ]);
     }
 
-    public function test_a_garagiste_can_reject_a_pending_appointment_without_a_reason(): void
+    public function test_rejecting_a_pending_appointment_without_a_reason_is_rejected(): void
     {
         $garage = Garage::factory()->complete()->create();
         $appointment = Appointment::factory()->forGarage($garage)->create();
         Sanctum::actingAs($garage->user);
 
         $this->postJson("/api/garage/appointments/{$appointment->id}/reject")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('reason');
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/reject", ['reason' => ''])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('reason');
+    }
+
+    public function test_a_garagiste_can_reject_a_pending_appointment_with_a_non_empty_reason(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $appointment = Appointment::factory()->forGarage($garage)->create();
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/reject", [
+            'reason' => 'Agenda complet ce jour-là.',
+        ])
             ->assertOk()
             ->assertJsonPath('data.status', AppointmentStatus::Rejected->value);
     }

@@ -141,7 +141,7 @@ Premier maillon de la chaîne RDV → devis → validation du devis par le clien
 - **Pas de créneaux prédéfinis en V1** : la date/heure est une simple proposition/confirmation en texte libre, pas un système de disponibilités structuré.
 - **Aucun paiement déclenché par la prise de RDV** (règle 10, rappel explicite) — le module Devis, à construire ensuite, est le premier point de la chaîne où un montant apparaît.
 - **Statuts** : `pending` (en attente) → `confirmed` (confirmé par le garagiste), `rejected` (refusé), ou `rescheduled` (contre-proposition du garagiste) ; `rescheduled` → `confirmed` (le client accepte la nouvelle date) ou `cancelled` (le client annule plutôt que de « refuser » la contre-proposition — ça referme la négociation sans état supplémentaire). `cancelled` est aussi accessible depuis `pending`/`confirmed` (annulation client). `completed` est prévu dans le modèle pour anticiper la suite de la chaîne (prestation terminée) mais n'est pas encore atteignable dans ce module — sa transition sera déclenchée par le futur module Devis/Prestation.
-- **Le garagiste agit uniquement depuis `pending`** : confirmer, refuser (motif optionnel, à la différence des rejets admin qui l'exigent), ou proposer une autre date. Pas de contre-proposition en chaîne dans cette V1 (un seul aller-retour).
+- **Le garagiste agit uniquement depuis `pending`** : confirmer, refuser (motif obligatoire, alignement sur les rejets admin — voir « Motif obligatoire pour le refus d'un RDV par le garagiste » ci-dessous), ou proposer une autre date. Pas de contre-proposition en chaîne dans cette V1 (un seul aller-retour).
 - **Anticipation du futur devis** : le module Devis référence le RDV via une FK `appointment_id` optionnelle sur son propre modèle (`Appointment` n'a rien à porter en anticipation — la relation se construit dans l'autre sens). *Mise à jour v0.9 : le RDV confirmé n'est plus une condition obligatoire pour créer un devis — voir « Module Commande, RDV optionnel pour le devis, et compte express » ci-dessous.*
 - **Suspension du compte garage** : un RDV déjà créé n'est pas annulé automatiquement si le garage est suspendu entre-temps (l'historique est conservé, cf. suspension de compte) — mais un automobiliste ne peut plus en demander de nouveau tant que le garage reste suspendu.
 
@@ -340,6 +340,10 @@ Jusqu'ici, l'image était facultative à la création d'un service ou d'un produ
 
 - **À la modification, l'image existante suffit** : pas besoin d'en re-uploader une à chaque édition — même logique que la photo de profil professionnel (§5, ajout v0.20), qui ne peut jamais être totalement retirée une fois le profil complet. L'image reste obligatoire à la modification uniquement si l'enregistrement n'en a encore aucune (cas des enregistrements créés avant cette règle) : c'est ce qui les fait converger vers la nouvelle règle dès qu'on y touche, sans les invalider tant qu'on n'y touche pas.
 - **Aucune action « supprimer l'image » (seule)**, ni côté backend ni côté frontend : le seul moyen de changer l'image est d'en envoyer une nouvelle via le même formulaire de création/modification, qui la remplace. Il n'existe jamais de chemin qui laisse `image_path` (colonne réelle derrière le champ exposé `image_url`) redevenir `null` une fois qu'une image a été fournie une première fois.
+
+### Motif obligatoire pour le refus d'un RDV par le garagiste (ajout v0.24, 2026-09-22)
+
+Jusqu'ici, le motif de refus d'un RDV par le garagiste était facultatif (§5, ajout v0.7). Nouvelle règle : **le motif devient obligatoire**, alignant ce refus sur le même principe que les rejets/suspensions admin — traçabilité pour l'automobiliste, qui doit comprendre pourquoi sa demande est refusée. `RejectAppointmentRequest::rules()` passe `reason` de `nullable` à `required`.
 
 ### Matrice des droits d'accès (résumé)
 

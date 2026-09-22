@@ -9,9 +9,9 @@ class RejectAppointmentRequest extends FormRequest
 {
     /**
      * Réservé aux garagistes via le middleware de route (role:garagiste) ;
-     * l'appartenance du RDV est vérifiée dans le contrôleur. Motif optionnel
-     * (contrairement aux rejets admin) — le cahier des charges ne l'exige
-     * pas pour un refus de RDV entre garagiste et client.
+     * l'appartenance du RDV est vérifiée dans le contrôleur. Motif
+     * obligatoire — traçabilité pour l'automobiliste, même principe que les
+     * rejets/suspensions admin.
      */
     public function authorize(): bool
     {
@@ -24,7 +24,7 @@ class RejectAppointmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'reason' => ['nullable', 'string', 'max:1000'],
+            'reason' => ['required', 'string', 'max:1000'],
         ];
     }
 }

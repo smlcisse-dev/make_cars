@@ -35,6 +35,10 @@ const rescheduleTouched = ref(false)
 // Seul un RDV `pending` autorise une action du garagiste (CLAUDE.md §5, v0.7).
 const canAct = computed(() => appointment.value?.status === 'pending')
 
+// Motif de refus obligatoire (CLAUDE.md §5, v0.24) : validation front miroir
+// de la règle backend (`RejectAppointmentRequest`).
+const isRejectReasonValid = computed(() => rejectReason.value.trim().length > 0)
+
 // La valeur d'un <input type="datetime-local"> ("2026-09-25T10:00") est
 // interprétée par `new Date()` en heure locale du navigateur ; vide → NaN.
 const isProposedAtValid = computed(() => {
@@ -75,14 +79,14 @@ async function handleConfirm(): Promise<void> {
   }
 }
 
-// Motif optionnel : une chaîne vide n'est pas envoyée (le backend l'accepte
-// absente, à la différence des rejets admin qui exigent un motif).
+// Motif obligatoire (CLAUDE.md §5, v0.24) : le bouton "Refuser" de la
+// modale est désactivé tant que le champ est vide (cf. `isRejectReasonValid`).
 async function handleReject(): Promise<void> {
   isRejecting.value = true
   actionErrorMessage.value = null
 
   try {
-    await rejectAppointment(appointmentId, rejectReason.value.trim() || undefined)
+    await rejectAppointment(appointmentId, rejectReason.value.trim())
     backToList('Rendez-vous refusé.')
   } catch (error) {
     actionErrorMessage.value = extractApiErrorMessage(error, 'Le refus a échoué. Réessayez.')
@@ -188,7 +192,7 @@ function formatDateTime(iso: string): string {
 
     <BaseModal v-if="isRejectModalOpen" title="Refuser ce rendez-vous" @close="isRejectModalOpen = false">
       <label for="reject-reason-textarea" class="block text-sm font-medium text-slate-700">
-        Motif <span class="text-slate-400">(facultatif)</span>
+        Motif <span class="text-rose-600">*</span>
       </label>
       <textarea
         id="reject-reason-textarea"
@@ -200,7 +204,9 @@ function formatDateTime(iso: string): string {
 
       <template #footer>
         <AppButton variant="secondary" @click="isRejectModalOpen = false">Annuler</AppButton>
-        <AppButton variant="danger" :loading="isRejecting" @click="handleReject">Refuser</AppButton>
+        <AppButton variant="danger" :disabled="!isRejectReasonValid" :loading="isRejecting" @click="handleReject">
+          Refuser
+        </AppButton>
       </template>
     </BaseModal>
 
