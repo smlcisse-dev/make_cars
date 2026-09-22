@@ -12,9 +12,14 @@ import { clearStoredSession, getStoredToken, getStoredUser, setStoredUser } from
 // la page. 15 s laisse de la marge par rapport à la latence réseau observée
 // vers Supabase (jusqu'à ~10 s mesurés), tout en bornant l'attente à une
 // durée raisonnable pour l'utilisateur.
+//
+// TEMPORAIRE (2026-09-22) : relevé de 15 s à 30 s par confort, face à une
+// latence Supabase anormalement élevée ce jour-là — ce n'est pas la correction
+// d'un bug. À ramener à 15 s (valeur justifiée ci-dessus) dès que la latence
+// Supabase est redevenue normale.
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 15_000,
+  timeout: 30_000,
 })
 
 // Ajoute le token Sanctum courant à chaque requête, s'il existe. Sanctum
