@@ -72,6 +72,9 @@ function lineToInput(line: QuoteLine): QuoteLineInput | null {
   if (line.type === 'diagnosis_fee') {
     return { type: 'diagnosis_fee', label: line.label, unit_price: Number(line.unit_price), quantity: line.quantity }
   }
+  if (line.type === 'custom_charge') {
+    return { type: 'custom_charge', label: line.label, unit_price: Number(line.unit_price), quantity: line.quantity }
+  }
   if (line.type === 'service' && line.repair_service_id !== null) {
     return { type: 'service', repair_service_id: line.repair_service_id, quantity: line.quantity }
   }
