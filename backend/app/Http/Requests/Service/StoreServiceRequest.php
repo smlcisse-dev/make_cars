@@ -28,7 +28,7 @@ class StoreServiceRequest extends FormRequest
             'category' => ['required', Rule::enum(ServiceCategory::class)],
             'price' => ['required', 'numeric', 'min:0'],
             'duration_minutes' => ['required', 'integer', 'min:1'],
-            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
         ];
     }
 }

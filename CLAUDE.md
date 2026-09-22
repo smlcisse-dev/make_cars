@@ -334,6 +334,13 @@ Tout champ `phone` saisi dans l'application doit être un numéro béninois vali
 - **Frontend** : `utils/beninPhone.ts` reproduit la règle (validation avant envoi, message clair sous le champ, envoi de la forme canonique) ; le backend reste l'autorité. Seul l'écran de profil professionnel a aujourd'hui un champ téléphone côté web (les inscriptions et l'app mobile n'existent pas encore côté interface) : les futurs écrans devront réutiliser cet utilitaire.
 - **Données antérieures** : les téléphones déjà en base dans un autre format (données de test ou saisies avant cette règle) ne sont pas migrés ; ils seront refusés au prochain enregistrement du profil concerné tant qu'ils n'ont pas été corrigés.
 
+### Image obligatoire pour un Service et un Produit (ajout v0.23, 2026-09-22)
+
+Jusqu'ici, l'image était facultative à la création d'un service ou d'un produit. Nouvelle règle métier : **une image devient obligatoire à la création**, pour les deux domaines (Services garagiste, Produits garagiste **et** Market Space — ces derniers partagent les mêmes classes de validation, `StoreProductRequest`/`UpdateProductRequest`).
+
+- **À la modification, l'image existante suffit** : pas besoin d'en re-uploader une à chaque édition — même logique que la photo de profil professionnel (§5, ajout v0.20), qui ne peut jamais être totalement retirée une fois le profil complet. L'image reste obligatoire à la modification uniquement si l'enregistrement n'en a encore aucune (cas des enregistrements créés avant cette règle) : c'est ce qui les fait converger vers la nouvelle règle dès qu'on y touche, sans les invalider tant qu'on n'y touche pas.
+- **Aucune action « supprimer l'image » (seule)**, ni côté backend ni côté frontend : le seul moyen de changer l'image est d'en envoyer une nouvelle via le même formulaire de création/modification, qui la remplace. Il n'existe jamais de chemin qui laisse `image_path` (colonne réelle derrière le champ exposé `image_url`) redevenir `null` une fois qu'une image a été fournie une première fois.
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |

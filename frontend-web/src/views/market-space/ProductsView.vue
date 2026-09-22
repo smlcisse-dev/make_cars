@@ -117,6 +117,16 @@ const imageFile = ref<File | null>(null)
 
 const isEditing = computed(() => editingProduct.value !== null)
 
+// Image obligatoire à la création ; en édition, l'image déjà présente
+// suffit — pas besoin d'en re-uploader une (CLAUDE.md §5, ajout v0.23).
+const isImageRequired = computed(() => !isEditing.value || !editingProduct.value?.image_url)
+const imageHint = computed(() => {
+  if (!isEditing.value) {
+    return 'obligatoire à la création, JPG/PNG, 5 Mo max'
+  }
+  return isImageRequired.value ? 'obligatoire, JPG/PNG, 5 Mo max' : 'facultative, JPG/PNG, 5 Mo max'
+})
+
 const formErrors = computed(() => ({
   name: form.value.name.trim() === '' ? 'Le nom est obligatoire.' : null,
   price: form.value.price === '' || Number(form.value.price) < 0 ? 'Indiquez un prix supérieur ou égal à 0.' : null,
@@ -129,6 +139,7 @@ const formErrors = computed(() => ({
     !isEditing.value && form.value.low_stock_threshold !== '' && !isNonNegativeInteger(form.value.low_stock_threshold)
       ? 'Le seuil doit être un entier, 0 ou plus.'
       : null,
+  image: isImageRequired.value && !imageFile.value ? 'Une image est obligatoire.' : null,
 }))
 const isFormValid = computed(() => Object.values(formErrors.value).every((error) => error === null))
 
@@ -385,7 +396,7 @@ async function handleStockSubmit(): Promise<void> {
       </div>
 
       <label for="product-image" class="mt-3 block text-sm font-medium text-slate-700">
-        Image <span class="text-slate-400">(facultative, JPG/PNG, 5 Mo max)</span>
+        Image <span :class="isImageRequired ? 'text-rose-600' : 'text-slate-400'">({{ imageHint }})</span>
       </label>
       <img
         v-if="editingProduct?.image_url && !imageFile"
@@ -400,6 +411,7 @@ async function handleStockSubmit(): Promise<void> {
         class="mt-2 block w-full text-sm text-slate-600"
         @change="handleImageChange"
       />
+      <p v-if="formTouched && formErrors.image" class="mt-1 text-sm text-rose-600">{{ formErrors.image }}</p>
 
       <p v-if="formErrorMessage" class="mt-3 text-sm text-rose-600">{{ formErrorMessage }}</p>
 

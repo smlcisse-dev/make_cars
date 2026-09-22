@@ -41,16 +41,18 @@ class ServiceTest extends TestCase
 
     public function test_a_garagiste_can_add_a_service_pending_validation(): void
     {
+        Storage::fake('public');
         $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
-        $response = $this->postJson('/api/garage/services', [
+        $response = $this->post('/api/garage/services', [
             'name' => 'Vidange citadine',
             'description' => 'Vidange complète huile + filtre pour citadine.',
             'category' => 'entretien_courant',
             'price' => 15000,
             'duration_minutes' => 45,
-        ]);
+            'image' => UploadedFile::fake()->image('vidange.jpg'),
+        ], ['Accept' => 'application/json']);
 
         $response->assertCreated()
             ->assertJsonPath('data.status', RepairServiceStatus::Pending->value)
@@ -82,6 +84,25 @@ class ServiceTest extends TestCase
         $this->assertNotNull($response->json('data.image_url'));
     }
 
+    /**
+     * L'image devient obligatoire à la création (CLAUDE.md §5, ajout v0.23).
+     */
+    public function test_creating_a_service_without_an_image_is_rejected(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson('/api/garage/services', [
+            'name' => 'Vidange citadine',
+            'description' => 'Vidange complète huile + filtre pour citadine.',
+            'category' => 'entretien_courant',
+            'price' => 15000,
+            'duration_minutes' => 45,
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
+    }
+
     public function test_creating_a_service_rejects_a_category_outside_the_fixed_list(): void
     {
         $garage = Garage::factory()->complete()->create();
@@ -101,7 +122,10 @@ class ServiceTest extends TestCase
     public function test_updating_a_service_resets_its_validation_status(): void
     {
         $garage = Garage::factory()->complete()->create();
-        $service = RepairService::factory()->forGarage($garage)->approved()->create();
+        $service = RepairService::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'services/existing.jpg',
+        ]);
         Sanctum::actingAs($garage->user);
 
         $response = $this->putJson("/api/garage/services/{$service->id}", [
@@ -118,6 +142,62 @@ class ServiceTest extends TestCase
             'status' => RepairServiceStatus::Pending->value,
             'reviewed_by' => null,
         ]);
+    }
+
+    /**
+     * L'image existante suffit à la modification, pas besoin d'en re-uploader
+     * une (CLAUDE.md §5, ajout v0.23) — même logique que la photo de profil
+     * professionnel qui ne peut jamais redevenir absente une fois fournie.
+     */
+    public function test_updating_a_service_without_a_new_image_keeps_the_existing_one(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $service = RepairService::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'services/existing.jpg',
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/services/{$service->id}", [
+            'name' => $service->name,
+            'description' => $service->description,
+            'category' => $service->category->value,
+            'price' => $service->price,
+            'duration_minutes' => $service->duration_minutes,
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('services/existing.jpg', $service->fresh()->image_path);
+    }
+
+    public function test_updating_a_service_without_an_image_fails_when_it_has_none(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $service = RepairService::factory()->forGarage($garage)->approved()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/services/{$service->id}", [
+            'name' => $service->name,
+            'description' => $service->description,
+            'category' => $service->category->value,
+            'price' => $service->price,
+            'duration_minutes' => $service->duration_minutes,
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
+    }
+
+    public function test_no_endpoint_exists_to_delete_a_services_image_alone(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $service = RepairService::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'services/existing.jpg',
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $this->deleteJson("/api/garage/services/{$service->id}/image")->assertNotFound();
+        $this->assertNotNull($service->fresh()->image_path);
     }
 
     public function test_updating_availability_does_not_reset_validation_status(): void
@@ -153,7 +233,10 @@ class ServiceTest extends TestCase
 
     public function test_a_garagiste_cannot_modify_another_garages_service(): void
     {
-        $service = RepairService::factory()->create();
+        $service = RepairService::factory()->create([
+            'image_disk' => 'public',
+            'image_path' => 'services/existing.jpg',
+        ]);
         $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 

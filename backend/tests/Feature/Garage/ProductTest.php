@@ -41,6 +41,33 @@ class ProductTest extends TestCase
 
     public function test_a_garagiste_can_add_a_product_pending_validation(): void
     {
+        Storage::fake('public');
+        $garage = Garage::factory()->complete()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->post('/api/garage/products', [
+            'name' => 'Huile moteur 5W30',
+            'description' => 'Bidon 5 litres.',
+            'sku' => 'HUILE-5W30',
+            'price' => 15000,
+            'stock_quantity' => 20,
+            'image' => UploadedFile::fake()->image('huile.jpg'),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()->assertJsonPath('data.status', ProductStatus::Pending->value);
+        $this->assertDatabaseHas('products', [
+            'sellable_type' => Garage::class,
+            'sellable_id' => $garage->id,
+            'name' => 'Huile moteur 5W30',
+            'status' => ProductStatus::Pending->value,
+        ]);
+    }
+
+    /**
+     * L'image devient obligatoire à la création (CLAUDE.md §5, ajout v0.23).
+     */
+    public function test_creating_a_product_without_an_image_is_rejected(): void
+    {
         $garage = Garage::factory()->complete()->create();
         Sanctum::actingAs($garage->user);
 
@@ -52,19 +79,16 @@ class ProductTest extends TestCase
             'stock_quantity' => 20,
         ]);
 
-        $response->assertCreated()->assertJsonPath('data.status', ProductStatus::Pending->value);
-        $this->assertDatabaseHas('products', [
-            'sellable_type' => Garage::class,
-            'sellable_id' => $garage->id,
-            'name' => 'Huile moteur 5W30',
-            'status' => ProductStatus::Pending->value,
-        ]);
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
     }
 
     public function test_updating_a_product_resets_its_validation_status(): void
     {
         $garage = Garage::factory()->complete()->create();
-        $product = Product::factory()->forGarage($garage)->approved()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'products/existing.jpg',
+        ]);
         Sanctum::actingAs($garage->user);
 
         $response = $this->putJson("/api/garage/products/{$product->id}", [
@@ -81,6 +105,58 @@ class ProductTest extends TestCase
             'status' => ProductStatus::Pending->value,
             'reviewed_by' => null,
         ]);
+    }
+
+    /**
+     * L'image existante suffit à la modification (CLAUDE.md §5, ajout v0.23).
+     */
+    public function test_updating_a_product_without_a_new_image_keeps_the_existing_one(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'products/existing.jpg',
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/products/{$product->id}", [
+            'name' => $product->name,
+            'description' => $product->description,
+            'sku' => $product->sku,
+            'price' => $product->price,
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('products/existing.jpg', $product->fresh()->image_path);
+    }
+
+    public function test_updating_a_product_without_an_image_fails_when_it_has_none(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create();
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->putJson("/api/garage/products/{$product->id}", [
+            'name' => $product->name,
+            'description' => $product->description,
+            'sku' => $product->sku,
+            'price' => $product->price,
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('image');
+    }
+
+    public function test_no_endpoint_exists_to_delete_a_products_image_alone(): void
+    {
+        $garage = Garage::factory()->complete()->create();
+        $product = Product::factory()->forGarage($garage)->approved()->create([
+            'image_disk' => 'public',
+            'image_path' => 'products/existing.jpg',
+        ]);
+        Sanctum::actingAs($garage->user);
+
+        $this->deleteJson("/api/garage/products/{$product->id}/image")->assertNotFound();
+        $this->assertNotNull($product->fresh()->image_path);
     }
 
     public function test_updating_stock_does_not_reset_validation_status(): void
@@ -134,7 +210,10 @@ class ProductTest extends TestCase
 
     public function test_a_garagiste_cannot_modify_another_garages_product(): void
     {
-        $product = Product::factory()->forGarage()->create();
+        $product = Product::factory()->forGarage()->create([
+            'image_disk' => 'public',
+            'image_path' => 'products/existing.jpg',
+        ]);
         $otherGarage = Garage::factory()->complete()->create();
         Sanctum::actingAs($otherGarage->user);
 
