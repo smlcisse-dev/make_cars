@@ -154,6 +154,16 @@ class QuoteService
             ];
         }
 
+        if ($type === QuoteLineType::CustomCharge) {
+            return [
+                'type' => $type,
+                'label' => $lineData['label'] ?? 'Prestation',
+                'unit_price' => $lineData['unit_price'],
+                'quantity' => $quantity,
+                'line_total' => $lineData['unit_price'] * $quantity,
+            ];
+        }
+
         if ($type === QuoteLineType::Service) {
             $service = RepairService::where('id', $lineData['repair_service_id'])
                 ->where('garage_id', $garage->id)

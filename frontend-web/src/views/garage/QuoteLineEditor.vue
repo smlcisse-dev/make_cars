@@ -43,7 +43,7 @@ let nextKey = 1
 
 function rowFromInput(line: QuoteLineInput): EditorRow {
   const base = { key: nextKey++, label: '', unitPrice: null, serviceId: null, productId: null }
-  if (line.type === 'diagnosis_fee') {
+  if (line.type === 'diagnosis_fee' || line.type === 'custom_charge') {
     return { ...base, type: line.type, label: line.label, unitPrice: line.unit_price, quantity: line.quantity }
   }
   if (line.type === 'service') {
@@ -115,9 +115,9 @@ function toInput(row: EditorRow): QuoteLineInput | null {
   if (quantity === null) {
     return null
   }
-  if (row.type === 'diagnosis_fee') {
+  if (row.type === 'diagnosis_fee' || row.type === 'custom_charge') {
     return row.unitPrice !== null && row.unitPrice >= 0
-      ? { type: 'diagnosis_fee', label: row.label.trim(), unit_price: row.unitPrice, quantity }
+      ? { type: row.type, label: row.label.trim(), unit_price: row.unitPrice, quantity }
       : null
   }
   if (row.type === 'service') {
@@ -127,7 +127,7 @@ function toInput(row: EditorRow): QuoteLineInput | null {
 }
 
 function unitPriceOf(row: EditorRow): number {
-  if (row.type === 'diagnosis_fee') {
+  if (row.type === 'diagnosis_fee' || row.type === 'custom_charge') {
     return row.unitPrice ?? 0
   }
   const price = row.type === 'service' ? findService(row.serviceId)?.price : findProduct(row.productId)?.price
@@ -177,9 +177,15 @@ const inputClasses =
       </div>
 
       <div class="mt-2 grid gap-3 sm:grid-cols-[1fr_7rem]">
-        <template v-if="row.type === 'diagnosis_fee'">
+        <template v-if="row.type === 'diagnosis_fee' || row.type === 'custom_charge'">
           <div class="grid gap-3 sm:grid-cols-2">
-            <input v-model="row.label" type="text" maxlength="255" placeholder="Libellé (défaut : Frais de diagnostic)" :class="inputClasses" />
+            <input
+              v-model="row.label"
+              type="text"
+              maxlength="255"
+              :placeholder="row.type === 'diagnosis_fee' ? 'Libellé (défaut : Frais de diagnostic)' : 'Libellé (défaut : Prestation)'"
+              :class="inputClasses"
+            />
             <input v-model.number="row.unitPrice" type="number" min="0" step="any" placeholder="Prix (FCFA)" :class="inputClasses" />
           </div>
         </template>
@@ -220,6 +226,7 @@ const inputClasses =
           <option value="service">{{ lineTypeLabel('service') }}</option>
           <option value="product">{{ lineTypeLabel('product') }}</option>
           <option value="diagnosis_fee">{{ lineTypeLabel('diagnosis_fee') }}</option>
+          <option value="custom_charge">{{ lineTypeLabel('custom_charge') }}</option>
         </select>
         <AppButton variant="secondary" @click="addRow">Ajouter une ligne</AppButton>
       </div>

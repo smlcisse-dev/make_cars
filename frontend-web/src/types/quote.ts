@@ -12,7 +12,7 @@ export type QuoteStatus =
 
 export type QuoteVersionDecision = 'accepted' | 'rejected'
 export type QuoteDocumentType = 'quote' | 'invoice'
-export type QuoteLineType = 'diagnosis_fee' | 'service' | 'product'
+export type QuoteLineType = 'diagnosis_fee' | 'custom_charge' | 'service' | 'product'
 
 // Reflète QuoteLineResource. `repair_service_id`/`product_id` non-null selon
 // `type` ; jamais les deux à la fois.
@@ -61,5 +61,6 @@ export interface Quote {
 // service/produit (relus depuis le catalogue côté backend).
 export type QuoteLineInput =
   | { type: 'diagnosis_fee'; label: string; unit_price: number; quantity: number }
+  | { type: 'custom_charge'; label: string; unit_price: number; quantity: number }
   | { type: 'service'; repair_service_id: number; quantity: number }
   | { type: 'product'; product_id: number; quantity: number }

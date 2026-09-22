@@ -25,6 +25,7 @@ const STATUS_TONES: Record<QuoteStatus, BadgeTone> = {
 
 const LINE_TYPE_LABELS: Record<QuoteLineType, string> = {
   diagnosis_fee: 'Frais de diagnostic',
+  custom_charge: 'Prestation libre',
   service: 'Service',
   product: 'Pièce',
 }

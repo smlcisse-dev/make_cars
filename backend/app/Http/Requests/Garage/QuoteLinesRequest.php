@@ -37,7 +37,7 @@ class QuoteLinesRequest extends FormRequest
             'lines.*.repair_service_id' => ['required_if:lines.*.type,service', 'integer'],
             'lines.*.product_id' => ['required_if:lines.*.type,product', 'integer'],
             'lines.*.label' => ['nullable', 'string', 'max:255'],
-            'lines.*.unit_price' => ['required_if:lines.*.type,diagnosis_fee', 'numeric', 'min:0'],
+            'lines.*.unit_price' => ['required_if:lines.*.type,diagnosis_fee,custom_charge', 'numeric', 'min:0'],
             'lines.*.quantity' => ['nullable', 'integer', 'min:1'],
         ];
     }

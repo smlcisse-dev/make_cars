@@ -64,6 +64,35 @@ class QuoteTest extends TestCase
         $this->assertDatabaseHas('quote_lines', ['type' => 'product', 'unit_price' => 5000, 'quantity' => 2, 'line_total' => 10000]);
     }
 
+    public function test_a_custom_charge_line_uses_a_default_label_unless_one_is_provided(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        Sanctum::actingAs($garage->user);
+
+        $response = $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [
+                ['type' => 'custom_charge', 'unit_price' => 8000, 'quantity' => 1],
+                ['type' => 'custom_charge', 'label' => 'Remplacement joint de culasse', 'unit_price' => 25000, 'quantity' => 1],
+            ],
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('quote_lines', ['type' => 'custom_charge', 'label' => 'Prestation', 'unit_price' => 8000]);
+        $this->assertDatabaseHas('quote_lines', ['type' => 'custom_charge', 'label' => 'Remplacement joint de culasse', 'unit_price' => 25000]);
+    }
+
+    public function test_a_custom_charge_line_without_a_unit_price_is_rejected(): void
+    {
+        $garage = $this->approvedGarage();
+        $appointment = $this->confirmedAppointment($garage);
+        Sanctum::actingAs($garage->user);
+
+        $this->postJson("/api/garage/appointments/{$appointment->id}/quote", [
+            'lines' => [['type' => 'custom_charge', 'label' => 'Réparation moteur']],
+        ])->assertUnprocessable();
+    }
+
     public function test_line_price_is_pulled_from_the_catalog_not_client_supplied(): void
     {
         $garage = $this->approvedGarage();
