@@ -107,7 +107,10 @@ function formatDate(iso: string): string {
           <div>
             <h2 class="text-lg font-semibold text-slate-900">{{ product.name }}</h2>
             <p class="mt-1 text-sm text-slate-500">
-              {{ product.sellable.name }}
+              <!-- product.sellable est null si la ligne référencée (Garage/MarketSpaceAccount)
+                   n'existe plus en base : une anomalie de données, pas une absence normale,
+                   d'où un texte de repli explicite plutôt qu'un tiret neutre. -->
+              {{ product.sellable?.name ?? 'Vendeur supprimé' }}
               <span class="text-slate-400">· {{ productSellableTypeLabel(product.sellable_type) }}</span>
             </p>
           </div>
@@ -162,7 +165,7 @@ function formatDate(iso: string): string {
     <ReasonPromptModal
       v-if="isRejectModalOpen && product"
       title="Rejeter ce produit"
-      :description="`Le motif sera conservé et visible par ${product.sellable.name}.`"
+      :description="`Le motif sera conservé et visible par ${product.sellable?.name ?? 'Vendeur supprimé'}.`"
       confirm-label="Rejeter"
       :loading="isRejecting"
       @cancel="isRejectModalOpen = false"

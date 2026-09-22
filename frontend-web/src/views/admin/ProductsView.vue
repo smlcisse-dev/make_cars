@@ -126,7 +126,10 @@ onMounted(() => {
         <template #empty>Aucun produit {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
         <template #cell-sellable="{ item }">
           <div>
-            <p>{{ item.sellable.name }}</p>
+            <!-- item.sellable est null si la ligne référencée (Garage/MarketSpaceAccount)
+                 n'existe plus en base : une anomalie de données, pas une absence normale,
+                 d'où un texte de repli explicite plutôt qu'un tiret neutre. -->
+            <p>{{ item.sellable?.name ?? 'Vendeur supprimé' }}</p>
             <p class="text-xs text-slate-400">{{ productSellableTypeLabel(item.sellable_type) }}</p>
           </div>
         </template>

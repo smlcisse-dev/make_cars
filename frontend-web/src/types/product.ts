@@ -19,7 +19,13 @@ export interface Product {
   id: number
   sellable_type: ProductSellableType
   sellable_id: number
-  sellable: ProductSellableSummary
+  // `null` quand la relation polymorphe ne résout aucune ligne (Garage/
+  // MarketSpaceAccount supprimé en base alors que sellable_id le référence
+  // encore) — une anomalie de données, jamais un état normal. Distinct du
+  // cas `whenLoaded()` non chargé (géré ailleurs dans le projet), qui ne se
+  // produit pas ici puisque `sellable` est toujours chargé par
+  // index()/show() côté backend.
+  sellable: ProductSellableSummary | null
   name: string
   description: string
   sku: string | null
