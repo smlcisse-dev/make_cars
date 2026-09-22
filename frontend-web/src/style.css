@@ -3,3 +3,16 @@
 body {
   @apply bg-slate-50 text-slate-900;
 }
+
+/* Les navigateurs n'appliquent pas `cursor: pointer` par défaut sur un
+   <button> (contrairement à <a href>) : règle globale pour que tout élément
+   cliquable actif affiche la main, plutôt qu'un correctif composant par
+   composant qui risquerait d'en oublier.
+   `:where(...)` garde cette règle à spécificité nulle : une classe
+   utilitaire Tailwind explicite (ex. `cursor-default` sur une notification
+   déjà lue, dont le clic est un no-op) doit toujours pouvoir la surclasser
+   sans `!important` — sinon la spécificité normale de `button:not(:disabled)`
+   (élément + pseudo-classe) l'emporterait sur une simple classe. */
+:where(button:not(:disabled), [role='button']:not(:disabled)) {
+  cursor: pointer;
+}
