@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -7,6 +7,7 @@ import {
   fetchRegistration,
   fetchRegistrationDocumentBlob,
   reactivateRegistration,
+  refuseReactivationRequest,
   rejectRegistration,
   suspendRegistration,
 } from '@/api/registrations'
@@ -36,6 +37,20 @@ const isReactivating = ref(false)
 const actionErrorMessage = ref<string | null>(null)
 const isRejectModalOpen = ref(false)
 const isSuspendModalOpen = ref(false)
+const isRefusingReactivation = ref(false)
+const isRefuseReactivationModalOpen = ref(false)
+const reactivationFlash = ref<string | null>(null)
+
+// Demande de réactivation en attente (CLAUDE.md §5, ajout v0.28) et
+// historique des demandes déjà décidées, du plus récent au plus ancien.
+const pendingReactivationRequest = computed(() =>
+  registration.value?.latest_reactivation_request?.status === 'pending'
+    ? registration.value.latest_reactivation_request
+    : null,
+)
+const pastReactivationRequests = computed(() =>
+  (registration.value?.reactivation_requests ?? []).filter((request) => request.status !== 'pending'),
+)
 
 const documentErrorById = ref<Record<number, string>>({})
 const isOpeningDocumentId = ref<number | null>(null)
@@ -132,6 +147,29 @@ async function handleReactivate(): Promise<void> {
     actionErrorMessage.value = extractApiErrorMessage(error, 'La réactivation a échoué. Réessayez.')
   } finally {
     isReactivating.value = false
+  }
+}
+
+// Refus de la demande de réactivation : motif obligatoire, le compte reste
+// suspendu. On reste sur la fiche (rechargée avec la réponse) plutôt que de
+// revenir à la liste : le dossier n'a pas changé d'état.
+async function handleRefuseReactivation(reason: string): Promise<void> {
+  if (!registration.value) {
+    return
+  }
+
+  isRefusingReactivation.value = true
+  actionErrorMessage.value = null
+  reactivationFlash.value = null
+
+  try {
+    registration.value = await refuseReactivationRequest(registration.value.id, reason)
+    reactivationFlash.value = 'Demande de réactivation refusée. Le compte reste suspendu.'
+  } catch (error) {
+    actionErrorMessage.value = extractApiErrorMessage(error, 'Le refus a échoué. Réessayez.')
+  } finally {
+    isRefusingReactivation.value = false
+    isRefuseReactivationModalOpen.value = false
   }
 }
 
@@ -250,11 +288,60 @@ function formatDate(iso: string): string {
       <div v-else-if="registration.status === 'approved'" class="rounded-lg border border-slate-200 bg-white p-6">
         <h3 class="text-sm font-semibold text-slate-900">Compte</h3>
         <p v-if="actionErrorMessage" class="mt-2 text-sm text-rose-600">{{ actionErrorMessage }}</p>
+        <p v-if="reactivationFlash" class="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {{ reactivationFlash }}
+        </p>
+
+        <!-- Demande de réactivation en attente (v0.28) -->
+        <div
+          v-if="registration.is_suspended && pendingReactivationRequest"
+          class="mt-3 rounded-md border border-sky-200 bg-sky-50 p-4"
+        >
+          <h4 class="text-sm font-semibold text-sky-900">Demande de réactivation</h4>
+          <p class="mt-1 text-xs text-sky-700">Envoyée le {{ formatDate(pendingReactivationRequest.created_at) }}</p>
+          <p class="mt-2 whitespace-pre-line text-sm text-slate-800">{{ pendingReactivationRequest.message }}</p>
+        </div>
+
         <div class="mt-3 flex gap-3">
           <AppButton v-if="!registration.is_suspended" variant="danger" @click="isSuspendModalOpen = true">
             Suspendre
           </AppButton>
-          <AppButton v-else :loading="isReactivating" @click="handleReactivate">Réactiver</AppButton>
+          <template v-else>
+            <AppButton :loading="isReactivating" @click="handleReactivate">Réactiver</AppButton>
+            <AppButton
+              v-if="pendingReactivationRequest"
+              variant="danger"
+              @click="isRefuseReactivationModalOpen = true"
+            >
+              Refuser la demande
+            </AppButton>
+          </template>
+        </div>
+
+        <!-- Historique des demandes déjà décidées -->
+        <div v-if="pastReactivationRequests.length" class="mt-6">
+          <h4 class="text-sm font-semibold text-slate-900">Demandes de réactivation précédentes</h4>
+          <ul class="mt-2 space-y-2">
+            <li
+              v-for="request in pastReactivationRequests"
+              :key="request.id"
+              class="rounded-md border border-slate-200 px-4 py-3 text-sm"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs text-slate-500">Envoyée le {{ formatDate(request.created_at) }}</span>
+                <StatusBadge :label="request.status_label" :tone="request.status === 'accepted' ? 'success' : 'neutral'" />
+              </div>
+              <p class="mt-1 whitespace-pre-line text-slate-800">{{ request.message }}</p>
+              <p v-if="request.decided_at" class="mt-2 text-xs text-slate-500">
+                Décision le {{ formatDate(request.decided_at) }}<span v-if="request.decided_by">
+                  par {{ request.decided_by.name }}</span
+                >
+              </p>
+              <p v-if="request.response_reason" class="mt-1 text-slate-700">
+                <span class="font-medium">Motif du refus :</span> {{ request.response_reason }}
+              </p>
+            </li>
+          </ul>
         </div>
       </div>
     </template>
@@ -267,6 +354,16 @@ function formatDate(iso: string): string {
       :loading="isRejecting"
       @cancel="isRejectModalOpen = false"
       @confirm="handleReject"
+    />
+
+    <ReasonPromptModal
+      v-if="isRefuseReactivationModalOpen && registration"
+      title="Refuser la demande de réactivation"
+      :description="`Le compte de ${registration.structure_name} restera suspendu. Le motif lui sera communiqué et il pourra faire une nouvelle demande.`"
+      confirm-label="Refuser la demande"
+      :loading="isRefusingReactivation"
+      @cancel="isRefuseReactivationModalOpen = false"
+      @confirm="handleRefuseReactivation"
     />
 
     <ReasonPromptModal

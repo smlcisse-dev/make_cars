@@ -76,6 +76,11 @@ export const useAuthStore = defineStore('auth', () => {
   const suspensionReason = computed(
     () => user.value?.professional_registration?.suspension_reason ?? null,
   )
+  // Dernière demande de réactivation (CLAUDE.md §5, ajout v0.28), lue par le
+  // bandeau de suspension.
+  const latestReactivationRequest = computed(
+    () => user.value?.professional_registration?.latest_reactivation_request ?? null,
+  )
 
   // Vrai tant qu'un professionnel doit rester sur « Mon profil » : dossier non
   // approuvé OU profil incomplet. Remplace l'ancien calcul de complétude seule
@@ -171,6 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
     registrationStatus,
     isSuspended,
     suspensionReason,
+    latestReactivationRequest,
     mustStayOnProfile,
     login,
     refreshUser,

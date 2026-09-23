@@ -12,6 +12,8 @@ interface ApiEnvelope<T> {
 
 export interface RegistrationListParams {
   status?: RegistrationStatus
+  // 1 = seulement les dossiers ayant une demande de réactivation en attente.
+  reactivation_requested?: 1
   page?: number
 }
 
@@ -56,6 +58,21 @@ export async function suspendRegistration(id: number, reason: string): Promise<P
 // Réactivation : effet immédiat, aucun motif requis (CLAUDE.md §5, ajout v0.6).
 export async function reactivateRegistration(id: number): Promise<ProfessionalRegistration> {
   const response = await http.post<ApiEnvelope<ProfessionalRegistration>>(`/admin/registrations/${id}/reactivate`)
+  return response.data.data
+}
+
+/**
+ * Refuse la demande de réactivation en attente (motif obligatoire, CLAUDE.md
+ * §5, ajout v0.28) : le compte reste suspendu. Renvoie la fiche complète.
+ */
+export async function refuseReactivationRequest(
+  id: number,
+  reason: string,
+): Promise<ProfessionalRegistration> {
+  const response = await http.post<ApiEnvelope<ProfessionalRegistration>>(
+    `/admin/registrations/${id}/reactivation-request/refuse`,
+    { reason },
+  )
   return response.data.data
 }
 

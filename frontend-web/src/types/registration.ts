@@ -29,6 +29,22 @@ export interface RegistrationDocument {
   download_url: string
 }
 
+// Demande de réactivation d'un compte suspendu (CLAUDE.md §5, ajout v0.28),
+// reflète ReactivationRequestResource.
+export type ReactivationRequestStatus = 'pending' | 'accepted' | 'refused'
+
+export interface ReactivationRequest {
+  id: number
+  status: ReactivationRequestStatus
+  status_label: string
+  message: string
+  response_reason: string | null
+  // Présent seulement dans l'historique de la fiche admin.
+  decided_by?: { id: number; name: string } | null
+  decided_at: string | null
+  created_at: string
+}
+
 // Reflète ProfessionalRegistrationResource (backend/app/Http/Resources).
 export interface ProfessionalRegistration {
   id: number
@@ -48,6 +64,12 @@ export interface ProfessionalRegistration {
   is_suspended: boolean
   suspension_reason: string | null
   suspended_at: string | null
+  // Dernière demande de réactivation et présence d'une demande en attente
+  // (v0.28). Facultatifs (`?`) : absents d'une session enregistrée avant.
+  latest_reactivation_request?: ReactivationRequest | null
+  has_pending_reactivation_request?: boolean
+  // Historique complet, du plus récent au plus ancien : fiche admin seulement.
+  reactivation_requests?: ReactivationRequest[]
   documents: RegistrationDocument[]
   created_at: string
 }
@@ -59,5 +81,5 @@ export interface ProfessionalRegistration {
 // lise `documents` sur cet objet, au lieu de nous laisser croire qu'il existe.
 export type SessionRegistration = Omit<
   ProfessionalRegistration,
-  'account_type' | 'account_type_label' | 'documents'
+  'account_type' | 'account_type_label' | 'documents' | 'reactivation_requests'
 >

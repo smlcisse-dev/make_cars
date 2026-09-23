@@ -12,10 +12,17 @@ import type { ProfessionalRegistration, RegistrationStatus } from '@/types/regis
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { registrationStatusTone } from '@/utils/registrationStatus'
 
-const STATUS_FILTERS: { value: RegistrationStatus; label: string }[] = [
+// Un filtre est soit un statut de dossier, soit « Réactivation demandée »
+// (CLAUDE.md §5, ajout v0.28 : comptes suspendus ayant une demande en
+// attente, quel que soit leur statut). Le type union `RegistrationStatus |
+// 'reactivation_requested'` autorise ces seules valeurs.
+type RegistrationFilter = RegistrationStatus | 'reactivation_requested'
+
+const STATUS_FILTERS: { value: RegistrationFilter; label: string }[] = [
   { value: 'pending', label: 'En attente' },
   { value: 'approved', label: 'Approuvé' },
   { value: 'rejected', label: 'Rejeté' },
+  { value: 'reactivation_requested', label: 'Réactivation demandée' },
 ]
 
 // Colonnes déclaratives passées au tableau générique (src/shared/components/
@@ -32,7 +39,7 @@ const columns: TableColumn[] = [
 const router = useRouter()
 const route = useRoute()
 
-const statusFilter = ref<RegistrationStatus>('pending')
+const statusFilter = ref<RegistrationFilter>('pending')
 const registrations = ref<ProfessionalRegistration[]>([])
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -49,7 +56,11 @@ async function loadRegistrations(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchRegistrations({ status: statusFilter.value, page: currentPage.value })
+    const response = await fetchRegistrations(
+      statusFilter.value === 'reactivation_requested'
+        ? { reactivation_requested: 1, page: currentPage.value }
+        : { status: statusFilter.value, page: currentPage.value },
+    )
     registrations.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -60,7 +71,7 @@ async function loadRegistrations(): Promise<void> {
   }
 }
 
-function selectStatus(status: RegistrationStatus): void {
+function selectStatus(status: RegistrationFilter): void {
   if (status === statusFilter.value) {
     return
   }
@@ -124,7 +135,10 @@ onMounted(() => {
 
     <template v-else>
       <AppTable :items="registrations" :columns="columns" @row-click="goToDetail">
-        <template #empty>Aucun dossier {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
+        <template #empty>
+          <template v-if="statusFilter === 'reactivation_requested'">Aucune demande de réactivation en attente.</template>
+          <template v-else>Aucun dossier {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
+        </template>
         <template #cell-created_at="{ item }">
           {{ formatDate(item.created_at) }}
         </template>
@@ -132,6 +146,11 @@ onMounted(() => {
           <div class="flex items-center gap-2">
             <StatusBadge :label="item.status_label" :tone="registrationStatusTone(item.status)" />
             <StatusBadge v-if="item.is_suspended" label="Suspendu" tone="danger" />
+            <StatusBadge
+              v-if="item.has_pending_reactivation_request"
+              label="Réactivation demandée"
+              tone="info"
+            />
           </div>
         </template>
       </AppTable>

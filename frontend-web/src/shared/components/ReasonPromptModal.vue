@@ -10,17 +10,28 @@ import BaseModal from '@/shared/components/BaseModal.vue'
 // compte, modération d'avis, décision de réclamation (CLAUDE.md §5). Plutôt
 // que de réécrire un formulaire + une validation à chaque fois, ces futurs
 // modules réutiliseront ce composant en changeant juste les libellés.
-withDefaults(
+//
+// Le libellé du champ, son texte d'aide et la couleur du bouton sont
+// paramétrables pour servir aussi hors modération : la demande de
+// réactivation d'un professionnel suspendu (message obligatoire, v0.28).
+// `withDefaults` fournit la valeur utilisée quand le parent omet la prop.
+const props = withDefaults(
   defineProps<{
     title: string
     description?: string
     confirmLabel?: string
     loading?: boolean
+    fieldLabel?: string
+    placeholder?: string
+    confirmVariant?: 'primary' | 'danger'
   }>(),
   {
     description: undefined,
     confirmLabel: 'Confirmer',
     loading: false,
+    fieldLabel: 'Motif',
+    placeholder: 'Expliquez la raison de cette décision...',
+    confirmVariant: 'danger',
   },
 )
 
@@ -48,20 +59,24 @@ function handleConfirm(): void {
     <p v-if="description" class="text-sm text-slate-500">{{ description }}</p>
 
     <label for="reason-prompt-textarea" class="mt-3 block text-sm font-medium text-slate-700">
-      Motif <span class="text-rose-600">*</span>
+      {{ props.fieldLabel }} <span class="text-rose-600">*</span>
     </label>
     <textarea
       id="reason-prompt-textarea"
       v-model="reason"
       rows="3"
       class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-      placeholder="Expliquez la raison de cette décision..."
+      :placeholder="props.placeholder"
     />
-    <p v-if="touched && !isValid" class="mt-1 text-sm text-rose-600">Le motif est obligatoire.</p>
+    <p v-if="touched && !isValid" class="mt-1 text-sm text-rose-600">
+      Le champ « {{ props.fieldLabel }} » est obligatoire.
+    </p>
 
     <template #footer>
       <AppButton variant="secondary" @click="emit('cancel')">Annuler</AppButton>
-      <AppButton variant="danger" :loading="loading" @click="handleConfirm">{{ confirmLabel }}</AppButton>
+      <AppButton :variant="props.confirmVariant" :loading="loading" @click="handleConfirm">{{
+        confirmLabel
+      }}</AppButton>
     </template>
   </BaseModal>
 </template>

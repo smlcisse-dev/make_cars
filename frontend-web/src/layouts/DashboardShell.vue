@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
+import SuspensionBanner from '@/shared/components/SuspensionBanner.vue'
 import { useAuthStore } from '@/stores/auth'
 
 // Un seul composant de mise en page pour les trois espaces (CLAUDE.md §4 :
@@ -89,19 +90,12 @@ async function handleLogout(): Promise<void> {
     </aside>
 
     <div class="flex flex-1 flex-col">
-      <!-- Compte suspendu (CLAUDE.md §5, ajout v0.6) : simple information,
-           l'accès au dashboard n'est pas bloqué. Placé ici plutôt que dans
-           chaque layout : `isSuspended` ne vaut vrai que pour un
-           professionnel, l'espace Admin n'est donc jamais concerné. -->
-      <div
-        v-if="auth.isSuspended"
-        class="border-b border-red-300 bg-red-50 px-6 py-3 text-sm text-red-900"
-      >
-        <span class="font-semibold"
-          >Votre compte est suspendu : il n'est plus visible par les automobilistes.</span
-        >
-        <span v-if="auth.suspensionReason"> Motif : {{ auth.suspensionReason }}</span>
-      </div>
+      <!-- Compte suspendu (CLAUDE.md §5, ajouts v0.6 et v0.28) : simple
+           information et demande de réactivation, l'accès au dashboard
+           n'est pas bloqué. Placé ici plutôt que dans chaque layout :
+           `isSuspended` ne vaut vrai que pour un professionnel, l'espace
+           Admin n'est donc jamais concerné. -->
+      <SuspensionBanner v-if="auth.isSuspended" />
       <main class="flex-1 p-6">
         <slot />
       </main>

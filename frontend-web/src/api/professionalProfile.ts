@@ -153,6 +153,14 @@ export async function fetchIdentityCertificateDocumentBlob(
   return response.data
 }
 
+// Demande de réactivation d'un compte suspendu (CLAUDE.md §5, ajout v0.28).
+export async function requestReactivation(
+  space: ProfessionalSpace,
+  message: string,
+): Promise<void> {
+  await http.post(`/${space}/profile/reactivation-request`, { message })
+}
+
 // Passe le dossier en `pending` (422 `registration_incomplete` si le profil ou
 // les informations légales sont incomplets).
 export async function submitRegistration(space: ProfessionalSpace): Promise<void> {
