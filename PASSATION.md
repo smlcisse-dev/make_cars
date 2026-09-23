@@ -1,157 +1,243 @@
-# Make Cars : document de passation (état au 2026-09-20)
+# Make Cars : document de passation (état au 2026-09-23)
 
-**Vérifié dans le code :**
-- `main` est synchronisée avec `origin/main`, sans commit en retard ni en avance. Seul élément non suivi : `.claude/`.
-- Dernier commit : `d35038b` (profil pro obligatoire + validation téléphone). 41 commits au total.
-- Tests backend : **425 tests, 425 réussis** (1004 assertions).
-- `backend/.env` pointe vers `.env.development` (base de développement).
-- Le backend expose 164 routes.
+Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23 par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
-**Non vérifié :** le « testé en navigateur ». Le frontend n'a aucun test automatisé (`package.json` sans script de test). Les sections ci-dessous disent « le code existe et est câblé au routeur » ; la confirmation manuelle reste à faire.
+**Vérifié dans le code / par commande**
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **69 commits** au total, dont 27 depuis la passation précédente.
+- **Dernier commit** : `528ef98` chore(http): relève temporairement le timeout Axios à 30 s.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **475 tests, 475 réussis, 1232 assertions**. Avant : 425 tests et 1004 assertions.
+- **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
+- **Routes** (`php artisan route:list`) : **173 routes** au total, contre 164 avant.
+
+| Espace | Routes | Détail |
+|---|---|---|
+| `api/garage/*` | 49 | profil 5, services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
+| `api/market-space/*` | 26 | profil 5, produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
+| `api/admin/*` | 39 | inscriptions 7, litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
+| `api/mobile/*` | 39 | automobiliste (voir §3) |
+| `api/auth/*` | 7 | login, login Google, logout, me, inscription automobiliste, inscription pro, `express-claim` |
+| Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2, réclamation de compte express 2, `health` 1 |
+| Hors `api/` | 5 | `sanctum/csrf-cookie`, `storage/{path}` ×2, `up`, `_boost/browser-logs` |
+
+**Niveau de vérification des écrans**
+
+Aucun test automatisé côté frontend : `package.json` n'a pas de script de test. On distingue deux niveaux.
+
+- **Testé manuellement en navigateur, écran par écran** : le **dashboard Garagiste au complet**, c'est-à-dire Services, Produits, Rendez-vous, Devis/Factures, Chat, Commandes, Avis, Réclamations et Notifications (plus Mon profil).
+  - *Source : déclaration de l'utilisateur. Rien dans le dépôt ne permet de le constater.*
+- **Construit et vérifié par relecture de code, jamais testé en navigateur** :
+  - le **dashboard Market Space**, miroir du Garagiste ;
+  - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
 
 ---
 
 ## 1. Frontend web : écrans existants
 
-Routes dans `frontend-web/src/router/index.ts`, avec garde de navigation par rôle.
+Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de navigation par rôle et garde « profil incomplet » (v0.20).
+
+**Contrôle des écrans orphelins : aucun.**
+- Chaque fichier de `src/views/` est déclaré dans le routeur.
+- Chaque écran de liste figure dans le menu de son layout.
+- Chaque écran de détail ou de création est atteint depuis sa liste (`router.push`), vérifié par `grep`.
+- `views/garage/QuoteLineEditor.vue` n'est pas une page : c'est un composant importé par `QuoteCreateView` et `QuoteDetailView`.
 
 **Commun**
 - `/login` : connexion email/mot de passe.
 - `/403` et page 404.
-- Composants partagés : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (motif obligatoire), `StatusBadge`, `LocationSelect`.
+- Composants partagés (`src/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal`, `StatusBadge`, `LocationSelect`.
+- Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
 
-**Espace Admin (`/admin`, 6 sections)**
+**Espace Admin (`/admin`)** : construit, relu, jamais testé en navigateur
 
-| Écran | Routes | Périmètre |
+| Menu | Routes | Périmètre |
 |---|---|---|
-| Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`) : cartes de chiffres et tableaux, sans graphiques. Répartition géographique par département, séparée garages / Market Space. |
-| Inscriptions | `/admin/registrations`, `/:id` | Liste et fiche KYC. Approbation, rejet, suspension/réactivation (motif obligatoire). |
-| Services | `/admin/services`, `/:id` | Validation des services de garage. |
-| Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). |
-| Avis | `/admin/avis`, `/:id` | Modération : masquage avec motif. |
-| Litiges | `/admin/litiges`, `/:id` | Liste, instruction, décision (fondée + action suspension/avertissement, ou rejet) et clôture. |
+| Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`), en cartes et tableaux, sans graphiques |
+| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC. Approbation, rejet, suspension et réactivation (motif obligatoire) |
+| Services | `/admin/services`, `/:id` | Validation des services de garage |
+| Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
+| Avis | `/admin/avis`, `/:id` | Masquage avec motif |
+| Litiges | `/admin/litiges`, `/:id` | Instruction, décision (fondée + suspension ou avertissement, ou rejet), clôture |
 
-**Espaces Garagiste (`/garage`) et Market Space (`/market-space`)**
-- Une seule page réelle par espace : **Mon profil** (`ProfessionalProfileView.vue`, prop `space`) :
-  - informations et localisation (`LocationSelect` en cascade, bouton « Utiliser ma position », quartier) ;
-  - horaires sur 7 jours ;
-  - photos ;
-  - bandeau des éléments manquants.
-- Le « Tableau de bord » de chaque espace est un **placeholder** (message de bienvenue).
-- Tant que le profil est incomplet, seul « Mon profil » est proposé dans la barre latérale.
+**Espace Garagiste (`/garage`)** : testé manuellement en navigateur (déclaration utilisateur)
+
+Ordre du menu dans `GarageLayout.vue`, identique au routeur :
+
+| Menu | Routes | Vue(s) |
+|---|---|---|
+| Tableau de bord | `/garage` | `DashboardView.vue`. **Toujours un placeholder** : message de bienvenue, avec un texte périmé (« arrive dans un prochain module ») |
+| Services | `/garage/services` | `ServicesView.vue` : CRUD, disponibilité, image obligatoire à la création (v0.23) |
+| Produits | `/garage/products` | `ProductsView.vue` : CRUD, correction de stock, seuil bas, image obligatoire (v0.23) |
+| Rendez-vous | `/garage/appointments`, `/:id` | `AppointmentsView`, `AppointmentDetailView` : confirmer, refuser (motif obligatoire, v0.24), reprogrammer |
+| Devis | `/garage/quotes`, `/new`, `/:id` | `QuotesView`, `QuoteCreateView` (avec ou sans RDV, client express), `QuoteDetailView` (versions, envoi, démarrage, paiement manuel, abandon, PDF) ; lignes diagnostic / service / pièce / **prestation libre** |
+| Commandes | `/garage/orders`, `/:id` | `OrdersView`, `OrderDetailView` : paiement manuel, PDF |
+| Messages | `/garage/conversations` | `ConversationsView.vue` : lien vers le devis depuis un message système |
+| Avis | `/garage/reviews` | `ReviewsView.vue` : lecture seule |
+| Réclamations | `/garage/disputes`, `/:id` | `DisputesView` (filtre par statut), `DisputeDetailView` (réponse) |
+| Notifications | `/garage/notifications` | `NotificationsView.vue` |
+| Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`) |
+
+**Espace Market Space (`/market-space`)** : construit, relu, jamais testé en navigateur
+
+Ordre du menu dans `MarketSpaceLayout.vue` :
+
+| Menu | Routes | Vue(s) |
+|---|---|---|
+| Tableau de bord | `/market-space` | **Placeholder**, texte périmé comme côté Garagiste |
+| Produits | `/market-space/products` | `ProductsView.vue` |
+| Commandes | `/market-space/orders`, `/:id` | `OrdersView`, `OrderDetailView` |
+| Messages | `/market-space/conversations` | `ConversationsView.vue` (chat Market Space, v0.22) |
+| Avis | `/market-space/reviews` | `ReviewsView.vue` |
+| Réclamations | `/market-space/disputes`, `/:id` | `DisputesView`, `DisputeDetailView` |
+| Notifications | `/market-space/notifications` | `NotificationsView.vue` |
+| Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`) |
+
+Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profil ».
 
 ## 2. Backend construit et testé, sans écran frontend
 
-**Espace Garagiste**
-- Services : CRUD, soumis à validation.
-- Produits : CRUD, stock, seuil bas.
-- RDV : 7 routes (confirmer, refuser, reprogrammer).
-- Devis/factures : 10 routes (versions, PDF, paiement manuel, statuts `draft` → `invoiced` ou `abandoned`).
-- Commandes : 4 routes, paiement manuel.
-- Clients express : `garage/clients`.
-- Chat : 4 routes.
-- Avis reçus, réclamations reçues (avec réponse), notifications, jeton FCM.
-
-**Espace Market Space**
-- Produits : 5 routes, stock.
-- Commandes : 4 routes.
-- Réclamations : 4 routes.
-- Avis, notifications, jeton FCM.
-
-**Côté automobiliste (`/mobile/*`)** : API complète, sans app Flutter.
-- Listes et fiches garages et Market Space.
-- Recherche `nearby` : position, rayon, nom, service, produit, prix, tri.
-- RDV, devis (accepter/refuser), commandes, chat, avis, réclamations, notifications, jeton d'appareil.
-
-**Auth et public**
-- Inscription automobiliste et professionnelle (`auth/register`).
-- Login email/mot de passe et Google (couvert par les tests).
-- `auth/express-claim`.
-- Liens signés email pour la décision d'un devis (`quotes/{quote}/...`, réponse JSON brute).
-- Lien signé de réclamation d'un compte express (`express-clients/{user}/claim`, réponse JSON brute).
-- `locations/*` : départements, communes, arrondissements.
-
-**Supervision admin en lecture, sans écran**
-- `admin/garages`, `admin/market-space-accounts`, `admin/appointments`, `admin/quotes`, `admin/orders`, `admin/conversations`.
-
-**Transversal**
-- Notifications push : modèle complet, envoi simulé sans `FCM_SERVER_KEY`.
-- Mini-boutique polymorphe, décrément de stock unique.
-- Emails (devis, décision de réclamation).
+- **Supervision admin en lecture** (12 routes, aucun écran, absentes du menu) : `admin/garages`, `admin/market-space-accounts`, `admin/appointments`, `admin/quotes`, `admin/orders`, `admin/conversations`, chacune en liste et en détail.
+- **Côté automobiliste (`/mobile/*`, 39 routes)** : l'API est complète, mais il n'existe pas d'application Flutter.
+  - Listes et fiches garages et Market Space, avec leurs avis.
+  - Recherche `nearby` : position, rayon, nom, service, produit, prix, tri.
+  - RDV : création, annulation, acceptation d'une reprogrammation.
+  - Devis : accepter/refuser une version, PDF.
+  - Commandes : création, annulation, PDF.
+  - Chat avec un garage **ou** une boutique.
+  - Avis et réclamations sur un devis ou une commande.
+  - Notifications, jeton d'appareil.
+- **Auth et routes publiques** :
+  - inscriptions automobiliste et professionnelle ;
+  - login Google ;
+  - `express-claim` ;
+  - liens signés de décision de devis et de réclamation de compte express (réponse JSON brute) ;
+  - `locations/*` (utilisé par `LocationSelect`).
+- **Jetons FCM des espaces pro** : `PUT garage|market-space/device-tokens` existent, mais le frontend web ne les appelle pas.
+- **Transversal** :
+  - notifications push avec envoi simulé tant que `FCM_SERVER_KEY` n'est pas renseignée ;
+  - emails (devis au client express, décision de réclamation) ;
+  - décrément de stock unique.
 
 ## 3. Ce qui n'existe nulle part
 
-- **Application mobile Flutter** : aucun code dans le dépôt (seuls `backend/` et `frontend-web/`).
+- **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
 - **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe.
-- **Dashboards Garagiste et Market Space fonctionnels** : services, produits, stock, RDV, devis, commandes, chat, avis, réclamations, notifications.
+- **Tableaux de bord d'accueil** Garagiste et Market Space : placeholders uniquement.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
-- **Paiement en ligne réel** : agrégateur non choisi, seul le paiement manuel V1 existe.
-- **Chat temps réel** : pas de WebSocket ni Reverb.
-- **Envoi push FCM réel**.
+- **Paiement en ligne réel** : seul le paiement manuel V1 existe.
+- **Chat temps réel** : ni WebSocket ni Reverb. Il faut recharger pour voir les nouveaux messages.
+- **Envoi push FCM réel.**
 - **Affichage carte** (frontend).
 - **Pages Vue de confirmation** pour les liens email (décision de devis, réclamation de compte express).
-- **Authentification par téléphone/SMS**.
+- **Authentification par téléphone/SMS.**
 - **Extension multi-pays** : table `countries`, fuseau par structure.
-- **Contestation d'un avis par le professionnel**.
+- **Contestation d'un avis** par le professionnel.
 - **Frontend** : aucun test automatisé, pas de design system.
 
-## 4. Identifiants de test (base de développement)
+## 4. Infrastructure de développement local
 
-Mot de passe de tous les comptes seedés : **`password`**. Vérifier l'environnement actif : `backend/bin/switch-env.sh status`.
+**Lancement du backend**
+- Commande utilisée : `php artisan serve --no-reload`, depuis `backend/`, port par défaut **8000**.
+  - Le frontend pointe sur `VITE_API_BASE_URL=http://127.0.0.1:8000/api` (`frontend-web/.env`).
+- **Workers** : `PHP_CLI_SERVER_WORKERS=4` est défini dans `backend/.env.development` ; la ligne est commentée dans `.env.production`.
+- **Pourquoi `--no-reload`** : `ServeCommand.php` n'honore `PHP_CLI_SERVER_WORKERS` qu'avec ce flag. Sans lui, Laravel affiche « Unable to respect the `PHP_CLI_SERVER_WORKERS` environment variable without the `--no-reload` flag » et ne lance qu'un seul serveur. Avec un seul worker, les requêtes lentes vers Supabase se bloquent les unes les autres.
+- **Contrepartie** : le `.env` n'est jamais rechargé à chaud. Après tout `switch-env.sh` ou toute modification du `.env`, il faut tuer et relancer le serveur (c'était déjà la règle, CLAUDE.md §4).
+- **Ne survit pas à un redémarrage** : ce mode n'est inscrit dans aucun script du dépôt. Après un reboot ou la fermeture du terminal, un simple `php artisan serve` repart avec un seul worker ; il faut relancer explicitement avec `--no-reload`.
+- **Vérifié le 2026-09-23** : aucun processus `artisan serve` ni Vite ne tourne en ce moment. La commande et le port viennent de l'historique des sessions précédentes (le 2026-09-22, processus `php artisan serve --no-reload`, workers `php -S 127.0.0.1:…`). Le port 8001 a aussi été observé ce jour-là, quand 8000 était déjà occupé.
+
+**Latence Supabase et timeout Axios**
+- **Ticket support Supabase SU-481692** : latence anormale du pooler `eu-central-1`.
+  - *Référence fournie par l'utilisateur. Elle n'apparaît nulle part dans le dépôt, et son statut actuel n'a pas pu être vérifié.* À mettre à jour à la réception de la réponse de Supabase.
+- **Timeout Axios** : `frontend-web/src/api/http.ts` est actuellement à `timeout: 30_000`, relevé depuis 15 s par le commit `528ef98` du 2026-09-22.
+  - Le commentaire dans le fichier le marque comme **TEMPORAIRE**.
+  - **À ramener à `15_000`** dès que la latence Supabase est redevenue normale. La valeur de 15 s est justifiée dans le même commentaire (jusqu'à ~10 s de latence mesurée en temps normal).
+
+## 5. Identifiants de test (base de développement)
+
+Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserFactory`, `ProfessionalRegistrationTestSeeder`, `CatalogTestSeeder`).
 
 | Compte | Email | Origine |
 |---|---|---|
 | Admin | `admin@makecars.test` | `DatabaseSeeder` |
 | Garagiste en attente | `garage.etoile.pending@makecars.test` | `ProfessionalRegistrationTestSeeder` |
 | Market Space en attente | `pieces.express.pending@makecars.test` | idem |
-| **Garagiste approuvé** | `garage.excellence.approved@makecars.test` | idem |
+| **Garagiste approuvé, profil complet** | `garage.excellence.approved@makecars.test` | idem (`completeProfile()`, commit `d3cf4ed`) |
 | Market Space rejeté | `auto.pieces.rejected@makecars.test` | idem |
-| **Market Space approuvé** | `marche.pieces.approved@makecars.test` | `CatalogTestSeeder` |
+| **Market Space approuvé, profil complet** | `marche.pieces.approved@makecars.test` | `CatalogTestSeeder` (`completeProfile()`, commit `10f3cee`) |
 
-- Je n'ai pas vérifié ce qui est réellement présent dans la base de dev ; relancer les seeders si besoin.
-- Les deux comptes approuvés ont un **profil incomplet** (règle v0.20) : ils atterrissent sur « Mon profil » tant que téléphone, position, localisation, 7 jours d'horaires et une photo ne sont pas saisis.
-- Un profil complet se crée en test avec l'état de factory `complete()`.
-- Après un `switch-env`, redémarrer `php artisan serve`.
-- Le mot de passe Supabase de dev se renseigne à la main dans `.env.development`, jamais par l'assistant.
+- **Changement par rapport à la passation précédente** : les deux comptes approuvés sortent désormais du seeder avec un profil complet. Ils ne sont plus bloqués sur « Mon profil ».
+- **Ordre d'exécution** : `ProfessionalRegistrationTestSeeder` puis `CatalogTestSeeder`. Les deux sont idempotents.
+- **Contenu réel de la base de dev non vérifié** (aucune requête lancée sur Supabase pour ce document) : relancer les seeders en cas de doute.
+- Après un `switch-env`, relancer `php artisan serve --no-reload`.
+- Le mot de passe Supabase se renseigne à la main dans `.env.development`, jamais par l'assistant.
 
-## 5. Points ouverts (§7 du CLAUDE.md)
+## 6. Points ouverts (§7 du CLAUDE.md)
 
-1. **Cartographie (affichage carte)** : frontend uniquement, la recherche par distance backend n'en a pas besoin. Candidat : OpenStreetMap via Leaflet (web) ou `flutter_map` (mobile).
-2. **Agrégateur de paiement** : Kkiapay, FedaPay ou autre. Le paiement manuel V1 le remplace en attendant.
+1. **Cartographie (affichage carte)** : frontend uniquement. Candidat : OpenStreetMap via Leaflet (web) ou `flutter_map` (mobile).
+2. **Agrégateur de paiement** : Kkiapay, FedaPay ou autre. Le paiement manuel V1 sert en attendant.
 3. **Chat temps réel** : Reverb, Pusher ou Supabase Realtime.
-4. **Contestation d'un avis** par un pro avant modération : procédure non définie.
-5. **Cadre légal du partage de données agrégées** avec l'administration : nature, fréquence, base légale.
-6. **Auth téléphone/SMS** pour l'automobiliste : email et Google sont tranchés, pas le SMS.
-7. **Périmètre de la mini-boutique** : catégories autorisées, limite, seuil à partir duquel il faut un compte Market Space.
-8. **Pages de confirmation** des liens email (devis, compte express) : à intégrer au SPA, sans changement backend.
-9. **FCM** : `FCM_SERVER_KEY` non configurée (mode simulation). Migration future vers l'API HTTP v1.
-10. **Fuseau horaire unique** `Africa/Porto-Novo` : à passer par structure avant tout pays à fuseau différent.
-11. **Design system / identité visuelle** non choisis : écran Statistiques en cartes et tableaux, à enrichir de graphiques plus tard.
+4. **Contestation d'un avis** par un pro avant modération.
+5. **Cadre légal** du partage des données agrégées avec l'administration.
+6. **Auth téléphone/SMS** pour l'automobiliste.
+7. **Périmètre de la mini-boutique** : catégories, limite, seuil de bascule vers un compte Market Space.
+8. **Pages de confirmation** des liens email (devis, compte express).
+9. **FCM** : `FCM_SERVER_KEY` non configurée, mode simulation. Migration future vers l'API HTTP v1.
+10. **Fuseau horaire unique** `Africa/Porto-Novo`.
+11. **Design system / identité visuelle** non choisis.
+12. **Téléphone d'un automobiliste non béninois** (nouveau, commit `7068c44`) : `BeninPhoneNumber` refuse tout numéro hors `+229`. Il faut choisir en V2 entre assouplir ou assumer.
 
-**Autres pistes ouvertes dans les ajouts récents**
-- Ajouter `is_profile_complete` à `scopePubliclyVisible()` : aujourd'hui, une fiche vide peut être visible côté mobile.
+**Autres pistes ouvertes**
+- `scopePubliclyVisible()` ne filtre toujours pas sur la complétude du profil (vérifié dans `Garage.php`). Une fiche incomplète reste visible côté mobile.
 - Vérification téléphone pour la finalisation d'un compte express.
 - Index géospatial si le volume de professionnels croît.
 - À Natitingou, `Peporiyakou` (source) = `Natitingou IV` (Wikipédia) : à confirmer.
+- **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
-## 6. Derniers changements de règles métier
+## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
-- **Profil complet obligatoire (v0.20, commit `d35038b`)**
-  - Dès l'approbation, le pro doit tout compléter : nom, adresse, téléphone, latitude et longitude, département, commune, arrondissement, quartier, 7 jours d'horaires, au moins une photo.
-  - Le middleware `profile.complete` renvoie 403 `profile_incomplete` sur toutes les routes de l'espace pro, sauf celles du profil.
-  - La dernière photo ne peut pas être supprimée.
-  - Frontend : garde de navigation et barre latérale restreints ; l'intercepteur Axios recharge sur la page de profil en cas de 403.
-  - La complétude n'est pas encore une condition de visibilité publique.
-- **Téléphone béninois (v0.21)**
-  - Format `+229` suivi de 10 chiffres commençant par `01`. `00229` accepté, l'ancien format à 8 chiffres refusé.
-  - Forme stockée : `+2290123456789`.
-  - Règle : `BeninPhoneNumber` + trait `NormalizesBeninPhone`. Frontend : `utils/beninPhone.ts`.
-  - Les téléphones antérieurs dans un autre format ne sont pas migrés.
-- **Hiérarchie administrative béninoise (v0.19, commit `253b1e8`)**
-  - Département (12), commune (77), arrondissement (546), puis quartier en texte libre.
-  - Données en base (`LocationSeeder`, appelé par la migration).
-  - Remplace `city`/`region` (v0.18).
-  - Les statistiques séparent la géographie garage et Market Space.
-- **Antérieurement** : statistiques admin (v0.18), réclamation de compte express (v0.17), filtre de prix (v0.16), recherche par nom de produit (v0.15), recherche par nom/service/tri (v0.14), recherche géolocalisée (v0.13).
+Toutes les versions de v0.3 à v0.24 sont citées au moins une fois, sans trou de numérotation. **CLAUDE.md n'a pas été modifié.** Les points ci-dessous sont signalés pour arbitrage.
+
+1. **v0.22 n'a pas de section dédiée.** Le chat Market Space et la `Conversation` polymorphe (commit `dcec7dc`) sont décrits en ligne dans « Module Chat (ajout v0.8) » et « Module Commande (ajout v0.9) ». Les titres passent donc de v0.21 à v0.23. Ce n'est pas une incohérence de fond, mais la seule version sans titre `###` propre.
+2. **La ligne de devis « Prestation libre » n'est pas documentée** (commits `636fa95` et `3165653`, `QuoteLineType::CustomCharge`, libellé et prix libres saisis par le garagiste). « Module Devis/Facture (v0.8) » ne cite que trois natures de lignes : diagnostic, service, pièce. Cette section mériterait un ajout (v0.25), à valider.
+3. **Glossaire périmé** : l'entrée « Statistiques agrégées (admin) » parle encore de « répartition géographique (ville/région) », remplacée depuis v0.19 par le découpage en départements, séparé entre garages et Market Space.
+4. **v0.20, v0.21, v0.23, v0.24** : cohérents entre eux et avec le code contrôlé :
+   - `RejectAppointmentRequest` : `reason` est `required` ;
+   - `StoreServiceRequest` / `StoreProductRequest` : `image` est `required` ;
+   - middleware `profile.complete` présent.
+
+## 8. Derniers changements (depuis le 2026-09-20)
+
+**Règles métier**
+- **Motif obligatoire pour le refus d'un RDV (v0.24, `b3b639a`)** : `reason` passe de `nullable` à `required`.
+- **Image obligatoire pour un service ou un produit (v0.23, `958cbf6`)** : obligatoire à la création. En modification, l'image existante suffit. Aucune action « supprimer l'image ».
+- **Chat Market Space ↔ automobiliste (v0.22, `dcec7dc`)** :
+  - `Conversation` devient polymorphe (`sellable_type` / `sellable_id`), unique par couple (vendeur, automobiliste) ;
+  - `POST /mobile/conversations` accepte `garage_id` **ou** `market_space_account_id` ;
+  - la facture d'une commande Market Space payée est postée dans le chat.
+- **Ligne de devis « Prestation libre » (`636fa95`, `3165653`)** : réparation découverte après inspection, sans fiche catalogue. Non encore reportée dans CLAUDE.md (voir §7).
+- **Point ouvert téléphone non béninois (`7068c44`)** : documentaire uniquement.
+
+**Construction des dashboards (frontend + ajustements backend)**
+- Garagiste :
+  - RDV `5eb6307` ;
+  - Services `85f0f8f` ;
+  - Produits `46c2733` ;
+  - Devis `88c25ee` ;
+  - Chat `bfbaf32` ;
+  - Commandes `f9c4ef6` et `d94198f` ;
+  - Avis, Réclamations, Notifications `600a233` ;
+  - correctifs `afcffbc` et `0a07841`.
+- Market Space :
+  - Produits et Commandes `f48dfab` ;
+  - Avis, Réclamations, Notifications `874281c`.
+
+**Correctifs et ajustements techniques**
+- `0b70784` : rechargement des relations Eloquent après approve / reject / suspend / moderate / resolve (écrans admin).
+- `b0aca16` : relations et pagination des devis, `per_page` sur services et produits.
+- `c037052` : expéditeur chargé après envoi, `quote_id` exposé sur les messages système.
+- `7095e8d` : écran Admin Produits résistant à un vendeur orphelin.
+- `0cd8a5f` : mémoïsation de `missingProfileFields()`.
+- `cc028fa` : curseur main sur les boutons actifs.
+- `528ef98` : timeout Axios à 30 s, temporaire (§4).
+- `d3cf4ed`, `10f3cee` : seeders avec profil complet.
 
 **Rappel opérationnel** (CLAUDE.md §9) : après chaque commit sur `main`, push immédiat vers `origin/main` (autorisation permanente). Les opérations destructrices restent soumises à confirmation.
