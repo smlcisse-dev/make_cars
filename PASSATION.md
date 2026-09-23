@@ -214,6 +214,32 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
   - écrans d'inscription (formulaire court, saisie du code) toujours absents : le parcours v0.26 n'est utilisable côté web qu'à partir de « Mon profil ».
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
+## Bloquant avant la mise en production
+
+À distinguer des points ouverts ordinaires (§6) : aucun lancement public tant qu'une case reste décochée.
+
+- [ ] **Protection des données personnelles (prioritaire)**
+  - *Raison* : la plateforme stocke des pièces d'identité (CIP : photo, date de naissance, filiation), ainsi que l'IFU, le NPI et le registre de commerce.
+  - *À définir*, au regard de la loi n° 2017-20 portant Code du numérique en République du Bénin et des obligations auprès de l'autorité de protection des données personnelles (APDP) :
+    - la durée de conservation de ces documents ;
+    - l'information du professionnel et le recueil de son consentement au moment de l'envoi ;
+    - le sort des documents d'un dossier refusé ou d'un compte fermé ;
+    - l'éventuelle déclaration ou autorisation du traitement.
+  - **À valider avec un juriste avant tout lancement public.**
+  - *Voir* : §6, point 5 (cadre légal) ; CLAUDE.md §5 « Certificat d'Identification Personnelle (ajout v0.27) » et §7.
+- [ ] **`FRONTEND_URL` renseignée dans `.env.production`**
+  - *Raison* : les liens des emails d'inscription (compte créé, approbation, refus) sont construits à partir de cette valeur ; vide, ils pointent au mauvais endroit.
+  - *Voir* : §6, point 13 ; CLAUDE.md §5 « Parcours d'inscription professionnelle en deux temps (ajout v0.26) ».
+- [ ] **Limites d'envoi de fichiers PHP et du serveur web reproduites sur le serveur de production**
+  - *Raison* : avec les valeurs PHP par défaut (2M / 8M), les justificatifs de 10 Mo (registre de commerce, CIP) sont refusés avant même la validation Laravel ; le serveur web peut avoir sa propre limite (ex. `client_max_body_size` pour Nginx).
+  - *Voir* : §4 « Limites PHP d'envoi de fichiers ».
+- [ ] **Suppression d'un compte professionnel : désactivation ou suppression logique**
+  - *Raison* : une suppression réelle supprime en cascade RDV, devis et conversations, et laisse orphelins commandes, avis et réclamations. Aucun devis, facture ou commande ne doit jamais disparaître (traçabilité, CLAUDE.md §6).
+  - *Voir* : §6, point 14 ; CLAUDE.md §7 « Suppression d'un compte professionnel ».
+- [ ] **Timeout Axios ramené à 15 s** une fois la latence Supabase revenue à la normale
+  - *Raison* : la valeur actuelle de 30 s est un palliatif temporaire, marqué comme tel dans `frontend-web/src/api/http.ts`.
+  - *Voir* : §4 « Latence Supabase et timeout Axios ».
+
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
 Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, et chacune a désormais sa section `###`. Trois écarts relevés le 2026-09-23 ont été corrigés le même jour dans CLAUDE.md :
