@@ -74,7 +74,7 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 | Avis | `/garage/reviews` | `shared/ReviewsView.vue` : lecture seule |
 | Réclamations | `/garage/disputes`, `/:id` | `shared/DisputesView` (filtre par statut), `shared/DisputeDetailView` (réponse) |
 | Notifications | `/garage/notifications` | `shared/NotificationsView.vue` |
-| Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`) |
+| Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`). Depuis le 2026-09-23, porte aussi le dossier d'inscription v0.26 : bandeau d'état (`profile_incomplete` / `pending` avec « Actualiser » / `rejected` avec motif / `approved`), profil en lecture seule pendant l'examen, section « Informations légales » (RCCM, IFU, NPI, document du registre de commerce), section « Soumettre mon dossier ». **Construit, pas encore testé en navigateur** |
 
 **Espace Market Space (`/market-space`)** : construit, relu, jamais testé en navigateur
 
@@ -91,7 +91,7 @@ Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran 
 | Notifications | `/market-space/notifications` | `shared/NotificationsView.vue` |
 | Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`) |
 
-Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profil ».
+Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`DashboardShell`), sans blocage d'accès. La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
 
 ## 2. Backend construit et testé, sans écran frontend
 
@@ -122,7 +122,7 @@ Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profi
 ## 3. Ce qui n'existe nulle part
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
-- **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe. Pour le parcours pro v0.26 : formulaire court, saisie du code, informations légales + document sur « Mon profil », bouton « Soumettre pour validation », page de suivi du dossier.
+- **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe. Pour le parcours pro v0.26 manquent le formulaire court et la saisie du code ; les informations légales, le document, la soumission et le suivi du dossier sont sur « Mon profil » (2026-09-23).
 - **Tableaux de bord d'accueil** Garagiste et Market Space : un message de bienvenue seulement, sans chiffres clés ni raccourcis.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
@@ -194,11 +194,8 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - Vérification téléphone pour la finalisation d'un compte express.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
-  - rafraîchissement de la session : `fetchCurrentUser()` n'est jamais appelée, donc un changement de statut du dossier n'est vu qu'après reconnexion ;
-  - bandeau « compte suspendu » avec motif ;
   - limites d'envoi de fichiers de PHP (`upload_max_filesize`, `post_max_size`) à vérifier au regard des 10 Mo du registre de commerce ;
-  - le commentaire de `frontend-web/src/types/user.ts` sur `profile_status` est périmé : il est désormais renseigné pour tout professionnel qui a un profil, quel que soit le statut du dossier ;
-  - le nouveau 403 `registration_not_approved` n'est pas géré par l'intercepteur Axios (seul `profile_incomplete` l'est).
+  - écrans d'inscription (formulaire court, saisie du code) toujours absents : le parcours v0.26 n'est utilisable côté web qu'à partir de « Mon profil ».
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
