@@ -1,10 +1,12 @@
 import type { ReviewStatus } from '@/types/review'
 
-// Reflète ProductResource côté backend pour l'espace Garagiste : mêmes champs
-// que types/product.ts (admin), SAUF `sellable` (jamais chargé ici) et
-// `sellable_type`/`sellable_id` (toujours le garage authentifié lui-même,
-// donc sans intérêt pour cet écran).
-export interface GarageProduct {
+// Reflète ProductResource côté backend pour les deux espaces professionnels
+// (mini-boutique Garage et Market Space partagent le même modèle `Product`
+// polymorphe — CLAUDE.md §5, ajout v0.4) : mêmes champs que types/product.ts
+// (admin), SAUF `sellable` (jamais chargé ici) et `sellable_type`/`sellable_id`
+// (toujours le professionnel authentifié lui-même, garage ou boutique, donc
+// sans intérêt pour cet écran).
+export interface ProfessionalProduct {
   id: number
   name: string
   description: string | null
@@ -21,7 +23,7 @@ export interface GarageProduct {
 }
 
 // Payload de création/modification du contenu (hors image et hors stock,
-// gérés séparément — le stock a son propre endpoint, cf. api/garageProducts.ts).
+// gérés séparément — le stock a son propre endpoint, cf. api/professionalProducts.ts).
 export interface ProductFormPayload {
   name: string
   description: string | null
@@ -30,7 +32,7 @@ export interface ProductFormPayload {
 }
 
 // Le stock n'est demandé qu'à la création (`stock_quantity` obligatoire côté
-// backend) ; ensuite il ne se corrige que via updateGarageProductStock.
+// backend) ; ensuite il ne se corrige que via updateProfessionalProductStock.
 export interface ProductCreatePayload extends ProductFormPayload {
   stock_quantity: number
   low_stock_threshold: number | null

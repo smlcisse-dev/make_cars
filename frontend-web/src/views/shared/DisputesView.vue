@@ -9,8 +9,23 @@ import AppTable from '@/shared/components/AppTable.vue'
 import type { TableColumn } from '@/shared/components/AppTable.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { Dispute, DisputeStatus } from '@/types/dispute'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { disputeStatusLabel, disputeStatusTone } from '@/utils/disputeStatus'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
+
+// Phrase d'introduction propre à chaque espace. `Record<K, V>` (TypeScript) est
+// un objet dont les clés sont exactement les valeurs de K, chacune associée à
+// une valeur de type V : si un troisième espace était ajouté à
+// ProfessionalSpace, la compilation échouerait tant que son texte manque ici.
+const INTRO: Record<ProfessionalSpace, string> = {
+  garage: "Contestations de clients vous concernant. Vous pouvez répondre ; la décision revient à l'administrateur.",
+  'market-space':
+    "Contestations de clients concernant votre boutique. Vous pouvez répondre ; la décision revient à l'administrateur.",
+}
 
 const STATUS_FILTERS: { value: DisputeStatus | null; label: string }[] = [
   { value: null, label: 'Toutes' },
@@ -42,7 +57,7 @@ async function loadDisputes(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchDisputes({ status: statusFilter.value ?? undefined, page: currentPage.value })
+    const response = await fetchDisputes(props.space, { status: statusFilter.value ?? undefined, page: currentPage.value })
     disputes.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -79,7 +94,7 @@ onMounted(loadDisputes)
     <div>
       <h2 class="text-lg font-semibold text-slate-900">Réclamations</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Contestations de clients vous concernant. Vous pouvez répondre ; la décision revient à l'administrateur.
+        {{ INTRO[space] }}
       </p>
     </div>
 
@@ -101,7 +116,7 @@ onMounted(loadDisputes)
       <AppTable
         :items="disputes"
         :columns="columns"
-        @row-click="(dispute: Dispute) => router.push({ name: 'garage.disputes.show', params: { id: dispute.id } })"
+        @row-click="(dispute: Dispute) => router.push({ name: `${space}.disputes.show`, params: { id: dispute.id } })"
       >
         <template #empty>Aucune réclamation.</template>
         <template #cell-client="{ item }">{{ item.client?.name }}</template>

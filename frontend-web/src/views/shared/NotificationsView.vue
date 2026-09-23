@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { fetchNotifications, markNotificationRead } from '@/api/marketSpaceNotifications'
+import { fetchNotifications, markNotificationRead } from '@/api/notifications'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import type { PushNotification } from '@/types/notification'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
 
 const notifications = ref<PushNotification[]>([])
 const currentPage = ref(1)
@@ -18,7 +23,7 @@ async function loadNotifications(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchNotifications(currentPage.value)
+    const response = await fetchNotifications(props.space, currentPage.value)
     notifications.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -44,7 +49,7 @@ async function handleClick(notification: PushNotification): Promise<void> {
   actionErrorMessage.value = null
 
   try {
-    const updated = await markNotificationRead(notification.id)
+    const updated = await markNotificationRead(props.space, notification.id)
     const index = notifications.value.findIndex((n) => n.id === notification.id)
     if (index !== -1) {
       notifications.value[index] = updated

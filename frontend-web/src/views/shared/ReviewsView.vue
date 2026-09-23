@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { fetchGarageReviews } from '@/api/garageReviews'
+import { fetchProfessionalReviews } from '@/api/professionalReviews'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
-import type { GarageReview } from '@/types/garageReview'
+import type { ProfessionalReview } from '@/types/professionalReview'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
-const reviews = ref<GarageReview[]>([])
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
+
+const reviews = ref<ProfessionalReview[]>([])
 const currentPage = ref(1)
 const lastPage = ref(1)
 const isLoading = ref(false)
@@ -18,7 +23,7 @@ async function loadReviews(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchGarageReviews(currentPage.value)
+    const response = await fetchProfessionalReviews(props.space, currentPage.value)
     reviews.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page

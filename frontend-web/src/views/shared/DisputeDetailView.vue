@@ -6,6 +6,7 @@ import { fetchDispute, fetchDisputeAttachmentBlob, respondToDispute } from '@/ap
 import AppButton from '@/shared/components/AppButton.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { Dispute } from '@/types/dispute'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import {
   disputeResolutionActionLabel,
@@ -13,6 +14,10 @@ import {
   disputeStatusTone,
   isDisputeOpen,
 } from '@/utils/disputeStatus'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -30,7 +35,7 @@ async function loadDispute(): Promise<void> {
   loadErrorMessage.value = null
 
   try {
-    dispute.value = await fetchDispute(disputeId)
+    dispute.value = await fetchDispute(props.space, disputeId)
   } catch (error) {
     loadErrorMessage.value = extractApiErrorMessage(error, 'Impossible de charger cette réclamation. Réessayez.')
   } finally {
@@ -48,7 +53,7 @@ async function openAttachment(attachmentId: number): Promise<void> {
   isOpeningAttachmentId.value = attachmentId
 
   try {
-    const blob = await fetchDisputeAttachmentBlob(disputeId, attachmentId)
+    const blob = await fetchDisputeAttachmentBlob(props.space, disputeId, attachmentId)
     const objectUrl = URL.createObjectURL(blob)
     window.open(objectUrl, '_blank')
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
@@ -77,7 +82,7 @@ async function handleReply(): Promise<void> {
   replyErrorMessage.value = null
 
   try {
-    const message = await respondToDispute(disputeId, replyBody.value.trim())
+    const message = await respondToDispute(props.space, disputeId, replyBody.value.trim())
     dispute.value.messages = [...(dispute.value.messages ?? []), message]
     // Une réponse fait passer la réclamation « en instruction » côté backend.
     if (dispute.value.status === 'submitted') {
@@ -100,7 +105,7 @@ onMounted(loadDispute)
 
 <template>
   <div class="max-w-3xl space-y-6">
-    <button type="button" class="text-sm text-slate-500 hover:text-slate-700" @click="router.push({ name: 'garage.disputes' })">
+    <button type="button" class="text-sm text-slate-500 hover:text-slate-700" @click="router.push({ name: `${space}.disputes` })">
       ← Retour aux réclamations
     </button>
 

@@ -1,5 +1,6 @@
 import http from '@/api/http'
-import type { OpeningHour, ProfessionalProfile, ProfessionalSpace } from '@/types/profile'
+import type { OpeningHour, ProfessionalProfile } from '@/types/profile'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { ProfileStatus } from '@/types/user'
 
 // Le backend renvoie la complétude du profil dans `meta.profile_status` (voir

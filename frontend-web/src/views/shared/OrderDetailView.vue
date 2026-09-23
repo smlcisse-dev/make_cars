@@ -2,13 +2,18 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { fetchMarketSpaceOrder, fetchMarketSpaceOrderPdfBlob, markMarketSpaceOrderPaid } from '@/api/marketSpaceOrders'
+import { fetchOrder, fetchOrderPdfBlob, markOrderPaid } from '@/api/orders'
 import AppButton from '@/shared/components/AppButton.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { Order } from '@/types/order'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatAmount } from '@/utils/money'
 import { orderStatusLabel, orderStatusTone } from '@/utils/orderStatus'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +33,7 @@ async function loadOrder(): Promise<void> {
   loadErrorMessage.value = null
 
   try {
-    order.value = await fetchMarketSpaceOrder(orderId)
+    order.value = await fetchOrder(props.space, orderId)
   } catch (error) {
     loadErrorMessage.value = extractApiErrorMessage(error, 'Impossible de charger cette commande. Réessayez.')
   } finally {
@@ -49,7 +54,7 @@ async function handleMarkPaid(): Promise<void> {
   actionErrorMessage.value = null
 
   try {
-    await markMarketSpaceOrderPaid(orderId)
+    await markOrderPaid(props.space, orderId)
     flashMessage.value = 'Paiement enregistré, facture générée.'
     await loadOrder()
   } catch (error) {
@@ -65,7 +70,7 @@ async function openPdf(): Promise<void> {
   actionErrorMessage.value = null
 
   try {
-    const blob = await fetchMarketSpaceOrderPdfBlob(orderId)
+    const blob = await fetchOrderPdfBlob(props.space, orderId)
     const objectUrl = URL.createObjectURL(blob)
     window.open(objectUrl, '_blank')
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
@@ -85,7 +90,7 @@ onMounted(loadOrder)
 
 <template>
   <div class="max-w-3xl space-y-6">
-    <button type="button" class="text-sm text-slate-500 hover:text-slate-700" @click="router.push({ name: 'market-space.orders' })">
+    <button type="button" class="text-sm text-slate-500 hover:text-slate-700" @click="router.push({ name: `${space}.orders` })">
       ← Retour aux commandes
     </button>
 

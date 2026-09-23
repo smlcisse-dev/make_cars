@@ -14,11 +14,8 @@ import LocationSelect from '@/shared/components/LocationSelect.vue'
 import { homePathForRole, useAuthStore } from '@/stores/auth'
 import { BENIN_PHONE_ERROR, normalizeBeninPhone } from '@/utils/beninPhone'
 import type { OpeningHourPayload } from '@/api/professionalProfile'
-import {
-  MISSING_FIELD_LABELS,
-  type ProfessionalProfile,
-  type ProfessionalSpace,
-} from '@/types/profile'
+import { MISSING_FIELD_LABELS, type ProfessionalProfile } from '@/types/profile'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { ProfileStatus } from '@/types/user'
 import { extractApiErrorMessage } from '@/utils/apiError'
 

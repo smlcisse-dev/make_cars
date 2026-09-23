@@ -2,21 +2,34 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
-  createGarageProduct,
-  deleteGarageProduct,
-  fetchGarageProducts,
-  updateGarageProduct,
-  updateGarageProductStock,
-} from '@/api/garageProducts'
+  createProfessionalProduct,
+  deleteProfessionalProduct,
+  fetchProfessionalProducts,
+  updateProfessionalProduct,
+  updateProfessionalProductStock,
+} from '@/api/professionalProducts'
 import AppButton from '@/shared/components/AppButton.vue'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import AppTable from '@/shared/components/AppTable.vue'
 import type { TableColumn } from '@/shared/components/AppTable.vue'
 import BaseModal from '@/shared/components/BaseModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
-import type { GarageProduct } from '@/types/garageProduct'
+import type { ProfessionalProduct } from '@/types/professionalProduct'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { reviewStatusLabel, reviewStatusTone } from '@/utils/reviewStatus'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
+
+// Phrase d'introduction propre à chaque espace (voir DisputesView pour `Record`).
+const INTRO: Record<ProfessionalSpace, string> = {
+  garage:
+    'Votre mini-boutique et votre stock unique. Toute création ou modification de contenu est soumise à validation admin ; les corrections de stock ne le sont pas.',
+  'market-space':
+    'Le catalogue et le stock de votre boutique. Toute création ou modification de contenu est soumise à validation admin ; les corrections de stock ne le sont pas.',
+}
 
 const columns: TableColumn[] = [
   { key: 'name', label: 'Nom' },
@@ -27,7 +40,7 @@ const columns: TableColumn[] = [
   { key: 'actions', label: '' },
 ]
 
-const products = ref<GarageProduct[]>([])
+const products = ref<ProfessionalProduct[]>([])
 const currentPage = ref(1)
 const lastPage = ref(1)
 const isLoading = ref(false)
@@ -39,7 +52,7 @@ async function loadProducts(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchGarageProducts(currentPage.value)
+    const response = await fetchProfessionalProducts(props.space, currentPage.value)
     products.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -63,7 +76,7 @@ function formatPrice(price: string): string {
 
 // Stock à réapprovisionner : seuil renseigné ET stock <= seuil (même règle que
 // Product::isAtOrBelowLowStockThreshold côté backend). Sans seuil, jamais.
-function isLowStock(product: GarageProduct): boolean {
+function isLowStock(product: ProfessionalProduct): boolean {
   return product.low_stock_threshold !== null && product.stock_quantity <= product.low_stock_threshold
 }
 
@@ -76,7 +89,7 @@ const inputClasses =
   'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none'
 
 // --- Suppression
-async function handleDelete(product: GarageProduct): Promise<void> {
+async function handleDelete(product: ProfessionalProduct): Promise<void> {
   if (!window.confirm(`Supprimer le produit « ${product.name} » ?`)) {
     return
   }
@@ -84,7 +97,7 @@ async function handleDelete(product: GarageProduct): Promise<void> {
   errorMessage.value = null
 
   try {
-    await deleteGarageProduct(product.id)
+    await deleteProfessionalProduct(props.space, product.id)
     flashMessage.value = 'Produit supprimé.'
     if (products.value.length === 1 && currentPage.value > 1) {
       currentPage.value -= 1
@@ -97,10 +110,11 @@ async function handleDelete(product: GarageProduct): Promise<void> {
 
 // --- Modale 1 : création / modification du CONTENU. `editingProduct` vaut
 // null en création ; en édition le formulaire est pré-rempli depuis la ligne
-// en mémoire (il n'existe pas de GET /garage/products/{id}). Le stock n'y
-// figure qu'à la création : modifier le contenu ne touche jamais le stock.
+// en mémoire (aucun des deux espaces n'expose de GET /{space}/products/{id}).
+// Le stock n'y figure qu'à la création : modifier le contenu ne touche jamais
+// le stock.
 const isFormOpen = ref(false)
-const editingProduct = ref<GarageProduct | null>(null)
+const editingProduct = ref<ProfessionalProduct | null>(null)
 const isSubmitting = ref(false)
 const formErrorMessage = ref<string | null>(null)
 const formTouched = ref(false)
@@ -152,7 +166,7 @@ function openCreateModal(): void {
   isFormOpen.value = true
 }
 
-function openEditModal(product: GarageProduct): void {
+function openEditModal(product: ProfessionalProduct): void {
   editingProduct.value = product
   form.value = {
     name: product.name,
@@ -191,8 +205,9 @@ async function handleSubmit(): Promise<void> {
 
   try {
     const result = editingProduct.value
-      ? await updateGarageProduct(editingProduct.value.id, content, imageFile.value)
-      : await createGarageProduct(
+      ? await updateProfessionalProduct(props.space, editingProduct.value.id, content, imageFile.value)
+      : await createProfessionalProduct(
+          props.space,
           {
             ...content,
             stock_quantity: Number(form.value.stock_quantity),
@@ -214,7 +229,7 @@ async function handleSubmit(): Promise<void> {
 
 // --- Modale 2 : ajustement du STOCK (endpoint distinct, sans revalidation
 // admin : CLAUDE.md §5, ajout v0.12). Seuil vide = pas d'alerte.
-const stockProduct = ref<GarageProduct | null>(null)
+const stockProduct = ref<ProfessionalProduct | null>(null)
 const isStockSubmitting = ref(false)
 const stockErrorMessage = ref<string | null>(null)
 const stockTouched = ref(false)
@@ -231,7 +246,7 @@ const stockErrors = computed(() => ({
 }))
 const isStockFormValid = computed(() => Object.values(stockErrors.value).every((error) => error === null))
 
-function openStockModal(product: GarageProduct): void {
+function openStockModal(product: ProfessionalProduct): void {
   stockProduct.value = product
   stockForm.value = {
     stock_quantity: product.stock_quantity,
@@ -251,7 +266,7 @@ async function handleStockSubmit(): Promise<void> {
   stockErrorMessage.value = null
 
   try {
-    const result = await updateGarageProductStock(stockProduct.value.id, {
+    const result = await updateProfessionalProductStock(props.space, stockProduct.value.id, {
       stock_quantity: Number(stockForm.value.stock_quantity),
       low_stock_threshold: stockForm.value.low_stock_threshold === '' ? null : Number(stockForm.value.low_stock_threshold),
     })
@@ -274,8 +289,7 @@ async function handleStockSubmit(): Promise<void> {
       <div>
         <h2 class="text-lg font-semibold text-slate-900">Produits</h2>
         <p class="mt-1 text-sm text-slate-500">
-          Votre mini-boutique et votre stock unique. Toute création ou modification de contenu est soumise à
-          validation admin ; les corrections de stock ne le sont pas.
+          {{ INTRO[space] }}
         </p>
       </div>
       <AppButton @click="openCreateModal">Ajouter un produit</AppButton>

@@ -8,9 +8,21 @@ import AppTable from '@/shared/components/AppTable.vue'
 import type { TableColumn } from '@/shared/components/AppTable.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { Order } from '@/types/order'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatAmount } from '@/utils/money'
 import { orderStatusLabel, orderStatusTone } from '@/utils/orderStatus'
+
+// Même écran pour les deux espaces professionnels : `space` choisit le
+// préfixe des endpoints et des noms de route (CLAUDE.md §4).
+const props = defineProps<{ space: ProfessionalSpace }>()
+
+// Phrase d'introduction propre à chaque espace (voir DisputesView pour `Record`).
+const INTRO: Record<ProfessionalSpace, string> = {
+  garage: 'Achats isolés de pièces passés par les automobilistes depuis votre mini-boutique, sans prestation associée.',
+  'market-space':
+    'Achats isolés de pièces passés par les automobilistes depuis votre boutique, sans prestation associée.',
+}
 
 const columns: TableColumn[] = [
   { key: 'client', label: 'Client' },
@@ -32,7 +44,7 @@ async function loadOrders(): Promise<void> {
   errorMessage.value = null
 
   try {
-    const response = await fetchOrders(currentPage.value)
+    const response = await fetchOrders(props.space, currentPage.value)
     orders.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -60,7 +72,7 @@ onMounted(loadOrders)
     <div>
       <h2 class="text-lg font-semibold text-slate-900">Commandes</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Achats isolés de pièces passés par les automobilistes depuis votre mini-boutique, sans prestation associée.
+        {{ INTRO[space] }}
       </p>
     </div>
 
@@ -71,7 +83,7 @@ onMounted(loadOrders)
       <AppTable
         :items="orders"
         :columns="columns"
-        @row-click="(order: Order) => router.push({ name: 'garage.orders.show', params: { id: order.id } })"
+        @row-click="(order: Order) => router.push({ name: `${space}.orders.show`, params: { id: order.id } })"
       >
         <template #empty>Aucune commande pour l'instant.</template>
         <template #cell-client="{ item }">{{ item.client?.name }}</template>

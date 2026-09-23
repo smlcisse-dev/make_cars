@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import { fetchAllGarageProducts } from '@/api/garageProducts'
+import { fetchAllGarageProducts } from '@/api/professionalProducts'
 import { fetchAllGarageServices } from '@/api/garageServices'
 import AppButton from '@/shared/components/AppButton.vue'
-import type { GarageProduct } from '@/types/garageProduct'
+import type { ProfessionalProduct } from '@/types/professionalProduct'
 import type { GarageService } from '@/types/garageService'
 import type { QuoteLineInput, QuoteLineType } from '@/types/quote'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -54,7 +54,7 @@ function rowFromInput(line: QuoteLineInput): EditorRow {
 
 const rows = ref<EditorRow[]>(props.modelValue.map(rowFromInput))
 const services = ref<GarageService[]>([])
-const products = ref<GarageProduct[]>([])
+const products = ref<ProfessionalProduct[]>([])
 const isLoadingCatalog = ref(false)
 const catalogError = ref<string | null>(null)
 const newLineType = ref<QuoteLineType>('service')
@@ -78,7 +78,7 @@ function serviceOptions(row: EditorRow): GarageService[] {
   return services.value.filter((s) => (s.status === 'approved' && s.is_active) || s.id === row.serviceId)
 }
 
-function productOptions(row: EditorRow): GarageProduct[] {
+function productOptions(row: EditorRow): ProfessionalProduct[] {
   return products.value.filter((p) => p.status === 'approved' || p.id === row.productId)
 }
 
@@ -86,7 +86,7 @@ function findService(id: number | null): GarageService | undefined {
   return services.value.find((s) => s.id === id)
 }
 
-function findProduct(id: number | null): GarageProduct | undefined {
+function findProduct(id: number | null): ProfessionalProduct | undefined {
   return products.value.find((p) => p.id === id)
 }
 

@@ -1,25 +1,25 @@
 import http from '@/api/http'
 import type { ChatMessage, Conversation } from '@/types/conversation'
 import type { PaginatedResponse } from '@/types/pagination'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 
 // Le chat existe dans les deux espaces professionnels (mêmes endpoints, préfixe
-// de route différent) : `space` choisit le préfixe, Garagiste par défaut.
-export type ChatSpace = 'garage' | 'market-space'
+// de route différent) : `space` choisit le préfixe.
 
 interface ApiEnvelope<T> {
   data: T
   message?: string
 }
 
-export async function fetchConversations(page = 1, space: ChatSpace = 'garage'): Promise<PaginatedResponse<Conversation>> {
+export async function fetchConversations(space: ProfessionalSpace, page = 1): Promise<PaginatedResponse<Conversation>> {
   const response = await http.get<PaginatedResponse<Conversation>>(`/${space}/conversations`, { params: { page } })
   return response.data
 }
 
 export async function fetchMessages(
+  space: ProfessionalSpace,
   conversationId: number,
   page = 1,
-  space: ChatSpace = 'garage',
 ): Promise<PaginatedResponse<ChatMessage>> {
   const response = await http.get<PaginatedResponse<ChatMessage>>(
     `/${space}/conversations/${conversationId}/messages`,
@@ -29,10 +29,10 @@ export async function fetchMessages(
 }
 
 export async function sendMessage(
+  space: ProfessionalSpace,
   conversationId: number,
   body: string | null,
   image: File | null,
-  space: ChatSpace = 'garage',
 ): Promise<ChatMessage> {
   const formData = new FormData()
   if (body) formData.append('body', body)
@@ -45,7 +45,11 @@ export async function sendMessage(
   return response.data.data
 }
 
-export async function fetchMessageImageBlob(conversationId: number, messageId: number, space: ChatSpace = 'garage'): Promise<Blob> {
+export async function fetchMessageImageBlob(
+  space: ProfessionalSpace,
+  conversationId: number,
+  messageId: number,
+): Promise<Blob> {
   const response = await http.get<Blob>(
     `/${space}/conversations/${conversationId}/messages/${messageId}/image`,
     { responseType: 'blob' },

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 
-import { type ChatSpace, fetchConversations, fetchMessageImageBlob, fetchMessages, sendMessage } from '@/api/conversations'
+import { fetchConversations, fetchMessageImageBlob, fetchMessages, sendMessage } from '@/api/conversations'
 import AppButton from '@/shared/components/AppButton.vue'
 import AppPagination from '@/shared/components/AppPagination.vue'
 import type { ChatMessage, Conversation } from '@/types/conversation'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 // Même écran pour les deux espaces : `space` choisit le préfixe des endpoints
 // (Composition API : `defineProps` déclare les entrées typées du composant).
-const props = withDefaults(defineProps<{ space?: ChatSpace }>(), { space: 'garage' })
+const props = defineProps<{ space: ProfessionalSpace }>()
 
 // `ref` rend une valeur réactive : quand elle change, le template qui la lit
 // est redessiné automatiquement (Composition API, CLAUDE.md §4).
@@ -37,7 +38,7 @@ async function loadConversations(): Promise<void> {
   listError.value = null
 
   try {
-    const response = await fetchConversations(currentPage.value, props.space)
+    const response = await fetchConversations(props.space, currentPage.value)
     conversations.value = response.data
     currentPage.value = response.meta.current_page
     lastPage.value = response.meta.last_page
@@ -68,7 +69,7 @@ async function selectConversation(conversation: Conversation): Promise<void> {
   isLoadingThread.value = true
 
   try {
-    const response = await fetchMessages(conversation.id, 1, props.space)
+    const response = await fetchMessages(props.space, conversation.id, 1)
     // L'API renvoie les plus récents d'abord : on inverse pour l'affichage.
     // Garde-fou : ignore la réponse si une autre conversation a été choisie entre-temps.
     if (selected.value?.id === conversation.id) {
@@ -110,7 +111,7 @@ async function submitMessage(): Promise<void> {
   sendError.value = null
 
   try {
-    const message = await sendMessage(conversation.id, draftBody.value.trim() || null, draftImage.value, props.space)
+    const message = await sendMessage(props.space, conversation.id, draftBody.value.trim() || null, draftImage.value)
     if (selected.value?.id === conversation.id) {
       messages.value.push(message)
       scrollToEnd()
@@ -130,7 +131,7 @@ async function openImage(message: ChatMessage): Promise<void> {
   sendError.value = null
 
   try {
-    const blob = await fetchMessageImageBlob(message.conversation_id, message.id, props.space)
+    const blob = await fetchMessageImageBlob(props.space, message.conversation_id, message.id)
     const objectUrl = URL.createObjectURL(blob)
     window.open(objectUrl, '_blank')
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
@@ -217,8 +218,9 @@ onMounted(loadConversations)
                 {{ message.sender?.name }}
               </p>
               <p v-if="message.body" class="whitespace-pre-line">{{ message.body }}</p>
+              <!-- Les devis n'existent que côté Garagiste : pas de lien dans l'espace Market Space. -->
               <RouterLink
-                v-if="message.is_system && message.quote_id"
+                v-if="space === 'garage' && message.is_system && message.quote_id"
                 :to="{ name: 'garage.quotes.show', params: { id: message.quote_id } }"
                 class="mt-1 inline-block text-xs underline"
               >
