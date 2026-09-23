@@ -12,7 +12,11 @@ import type { AccountType } from '@/types/user'
 export type RegistrationStatus = 'profile_incomplete' | 'pending' | 'approved' | 'rejected'
 
 // Reflète App\Enums\RegistrationDocumentType côté backend.
-export type RegistrationDocumentType = 'business_registration' | 'premises_photo'
+// `identity_certificate` : Certificat d'Identification Personnelle (v0.27).
+export type RegistrationDocumentType =
+  | 'business_registration'
+  | 'premises_photo'
+  | 'identity_certificate'
 
 // Reflète RegistrationDocumentResource. Le fichier lui-même n'est jamais
 // public : `download_url` pointe vers un endpoint protégé par Sanctum, à

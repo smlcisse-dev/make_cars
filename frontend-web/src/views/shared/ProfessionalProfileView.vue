@@ -5,15 +5,18 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import {
   deleteImage,
   fetchBusinessRegistrationDocumentBlob,
+  fetchIdentityCertificateDocumentBlob,
   fetchProfile,
   submitRegistration,
   updateLegalInfo,
   updateOpeningHours,
   updateProfile,
   uploadBusinessRegistrationDocument,
+  uploadIdentityCertificateDocument,
   uploadImages,
 } from '@/api/professionalProfile'
 import AppButton from '@/shared/components/AppButton.vue'
+import LegalDocumentField from '@/shared/components/LegalDocumentField.vue'
 import LocationSelect from '@/shared/components/LocationSelect.vue'
 import { useAuthStore } from '@/stores/auth'
 import { BENIN_PHONE_ERROR, normalizeBeninPhone } from '@/utils/beninPhone'
@@ -115,7 +118,6 @@ const infoState = sectionState()
 const hoursState = sectionState()
 const photosState = sectionState()
 const legalState = sectionState()
-const documentState = sectionState()
 const submitState = sectionState()
 
 const missingLabels = computed(() =>
@@ -360,58 +362,14 @@ async function saveLegal(): Promise<void> {
   }
 }
 
-// Document du registre de commerce : pdf/jpg/png, 10 Mo max (mêmes règles
-// que UploadBusinessRegistrationDocumentRequest). On vérifie l'extension
-// plutôt que le type MIME, que certains navigateurs laissent vide.
-const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024
-const DOCUMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
-
-// « Template ref » : `ref="documentInput"` dans le template relie cette
-// variable à l'élément <input> réel une fois la page affichée. Ça permet
-// d'ouvrir le sélecteur de fichiers depuis le bouton « Remplacer ».
-const documentInput = ref<HTMLInputElement | null>(null)
-
-function pickDocument(): void {
-  documentInput.value?.click()
-}
-
-async function onDocumentSelected(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-
-  documentState.success = null
-  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
-  if (!DOCUMENT_EXTENSIONS.includes(extension)) {
-    documentState.error = 'Format non accepté : PDF, JPG ou PNG uniquement.'
-    return
-  }
-  if (file.size > DOCUMENT_MAX_BYTES) {
-    documentState.error = 'Le document ne doit pas dépasser 10 Mo.'
-    return
-  }
-
-  await runSection(documentState, 'Document enregistré.', () =>
-    uploadBusinessRegistrationDocument(props.space, file),
-  )
-}
-
-// Fichier privé : blob authentifié -> URL locale temporaire -> nouvel onglet,
-// comme pour les PDF de devis.
-const isOpeningDocument = ref(false)
-async function openDocument(): Promise<void> {
-  isOpeningDocument.value = true
-  documentState.error = null
+// Justificatifs privés (registre de commerce, CIP) : chaque bloc
+// LegalDocumentField gère son propre envoi ; on recharge ensuite le profil
+// pour mettre à jour `meta.legal` et la liste de ce qui manque.
+async function onLegalDocumentUploaded(): Promise<void> {
   try {
-    const blob = await fetchBusinessRegistrationDocumentBlob(props.space)
-    const objectUrl = URL.createObjectURL(blob)
-    window.open(objectUrl, '_blank')
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    await reload()
   } catch (error) {
-    documentState.error = extractApiErrorMessage(error, 'Impossible de récupérer ce document.')
-  } finally {
-    isOpeningDocument.value = false
+    loadError.value = extractApiErrorMessage(error, 'Impossible de recharger le profil.')
   }
 }
 
@@ -815,52 +773,26 @@ async function refreshDossier(): Promise<void> {
           <span v-if="legalState.error" class="text-sm text-red-600">{{ legalState.error }}</span>
         </div>
 
-        <!-- Document du registre de commerce : envoyé dès sa sélection, comme
-             les photos (endpoint séparé des champs ci-dessus). -->
-        <div class="space-y-2 border-t border-slate-200 pt-4">
-          <h3 class="text-sm font-semibold text-slate-900">Document du registre de commerce</h3>
-          <p class="text-xs text-slate-500">PDF, JPG ou PNG, 10 Mo maximum.</p>
-          <input
-            ref="documentInput"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-            class="hidden"
-            @change="onDocumentSelected"
-          />
-          <div class="flex flex-wrap items-center gap-3">
-            <template v-if="legal.has_business_registration_document">
-              <span class="text-sm text-green-700">Document envoyé</span>
-              <AppButton variant="secondary" :loading="isOpeningDocument" @click="openDocument">
-                Voir le document
-              </AppButton>
-              <AppButton
-                v-if="!isLegalLocked"
-                variant="secondary"
-                :loading="documentState.saving"
-                @click="pickDocument"
-              >
-                Remplacer
-              </AppButton>
-            </template>
-            <template v-else>
-              <span class="text-sm text-slate-600">Aucun document envoyé.</span>
-              <AppButton
-                v-if="!isLegalLocked"
-                variant="secondary"
-                :loading="documentState.saving"
-                @click="pickDocument"
-              >
-                Choisir un fichier
-              </AppButton>
-            </template>
-          </div>
-          <p v-if="documentState.success" class="text-sm text-green-700">
-            {{ documentState.success }}
-          </p>
-          <p v-if="documentState.error" class="text-sm text-red-600">
-            {{ documentState.error }}
-          </p>
-        </div>
+        <!-- Justificatifs : envoyés dès leur sélection, comme les photos
+             (endpoints séparés des champs ci-dessus). -->
+        <LegalDocumentField
+          title="Document du registre de commerce"
+          help="PDF, JPG ou PNG, 10 Mo maximum."
+          :has-document="legal.has_business_registration_document"
+          :locked="isLegalLocked"
+          :upload="(file) => uploadBusinessRegistrationDocument(space, file)"
+          :fetch-blob="() => fetchBusinessRegistrationDocumentBlob(space)"
+          @uploaded="onLegalDocumentUploaded"
+        />
+        <LegalDocumentField
+          title="Certificat d'Identification Personnelle (CIP)"
+          help="Le certificat délivré par l'ANIP, sur lequel figure votre NPI. Il sert uniquement à vérifier votre NPI et n'est visible que par l'équipe Make Cars. PDF, JPG ou PNG, 10 Mo maximum."
+          :has-document="legal.has_identity_certificate_document"
+          :locked="isLegalLocked"
+          :upload="(file) => uploadIdentityCertificateDocument(space, file)"
+          :fetch-blob="() => fetchIdentityCertificateDocumentBlob(space)"
+          @uploaded="onLegalDocumentUploaded"
+        />
       </form>
 
       <!-- Soumission du dossier : seulement depuis `profile_incomplete` ou

@@ -54,6 +54,7 @@ export const MISSING_LEGAL_FIELD_LABELS: Record<string, string> = {
   business_registration_document: 'Document du registre de commerce',
   ifu: 'IFU',
   npi: 'NPI',
+  identity_certificate_document: "Certificat d'Identification Personnelle (CIP)",
 }
 
 // Complétude des informations légales privées (`meta.legal_status`), même
@@ -84,4 +85,6 @@ export interface LegalInfo {
   ifu: string | null
   npi: string | null
   has_business_registration_document: boolean
+  // Certificat d'Identification Personnelle (ajout v0.27).
+  has_identity_certificate_document: boolean
 }

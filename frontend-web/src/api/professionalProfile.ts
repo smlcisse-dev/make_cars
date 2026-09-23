@@ -133,6 +133,26 @@ export async function fetchBusinessRegistrationDocumentBlob(
   return response.data
 }
 
+// Certificat d'Identification Personnelle (CLAUDE.md §5, ajout v0.27) : même
+// fonctionnement que le document du registre de commerce, endpoint distinct.
+export async function uploadIdentityCertificateDocument(
+  space: ProfessionalSpace,
+  file: File,
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('document', file)
+  await http.post(`/${space}/profile/legal/identity-document`, formData)
+}
+
+export async function fetchIdentityCertificateDocumentBlob(
+  space: ProfessionalSpace,
+): Promise<Blob> {
+  const response = await http.get<Blob>(`/${space}/profile/legal/identity-document`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
+
 // Passe le dossier en `pending` (422 `registration_incomplete` si le profil ou
 // les informations légales sont incomplets).
 export async function submitRegistration(space: ProfessionalSpace): Promise<void> {
