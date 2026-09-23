@@ -473,7 +473,7 @@ Un professionnel suspendu (§5, ajout v0.6) peut corriger ce qui a motivé la su
 - **Parcours d'inscription professionnelle v0.26, suites** (§5, ajout v0.26) :
   - écrans frontend du parcours à construire (formulaire, code, page de suivi du dossier) ;
   - landing page (projet séparé) ;
-  - notification de l'admin à chaque nouvelle soumission ;
+  - notification de l'admin à chaque nouvelle soumission et à chaque nouvelle demande de réactivation (v0.28) : aujourd'hui l'admin doit penser à consulter le filtre « Réactivation demandée » ;
   - prénom et nom pour les flux automobiliste, compte express et Google ;
   - `FRONTEND_URL` à renseigner en production.
 - **Suppression d'un compte professionnel** (ajout 2026-09-23) : supprimer un utilisateur professionnel supprime en cascade (clés étrangères `cascadeOnDelete`) son profil Garage/Market Space, puis les RDV, devis et conversations de ce profil. Les commandes, avis et réclamations, reliés par des relations polymorphes sans clé étrangère, resteraient orphelins. Aujourd'hui aucun endpoint ne supprime un compte, mais le cahier des charges prévoit la suppression de comptes par l'admin. Avant de construire cette fonction, il faudra garantir qu'aucun devis, facture ou commande ne disparaisse (traçabilité, §6) : par exemple une désactivation ou une suppression logique plutôt qu'une suppression réelle. Même constat que le correctif des seeders de test du 2026-09-23, qui ne suppriment plus un compte ayant un historique.

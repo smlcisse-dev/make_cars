@@ -203,7 +203,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 10. **Fuseau horaire unique** `Africa/Porto-Novo`.
 11. **Design system / identité visuelle** non choisis.
 12. **Téléphone d'un automobiliste non béninois** (nouveau, commit `7068c44`) : `BeninPhoneNumber` refuse tout numéro hors `+229`. Il faut choisir en V2 entre assouplir ou assumer.
-13. **Parcours d'inscription pro v0.26, suites** : écrans frontend du parcours, landing page (projet séparé), notification de l'admin à chaque soumission, prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
+13. **Parcours d'inscription pro v0.26, suites** : écrans frontend du parcours, landing page (projet séparé), notification de l'admin à chaque soumission et à chaque nouvelle demande de réactivation (v0.28 : aujourd'hui l'admin doit penser à consulter le filtre « Réactivation demandée »), prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
 14. **Suppression d'un compte professionnel** (nouveau, 2026-09-23) : supprimer un utilisateur pro supprime en cascade son profil, puis ses RDV, devis et conversations. Commandes, avis et réclamations, polymorphes, resteraient orphelins. Aucun endpoint ne supprime de compte aujourd'hui, mais le cahier des charges prévoit la suppression de comptes par l'admin. Avant de la construire, il faut garantir qu'aucun devis, facture ou commande ne disparaisse (CLAUDE.md §6, traçabilité) : désactivation ou suppression logique plutôt que suppression réelle.
 
 **Autres pistes ouvertes**
@@ -239,10 +239,10 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - [ ] **Timeout Axios ramené à 15 s** une fois la latence Supabase revenue à la normale
   - *Raison* : la valeur actuelle de 30 s est un palliatif temporaire, marqué comme tel dans `frontend-web/src/api/http.ts`.
   - *Voir* : §4 « Latence Supabase et timeout Axios ».
-- [ ] **Migration v0.28 appliquée sur la base de production** (`2026_09_23_193401_create_reactivation_requests_table`)
-  - *Raison* : appliquée le 2026-09-23 sur la base de développement uniquement. Sans cette table, la demande de réactivation, son refus et la connexion d'un professionnel (qui charge la dernière demande) échouent en production.
-  - *Procédure* : `backend/bin/switch-env.sh prod`, `switch-env.sh status` pour confirmer, sauvegarde de la base, `php artisan migrate`, puis retour sur `dev` et redémarrage de `php artisan serve --no-reload`.
-  - *Voir* : §8 « Lot du 2026-09-23 » ; CLAUDE.md §5 « Demande de réactivation d'un compte suspendu (ajout v0.28) ».
+- [ ] **Toutes les migrations en attente appliquées sur la base de production**, jamais une seule à la fois.
+  - *Raison* : depuis la v0.26, les migrations n'ont été appliquées que sur la base de développement. Le code actuel en dépend (connexion, inscription, dossier, réactivation) : déployer sans elles casse la production.
+  - *Procédure* : `switch-env.sh prod`, `switch-env.sh status` pour confirmer, sauvegarde de la base, `php artisan migrate:status` pour lister les migrations en attente (et les noter ici), `php artisan migrate`, nouvelle vérification avec `migrate:status`, puis retour sur `dev` et redémarrage de `php artisan serve --no-reload`.
+  - Liste actuelle des migrations en attente attendues : toutes celles du 2026-09-23 (v0.26 et v0.28). À vérifier par `migrate:status`, sans lancer `migrate` en production.
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
