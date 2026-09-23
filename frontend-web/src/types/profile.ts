@@ -70,6 +70,11 @@ export interface ProfileRegistrationMeta {
   status_label: string
   rejection_reason: string | null
   submitted_at: string | null
+  // Suspension : absente de la réponse actuelle du backend, prise en compte
+  // si elle y figure (propriétés facultatives, `?`).
+  is_suspended?: boolean
+  suspension_reason?: string | null
+  suspended_at?: string | null
 }
 
 // Informations légales privées (`meta.legal`) : seul endroit où le

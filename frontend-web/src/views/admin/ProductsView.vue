@@ -98,8 +98,7 @@ onMounted(() => {
     <div>
       <h2 class="text-lg font-semibold text-slate-900">Produits</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Mini-boutiques Garage et Market Space confondus, soumis à validation avant d'être visibles côté mobile
-        (CLAUDE.md §5, règle 5).
+        Mini-boutiques Garage et Market Space confondus, soumis à validation avant d'être visibles côté mobile.
       </p>
     </div>
 

@@ -198,6 +198,7 @@ async function reload(): Promise<void> {
   const loaded = await fetchProfile(props.space)
   applyProfile(loaded)
   auth.updateProfileStatus(loaded.status)
+  if (loaded.registration) auth.updateRegistrationFromProfile(loaded.registration)
 }
 
 onMounted(async () => {
@@ -306,8 +307,14 @@ function useMyPosition(): void {
   )
 }
 
+// Variantes `disabled:` de Tailwind : `disabled:bg-slate-100` n'applique le
+// fond gris que lorsque le champ est désactivé (pseudo-classe CSS
+// `:disabled`). Elle s'applique aussi quand c'est un <fieldset disabled>
+// parent qui désactive le champ : un seul attribut sur le fieldset suffit à
+// griser tous les champs du profil verrouillé, sans liaison supplémentaire.
+// Mêmes classes que les <select> de LocationSelect, pour un rendu identique.
 const inputClasses =
-  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900'
+  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'
 
 function validateLegal(): Record<string, string> {
   const errors: Record<string, string> = {}
@@ -657,7 +664,7 @@ async function refreshDossier(): Promise<void> {
           >
             <span class="text-sm font-medium text-slate-700">{{ DAY_LABELS[index] }}</span>
             <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input v-model="hour.is_closed" type="checkbox" />
+              <input v-model="hour.is_closed" type="checkbox" class="disabled:cursor-not-allowed" />
               Fermé
             </label>
             <input

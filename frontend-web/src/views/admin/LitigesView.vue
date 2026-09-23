@@ -97,7 +97,7 @@ onMounted(() => {
       <h2 class="text-lg font-semibold text-slate-900">Réclamations / Litiges</h2>
       <p class="mt-1 text-sm text-slate-500">
         Contestations d'automobilistes sur une transaction terminée (devis facturé ou commande payée), instruites et
-        tranchées avec un motif obligatoire (CLAUDE.md §5, ajout v0.11).
+        tranchées avec un motif obligatoire.
       </p>
     </div>
 

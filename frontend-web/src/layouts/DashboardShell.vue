@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 
@@ -13,12 +14,38 @@ interface NavItem {
   to: string
 }
 
-defineProps<{
+const props = defineProps<{
   title: string
   navItems: NavItem[]
 }>()
 
 const auth = useAuthStore()
+const route = useRoute()
+
+// Entrée d'accueil d'un espace (`/admin`, `/garage`, `/market-space`) : un
+// seul segment de chemin.
+function isHomeEntry(to: string): boolean {
+  return to.split('/').filter(Boolean).length === 1
+}
+
+// Rubrique allumée, calculée ici plutôt que par l'`active-class` de
+// RouterLink : celle-ci s'applique à tout lien dont le chemin est un préfixe
+// de la page courante, donc « Tableau de bord » (`/admin`) restait allumé sur
+// toutes les pages de l'espace. Règle : l'accueil n'est actif que sur son
+// chemin exact ; toute autre entrée l'est sur son chemin ou sur une page de
+// détail (`/admin/registrations/41` allume « Inscriptions »). Si plusieurs
+// entrées conviennent, la plus longue (la plus précise) l'emporte : une seule
+// rubrique allumée à la fois. `computed` se recalcule à chaque navigation,
+// car `route.path` est réactif.
+const activeTo = computed<string | null>(() => {
+  const path = route.path.replace(/\/+$/, '') || '/'
+  const matches = props.navItems
+    .map((item) => item.to)
+    .filter((to) =>
+      isHomeEntry(to) ? path === to : path === to || path.startsWith(`${to}/`),
+    )
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null
+})
 
 async function handleLogout(): Promise<void> {
   await auth.logout()
@@ -38,8 +65,12 @@ async function handleLogout(): Promise<void> {
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          active-class="bg-slate-900 text-white hover:bg-slate-900"
+          :class="[
+            'block rounded-md px-3 py-2 text-sm font-medium',
+            item.to === activeTo
+              ? 'bg-slate-900 text-white hover:bg-slate-900'
+              : 'text-slate-700 hover:bg-slate-100',
+          ]"
         >
           {{ item.label }}
         </RouterLink>

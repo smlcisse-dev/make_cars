@@ -9,7 +9,8 @@ import {
   setStoredToken,
   setStoredUser,
 } from '@/lib/token'
-import type { RegistrationStatus } from '@/types/registration'
+import type { ProfileRegistrationMeta } from '@/types/profile'
+import type { RegistrationStatus, SessionRegistration } from '@/types/registration'
 import type { AccountType, ProfileStatus, User } from '@/types/user'
 
 // Chemin d'accueil de chaque espace, une fois connecté (CLAUDE.md §3) —
@@ -99,6 +100,39 @@ export const useAuthStore = defineStore('auth', () => {
     setStoredUser(user.value)
   }
 
+  // Reporte dans la session l'état du dossier lu par « Mon profil »
+  // (`meta.registration` de GET /{space}/profile). Filet de sécurité : si le
+  // rafraîchissement de session au démarrage (/auth/me) a échoué, afficher
+  // « Mon profil » suffit à débloquer un compte approuvé entre-temps, puisque
+  // `mustStayOnProfile` lit ce statut. Seules les clés présentes dans `meta`
+  // sont reportées ; les autres (id, dates...) sont conservées.
+  function updateRegistrationFromProfile(meta: ProfileRegistrationMeta): void {
+    if (!user.value) return
+    const patch: Partial<SessionRegistration> = {
+      status: meta.status,
+      status_label: meta.status_label,
+      rejection_reason: meta.rejection_reason,
+      submitted_at: meta.submitted_at,
+    }
+    // `!== undefined` : ne reporte la suspension que si le backend l'a
+    // envoyée (propriétés facultatives du type).
+    if (meta.is_suspended !== undefined) patch.is_suspended = meta.is_suspended
+    if (meta.suspension_reason !== undefined) patch.suspension_reason = meta.suspension_reason
+    if (meta.suspended_at !== undefined) patch.suspended_at = meta.suspended_at
+    user.value = {
+      ...user.value,
+      // `as SessionRegistration` : une session enregistrée avant v0.26 n'a pas
+      // encore de dossier ; l'objet partiel ainsi créé porte au moins le
+      // statut, seule donnée lue par le garde et les menus. Le prochain
+      // /auth/me le remplace par la version complète.
+      professional_registration: {
+        ...(user.value.professional_registration ?? {}),
+        ...patch,
+      } as SessionRegistration,
+    }
+    setStoredUser(user.value)
+  }
+
   // Relit l'utilisateur connecté depuis le backend (/auth/me) : statut du
   // dossier, suspension et complétude du profil peuvent avoir changé depuis
   // la connexion (décision de l'administrateur). Le token, lui, ne change pas.
@@ -144,5 +178,6 @@ export const useAuthStore = defineStore('auth', () => {
     setSession,
     clearSession,
     updateProfileStatus,
+    updateRegistrationFromProfile,
   }
 })

@@ -373,7 +373,7 @@ async function handleClose(): Promise<void> {
         <h3 class="text-sm font-semibold text-slate-900">Espace d'échange avec le professionnel</h3>
         <p class="mt-1 text-sm text-slate-500">
           L'admin et le professionnel peuvent s'y exprimer à plusieurs reprises avant la décision — jamais le chat
-          Garage↔Automobiliste (CLAUDE.md §5, ajout v0.11).
+          Garage↔Automobiliste.
         </p>
 
         <ul class="mt-3 space-y-3">

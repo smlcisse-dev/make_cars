@@ -96,7 +96,7 @@ onMounted(() => {
     <div>
       <h2 class="text-lg font-semibold text-slate-900">Services de réparation</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Catalogue des garages, soumis à validation avant d'être visible côté mobile (CLAUDE.md §5, règle 5).
+        Catalogue des garages, soumis à validation avant d'être visible côté mobile.
       </p>
     </div>
 

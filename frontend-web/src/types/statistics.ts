@@ -6,6 +6,9 @@
 export interface StructureStatusCounts {
   approved: number
   pending: number
+  // Dossiers jamais soumis : profil ou informations légales à compléter
+  // (ajout v0.26).
+  profile_incomplete: number
   suspended: number
   rejected: number
   total: number

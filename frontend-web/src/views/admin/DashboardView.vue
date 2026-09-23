@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 
 import { fetchStatistics } from '@/api/adminStatistics'
 import AppButton from '@/shared/components/AppButton.vue'
-import StatusBadge from '@/shared/components/StatusBadge.vue'
+import StatusBadge, { type BadgeTone } from '@/shared/components/StatusBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { AdminStatistics } from '@/types/statistics'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -49,12 +49,30 @@ function formatAmount(amount: string): string {
   return `${Number(amount).toLocaleString('fr-FR')} FCFA`
 }
 
-const STRUCTURE_STATUS_LABELS = {
+// Ordre d'affichage des badges des cartes « Structures ». `profile_incomplete`
+// = dossiers créés mais jamais soumis (profil ou informations légales à
+// compléter).
+const STRUCTURE_STATUSES = ['approved', 'pending', 'profile_incomplete', 'suspended', 'rejected'] as const
+// `(typeof STRUCTURE_STATUSES)[number]` : type union des valeurs du tableau
+// ci-dessus ('approved' | 'pending' | ...). `Record<K, V>` exige alors une
+// entrée pour chacune : oublier un statut devient une erreur de compilation.
+type StructureStatus = (typeof STRUCTURE_STATUSES)[number]
+
+const STRUCTURE_STATUS_LABELS: Record<StructureStatus, string> = {
   approved: 'Approuvés',
   pending: 'En attente',
+  profile_incomplete: 'Profil à compléter',
   suspended: 'Suspendus',
   rejected: 'Rejetés',
-} as const
+}
+
+const STRUCTURE_STATUS_TONES: Record<StructureStatus, BadgeTone> = {
+  approved: 'success',
+  pending: 'warning',
+  profile_incomplete: 'neutral',
+  suspended: 'danger',
+  rejected: 'neutral',
+}
 
 const GEOGRAPHY_COLUMNS = [
   { key: 'garagiste', label: 'Garagiste' },
@@ -72,7 +90,7 @@ onMounted(loadStatistics)
       <div>
         <h2 class="text-lg font-semibold text-slate-900">Bienvenue, {{ auth.user?.name }}</h2>
         <p class="mt-1 text-sm text-slate-500">
-          Statistiques agrégées de la plateforme (CLAUDE.md §5, ajout v0.18) — utiles pour appuyer les politiques de
+          Statistiques agrégées de la plateforme — utiles pour appuyer les politiques de
           régulation/formalisation du secteur auprès des autorités béninoises.
         </p>
       </div>
@@ -97,10 +115,10 @@ onMounted(loadStatistics)
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
               <StatusBadge
-                v-for="key in (['approved', 'pending', 'suspended', 'rejected'] as const)"
+                v-for="key in STRUCTURE_STATUSES"
                 :key="key"
                 :label="`${STRUCTURE_STATUS_LABELS[key]} : ${counts[key]}`"
-                :tone="key === 'approved' ? 'success' : key === 'pending' ? 'warning' : key === 'suspended' ? 'danger' : 'neutral'"
+                :tone="STRUCTURE_STATUS_TONES[key]"
               />
             </div>
           </div>

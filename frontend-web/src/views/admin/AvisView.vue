@@ -95,7 +95,7 @@ onMounted(() => {
       <h2 class="text-lg font-semibold text-slate-900">Avis clients</h2>
       <p class="mt-1 text-sm text-slate-500">
         Avis laissés par les automobilistes après une transaction terminée, visibles dès leur création — seul un
-        masquage motivé peut les retirer de la vue publique (CLAUDE.md §5, ajout v0.10).
+        masquage motivé peut les retirer de la vue publique.
       </p>
     </div>
 
