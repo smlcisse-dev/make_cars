@@ -33,6 +33,17 @@ export interface RegistrationDocument {
 // reflète ReactivationRequestResource.
 export type ReactivationRequestStatus = 'pending' | 'accepted' | 'refused'
 
+// Pièce jointe facultative d'une demande (photo ou PDF). `download_url`
+// pointe vers l'endpoint de l'espace de celui qui consulte (admin ou
+// professionnel propriétaire) : fichier privé, à récupérer en blob authentifié.
+export interface ReactivationRequestAttachment {
+  id: number
+  original_name: string
+  mime_type: string
+  size: number
+  download_url: string
+}
+
 export interface ReactivationRequest {
   id: number
   status: ReactivationRequestStatus
@@ -42,6 +53,8 @@ export interface ReactivationRequest {
   // Présent seulement dans l'historique de la fiche admin.
   decided_by?: { id: number; name: string } | null
   decided_at: string | null
+  // Absent si le backend ne les a pas chargées ; `[]` si aucune.
+  attachments?: ReactivationRequestAttachment[]
   created_at: string
 }
 

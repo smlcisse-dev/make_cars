@@ -3,10 +3,10 @@ import { computed, ref } from 'vue'
 
 import { requestReactivation } from '@/api/professionalProfile'
 import AppButton from '@/shared/components/AppButton.vue'
-import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
+import ReactivationRequestModal from '@/shared/components/ReactivationRequestModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { ProfessionalSpace } from '@/types/professionalSpace'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { extractApiErrorMessage, extractValidationErrors } from '@/utils/apiError'
 
 // Bandeau « compte suspendu » des deux espaces professionnels (CLAUDE.md §5,
 // ajout v0.6), avec la demande de réactivation (ajout v0.28) : le
@@ -25,24 +25,32 @@ const space = computed<ProfessionalSpace | null>(() => {
 
 const latest = computed(() => auth.latestReactivationRequest)
 const isPending = computed(() => latest.value?.status === 'pending')
+const attachmentCount = computed(() => latest.value?.attachments?.length ?? 0)
 
 const isModalOpen = ref(false)
 const isSending = ref(false)
 const errorMessage = ref<string | null>(null)
+const fieldErrors = ref<Record<string, string>>({})
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { dateStyle: 'long' })
 }
 
-async function send(message: string): Promise<void> {
+async function send(payload: { message: string; files: File[] }): Promise<void> {
   if (!space.value) return
   isSending.value = true
   errorMessage.value = null
+  fieldErrors.value = {}
   try {
-    await requestReactivation(space.value, message)
+    await requestReactivation(space.value, payload.message, payload.files)
     isModalOpen.value = false
     await auth.refreshUser()
   } catch (error) {
+    // 422 (fichier refusé…) : la fenêtre reste ouverte, les erreurs
+    // s'affichent sous les champs et le professionnel corrige sa saisie.
+    fieldErrors.value = extractValidationErrors(error)
+    if (Object.keys(fieldErrors.value).length) return
+
     errorMessage.value = extractApiErrorMessage(error, "La demande n'a pas pu être envoyée.")
     isModalOpen.value = false
     // Ex. 409 « déjà en attente » : la session était périmée, on la relit.
@@ -50,6 +58,11 @@ async function send(message: string): Promise<void> {
   } finally {
     isSending.value = false
   }
+}
+
+function openModal(): void {
+  fieldErrors.value = {}
+  isModalOpen.value = true
 }
 </script>
 
@@ -63,7 +76,13 @@ async function send(message: string): Promise<void> {
     </p>
 
     <p v-if="isPending && latest" class="mt-2">
-      Demande de réactivation envoyée le {{ formatDate(latest.created_at) }}, en cours d'examen.
+      Demande de réactivation envoyée le {{ formatDate(latest.created_at) }}<span
+        v-if="attachmentCount"
+      >
+        avec {{ attachmentCount }} pièce{{ attachmentCount > 1 ? 's' : '' }} jointe{{
+          attachmentCount > 1 ? 's' : ''
+        }}</span
+      >, en cours d'examen.
     </p>
     <template v-else>
       <p v-if="latest?.status === 'refused'" class="mt-2">
@@ -71,22 +90,17 @@ async function send(message: string): Promise<void> {
         <span v-if="latest.response_reason">Motif : {{ latest.response_reason }}</span>
       </p>
       <div class="mt-2 flex flex-wrap items-center gap-3">
-        <AppButton variant="secondary" @click="isModalOpen = true">
+        <AppButton variant="secondary" @click="openModal">
           Demander la réactivation
         </AppButton>
         <span v-if="errorMessage" class="text-red-700">{{ errorMessage }}</span>
       </div>
     </template>
 
-    <ReasonPromptModal
+    <ReactivationRequestModal
       v-if="isModalOpen"
-      title="Demander la réactivation"
-      description="L'équipe Make Cars examinera votre demande et décidera de réactiver ou non votre compte."
-      field-label="Message"
-      placeholder="Expliquez ce que vous avez corrigé"
-      confirm-label="Envoyer la demande"
-      confirm-variant="primary"
       :loading="isSending"
+      :field-errors="fieldErrors"
       @cancel="isModalOpen = false"
       @confirm="send"
     />

@@ -12,6 +12,7 @@ import {
   suspendRegistration,
 } from '@/api/registrations'
 import AppButton from '@/shared/components/AppButton.vue'
+import ReactivationAttachmentList from '@/shared/components/ReactivationAttachmentList.vue'
 import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationDocument } from '@/types/registration'
@@ -300,6 +301,7 @@ function formatDate(iso: string): string {
           <h4 class="text-sm font-semibold text-sky-900">Demande de réactivation</h4>
           <p class="mt-1 text-xs text-sky-700">Envoyée le {{ formatDate(pendingReactivationRequest.created_at) }}</p>
           <p class="mt-2 whitespace-pre-line text-sm text-slate-800">{{ pendingReactivationRequest.message }}</p>
+          <ReactivationAttachmentList :attachments="pendingReactivationRequest.attachments ?? []" />
         </div>
 
         <div class="mt-3 flex gap-3">
@@ -332,6 +334,7 @@ function formatDate(iso: string): string {
                 <StatusBadge :label="request.status_label" :tone="request.status === 'accepted' ? 'success' : 'neutral'" />
               </div>
               <p class="mt-1 whitespace-pre-line text-slate-800">{{ request.message }}</p>
+              <ReactivationAttachmentList :attachments="request.attachments ?? []" />
               <p v-if="request.decided_at" class="mt-2 text-xs text-slate-500">
                 Décision le {{ formatDate(request.decided_at) }}<span v-if="request.decided_by">
                   par {{ request.decided_by.name }}</span

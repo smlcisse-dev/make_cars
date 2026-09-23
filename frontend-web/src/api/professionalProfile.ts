@@ -153,12 +153,18 @@ export async function fetchIdentityCertificateDocumentBlob(
   return response.data
 }
 
-// Demande de réactivation d'un compte suspendu (CLAUDE.md §5, ajout v0.28).
+// Demande de réactivation d'un compte suspendu (CLAUDE.md §5, ajout v0.28),
+// avec pièces jointes facultatives : envoi en multipart (FormData), la clé
+// `attachments[]` produisant un tableau côté Laravel.
 export async function requestReactivation(
   space: ProfessionalSpace,
   message: string,
+  attachments: File[] = [],
 ): Promise<void> {
-  await http.post(`/${space}/profile/reactivation-request`, { message })
+  const formData = new FormData()
+  formData.append('message', message)
+  attachments.forEach((file) => formData.append('attachments[]', file))
+  await http.post(`/${space}/profile/reactivation-request`, formData)
 }
 
 // Passe le dossier en `pending` (422 `registration_incomplete` si le profil ou

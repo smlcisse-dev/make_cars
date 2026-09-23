@@ -12,8 +12,9 @@ import BaseModal from '@/shared/components/BaseModal.vue'
 // modules réutiliseront ce composant en changeant juste les libellés.
 //
 // Le libellé du champ, son texte d'aide et la couleur du bouton sont
-// paramétrables pour servir aussi hors modération : la demande de
-// réactivation d'un professionnel suspendu (message obligatoire, v0.28).
+// paramétrables pour servir aussi hors modération. (La demande de
+// réactivation, qui accepte des pièces jointes, a sa propre fenêtre :
+// ReactivationRequestModal.)
 // `withDefaults` fournit la valeur utilisée quand le parent omet la prop.
 const props = withDefaults(
   defineProps<{
