@@ -27,6 +27,7 @@ class ReactivationRequestResource extends JsonResource
             'response_reason' => $this->response_reason,
             'decided_by' => $this->whenLoaded('decidedBy', fn () => $this->decidedBy ? ['id' => $this->decidedBy->id, 'name' => $this->decidedBy->name] : null),
             'decided_at' => $this->decided_at?->toIso8601String(),
+            'attachments' => ReactivationRequestAttachmentResource::collection($this->whenLoaded('attachments')),
             'created_at' => $this->created_at->toIso8601String(),
         ];
     }

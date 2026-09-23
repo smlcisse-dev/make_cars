@@ -10,6 +10,8 @@ use App\Http\Requests\Professional\UpdateLegalInfoRequest;
 use App\Http\Requests\Professional\UploadLegalDocumentRequest;
 use App\Http\Resources\ReactivationRequestResource;
 use App\Models\ProfessionalRegistration;
+use App\Models\ReactivationRequest;
+use App\Models\ReactivationRequestAttachment;
 use App\Services\ProfessionalRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,9 +77,23 @@ class RegistrationDossierController extends Controller
         $reactivationRequest = $this->registrationService->requestReactivation(
             $this->registration($request),
             $request->string('message')->toString(),
+            $request->file('attachments', []),
         );
 
         return $this->success(new ReactivationRequestResource($reactivationRequest), 'Votre demande de réactivation a été envoyée.', 201);
+    }
+
+    /**
+     * Téléchargement d'une pièce jointe d'une de ses propres demandes de
+     * réactivation : 404 pour toute demande d'un autre dossier, ou pièce
+     * jointe d'une autre demande.
+     */
+    public function downloadReactivationAttachment(Request $request, ReactivationRequest $reactivationRequest, ReactivationRequestAttachment $attachment): StreamedResponse
+    {
+        abort_unless($reactivationRequest->professional_registration_id === $this->registration($request)->id, 404);
+        abort_unless($attachment->reactivation_request_id === $reactivationRequest->id, 404);
+
+        return $attachment->download();
     }
 
     private function storeDocument(UploadLegalDocumentRequest $request, RegistrationDocumentType $type, string $message): JsonResponse

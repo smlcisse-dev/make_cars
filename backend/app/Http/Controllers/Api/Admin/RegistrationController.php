@@ -10,6 +10,8 @@ use App\Http\Requests\Admin\RejectRegistrationRequest;
 use App\Http\Requests\Admin\SuspendRegistrationRequest;
 use App\Http\Resources\ProfessionalRegistrationResource;
 use App\Models\ProfessionalRegistration;
+use App\Models\ReactivationRequest;
+use App\Models\ReactivationRequestAttachment;
 use App\Models\RegistrationDocument;
 use App\Services\ProfessionalRegistrationService;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +27,7 @@ class RegistrationController extends Controller
      * Le profil est chargé pour exposer `structure_name`/`address`, lus
      * depuis lui (CLAUDE.md §5, ajout v0.26).
      */
-    private const LIST_RELATIONS = ['documents', 'user.garage', 'user.marketSpaceAccount', 'latestReactivationRequest'];
+    private const LIST_RELATIONS = ['documents', 'user.garage', 'user.marketSpaceAccount', 'latestReactivationRequest.attachments'];
 
     /**
      * Fiche d'examen : profil complet, documents et historique des décisions.
@@ -33,8 +35,9 @@ class RegistrationController extends Controller
     private const DETAIL_RELATIONS = [
         'documents',
         'decisions.decidedBy',
-        'latestReactivationRequest',
+        'latestReactivationRequest.attachments',
         'reactivationRequests.decidedBy',
+        'reactivationRequests.attachments',
         'user.garage.openingHours', 'user.garage.images', 'user.garage.department', 'user.garage.commune', 'user.garage.arrondissement',
         'user.marketSpaceAccount.openingHours', 'user.marketSpaceAccount.images', 'user.marketSpaceAccount.department',
         'user.marketSpaceAccount.commune', 'user.marketSpaceAccount.arrondissement',
@@ -138,5 +141,17 @@ class RegistrationController extends Controller
         abort_unless($document->professional_registration_id === $registration->id, 404);
 
         return Storage::disk($document->disk)->download($document->path);
+    }
+
+    /**
+     * Pièce jointe d'une demande de réactivation : la demande doit appartenir
+     * à ce dossier et la pièce jointe à cette demande (404 sinon).
+     */
+    public function downloadReactivationAttachment(ProfessionalRegistration $registration, ReactivationRequest $reactivationRequest, ReactivationRequestAttachment $attachment): StreamedResponse
+    {
+        abort_unless($reactivationRequest->professional_registration_id === $registration->id, 404);
+        abort_unless($attachment->reactivation_request_id === $reactivationRequest->id, 404);
+
+        return $attachment->download();
     }
 }

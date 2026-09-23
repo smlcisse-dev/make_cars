@@ -26,6 +26,8 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     Route::get('profile/legal/identity-document', [RegistrationDossierController::class, 'downloadIdentityDocument']);
     Route::post('profile/submit', [RegistrationDossierController::class, 'submit']);
     Route::post('profile/reactivation-request', [RegistrationDossierController::class, 'requestReactivation']);
+    Route::get('profile/reactivation-requests/{reactivationRequest}/attachments/{attachment}', [RegistrationDossierController::class, 'downloadReactivationAttachment'])
+        ->name('garage.reactivation-requests.attachments.download');
 
     // Écritures du profil : verrouillées pendant l'examen du dossier.
     Route::middleware('registration.editable')->group(function () {

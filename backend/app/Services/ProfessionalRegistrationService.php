@@ -207,28 +207,63 @@ class ProfessionalRegistrationService
      * en attente à la fois ; les demandes déjà décidées (y compris celles
      * d'une suspension antérieure) ne bloquent jamais une nouvelle demande.
      *
+     * @param  UploadedFile[]  $attachments  pièces jointes facultatives (0 à 5)
+     *
      * @throws ApiException compte non suspendu, ou demande déjà en attente (409).
      */
-    public function requestReactivation(ProfessionalRegistration $registration, string $message): ReactivationRequest
+    public function requestReactivation(ProfessionalRegistration $registration, string $message, array $attachments = []): ReactivationRequest
     {
-        return DB::transaction(function () use ($registration, $message) {
-            // Verrou sur le dossier : deux envois simultanés ne peuvent pas
-            // créer deux demandes en attente.
-            $registration = ProfessionalRegistration::query()->lockForUpdate()->findOrFail($registration->id);
+        // Chemins écrits sur le disque pendant la transaction : si elle
+        // échoue (fichier illisible, erreur SQL…), ils sont effacés pour ne
+        // laisser aucun fichier orphelin.
+        $storedPaths = [];
+        $disk = config('filesystems.private_media_disk', 'local');
 
-            if (! $registration->isSuspended()) {
-                throw new ApiException('Votre compte n\'est pas suspendu.', 409, 'not_suspended');
+        try {
+            return DB::transaction(function () use ($registration, $message, $attachments, $disk, &$storedPaths) {
+                // Verrou sur le dossier : deux envois simultanés ne peuvent pas
+                // créer deux demandes en attente.
+                $registration = ProfessionalRegistration::query()->lockForUpdate()->findOrFail($registration->id);
+
+                if (! $registration->isSuspended()) {
+                    throw new ApiException('Votre compte n\'est pas suspendu.', 409, 'not_suspended');
+                }
+
+                if ($registration->pendingReactivationRequest() !== null) {
+                    throw new ApiException('Une demande de réactivation est déjà en cours d\'examen.', 409, 'reactivation_already_requested');
+                }
+
+                $request = $registration->reactivationRequests()->create([
+                    'message' => $message,
+                    'status' => ReactivationRequestStatus::Pending,
+                ]);
+
+                foreach ($attachments as $file) {
+                    $path = $file->store('reactivation-request-attachments/'.$request->id, $disk);
+
+                    if ($path === false) {
+                        throw new \RuntimeException('Échec de l\'enregistrement d\'une pièce jointe.');
+                    }
+
+                    $storedPaths[] = $path;
+                    $request->attachments()->create([
+                        'disk' => $disk,
+                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getMimeType() ?? $file->getClientMimeType(),
+                        'size' => $file->getSize(),
+                    ]);
+                }
+
+                return $request->load('attachments');
+            });
+        } catch (\Throwable $exception) {
+            if ($storedPaths !== []) {
+                Storage::disk($disk)->delete($storedPaths);
             }
 
-            if ($registration->pendingReactivationRequest() !== null) {
-                throw new ApiException('Une demande de réactivation est déjà en cours d\'examen.', 409, 'reactivation_already_requested');
-            }
-
-            return $registration->reactivationRequests()->create([
-                'message' => $message,
-                'status' => ReactivationRequestStatus::Pending,
-            ]);
-        });
+            throw $exception;
+        }
     }
 
     /**

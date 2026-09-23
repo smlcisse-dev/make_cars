@@ -24,6 +24,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('registrations/{registration}/reactivation-request/refuse', [RegistrationController::class, 'refuseReactivationRequest']);
     Route::get('registrations/{registration}/documents/{document}', [RegistrationController::class, 'downloadDocument'])
         ->name('admin.registrations.documents.download');
+    Route::get('registrations/{registration}/reactivation-requests/{reactivationRequest}/attachments/{attachment}', [RegistrationController::class, 'downloadReactivationAttachment'])
+        ->name('admin.registrations.reactivation-requests.attachments.download');
 
     Route::get('garages', [GarageController::class, 'index']);
     Route::get('garages/{garage}', [GarageController::class, 'show']);
