@@ -194,12 +194,13 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
-Toutes les versions de v0.3 à v0.24 sont citées au moins une fois, sans trou de numérotation. **CLAUDE.md n'a pas été modifié.** Les points ci-dessous sont signalés pour arbitrage.
+Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, et chacune a désormais sa section `###`. Trois écarts relevés le 2026-09-23 ont été corrigés le même jour dans CLAUDE.md :
 
-1. **v0.22 n'a pas de section dédiée.** Le chat Market Space et la `Conversation` polymorphe (commit `dcec7dc`) sont décrits en ligne dans « Module Chat (ajout v0.8) » et « Module Commande (ajout v0.9) ». Les titres passent donc de v0.21 à v0.23. Ce n'est pas une incohérence de fond, mais la seule version sans titre `###` propre.
-2. **La ligne de devis « Prestation libre » n'est pas documentée** (commits `636fa95` et `3165653`, `QuoteLineType::CustomCharge`, libellé et prix libres saisis par le garagiste). « Module Devis/Facture (v0.8) » ne cite que trois natures de lignes : diagnostic, service, pièce. Cette section mériterait un ajout (v0.25), à valider.
-3. **Glossaire périmé** : l'entrée « Statistiques agrégées (admin) » parle encore de « répartition géographique (ville/région) », remplacée depuis v0.19 par le découpage en départements, séparé entre garages et Market Space.
-4. **v0.20, v0.21, v0.23, v0.24** : cohérents entre eux et avec le code contrôlé :
+1. **v0.22 a désormais sa section dédiée** (« Chat Market Space et conversation polymorphe »). La mention périmée de la contrainte unique `garage_id`+`user_id` dans « Module Chat (v0.8) » a été remplacée par un renvoi : la colonne `garage_id` n'existe plus depuis la migration `make_conversations_polymorphic`.
+2. **La ligne de devis « Prestation libre » est documentée** dans une nouvelle section v0.25, et la liste des natures de lignes du « Module Devis/Facture (v0.8) » y renvoie.
+3. **Le glossaire est à jour** : « Statistiques agrégées (admin) » parle maintenant de la répartition par département, séparée entre garages et Market Space (v0.19).
+
+**v0.20, v0.21, v0.23, v0.24** : cohérents entre eux et avec le code contrôlé :
    - `RejectAppointmentRequest` : `reason` est `required` ;
    - `StoreServiceRequest` / `StoreProductRequest` : `image` est `required` ;
    - middleware `profile.complete` présent.
@@ -213,7 +214,7 @@ Toutes les versions de v0.3 à v0.24 sont citées au moins une fois, sans trou d
   - `Conversation` devient polymorphe (`sellable_type` / `sellable_id`), unique par couple (vendeur, automobiliste) ;
   - `POST /mobile/conversations` accepte `garage_id` **ou** `market_space_account_id` ;
   - la facture d'une commande Market Space payée est postée dans le chat.
-- **Ligne de devis « Prestation libre » (`636fa95`, `3165653`)** : réparation découverte après inspection, sans fiche catalogue. Non encore reportée dans CLAUDE.md (voir §7).
+- **Ligne de devis « Prestation libre » (`636fa95`, `3165653`)** : réparation découverte après inspection, sans fiche catalogue. Documentée dans CLAUDE.md en v0.25.
 - **Point ouvert téléphone non béninois (`7068c44`)** : documentaire uniquement.
 
 **Construction des dashboards (frontend + ajustements backend)**
