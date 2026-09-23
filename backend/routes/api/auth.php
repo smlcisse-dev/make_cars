@@ -1,12 +1,24 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\ExpressClaimController;
+use App\Http\Controllers\Api\Auth\ProfessionalSignupController;
 use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\Auth\SessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('register/automobiliste', [RegisterController::class, 'automobiliste']);
-Route::post('register/professionnel', [RegisterController::class, 'professional']);
+
+/**
+ * Inscription professionnelle courte avec vérification de l'email par code
+ * (CLAUDE.md §5, ajout v0.26) — publique, limitée à 10 requêtes/minute par IP
+ * pour freiner la force brute sur le code et l'envoi massif d'emails.
+ */
+Route::middleware('throttle:10,1')->group(function () {
+    Route::post('register/professionnel', [ProfessionalSignupController::class, 'store']);
+    Route::post('register/professionnel/{uuid}/verify', [ProfessionalSignupController::class, 'verify']);
+    Route::post('register/professionnel/{uuid}/resend', [ProfessionalSignupController::class, 'resend']);
+});
+
 Route::post('login', [SessionController::class, 'store']);
 Route::post('login/google', [SessionController::class, 'google']);
 

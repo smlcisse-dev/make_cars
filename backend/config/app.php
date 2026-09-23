@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Adresse de la SPA Vue (frontend-web), distincte de l'API : sert à
+    | construire les liens des emails qui mènent à une page du dashboard
+    | (ex. page profil après création du compte — CLAUDE.md §5, ajout v0.26).
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

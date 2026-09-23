@@ -6,6 +6,7 @@ use App\Enums\DayOfWeek;
 use App\Models\MarketSpaceAccount;
 use App\Models\MarketSpaceImage;
 use App\Models\ProfessionalRegistration;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,17 @@ class MarketSpaceAccountService
             'address' => $registration->address,
             'phone' => $registration->user->phone,
         ]);
+    }
+
+    /**
+     * Profil Market Space vide, créé dès la vérification de l'email (CLAUDE.md §5,
+     * ajout v0.26) : seul le téléphone saisi à l'inscription est repris ; le
+     * professionnel complète tout le reste depuis sa page profil avant de
+     * soumettre son dossier.
+     */
+    public function createEmpty(User $user): MarketSpaceAccount
+    {
+        return $user->marketSpaceAccount()->create(['phone' => $user->phone]);
     }
 
     /**

@@ -14,9 +14,9 @@ class RegisterProfessionalRequest extends FormRequest
     use NormalizesBeninPhone;
 
     /**
-     * Inscription professionnelle : ouverte à tout visiteur non authentifié,
-     * mais le dossier créé reste en attente de validation admin
-     * (CLAUDE.md §5, règle 4).
+     * Formulaire court d'inscription professionnelle (CLAUDE.md §5, ajout
+     * v0.26) : ouvert à tout visiteur, ne crée qu'une demande en attente de
+     * vérification de l'email — aucun compte, aucun justificatif à ce stade.
      */
     public function authorize(): bool
     {
@@ -29,17 +29,12 @@ class RegisterProfessionalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', new BeninPhoneNumber, 'unique:users,phone'],
+            'phone' => ['required', 'string', new BeninPhoneNumber, 'unique:users,phone'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'account_type' => ['required', Rule::in(['garagiste', 'market_space'])],
-            'structure_name' => ['required', 'string', 'max:255'],
-            'address' => ['required', 'string', 'max:255'],
-            'business_registration_number' => ['required', 'string', 'max:100'],
-            'business_registration_document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
-            'premises_photos' => ['required', 'array', 'min:1'],
-            'premises_photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
         ];
     }
 }

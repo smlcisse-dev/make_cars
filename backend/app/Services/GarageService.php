@@ -6,6 +6,7 @@ use App\Enums\DayOfWeek;
 use App\Models\Garage;
 use App\Models\GarageImage;
 use App\Models\ProfessionalRegistration;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,17 @@ class GarageService
             'address' => $registration->address,
             'phone' => $registration->user->phone,
         ]);
+    }
+
+    /**
+     * Profil Garage vide, créé dès la vérification de l'email (CLAUDE.md §5,
+     * ajout v0.26) : seul le téléphone saisi à l'inscription est repris ; le
+     * professionnel complète tout le reste depuis sa page profil avant de
+     * soumettre son dossier.
+     */
+    public function createEmpty(User $user): Garage
+    {
+        return $user->garage()->create(['phone' => $user->phone]);
     }
 
     /**
