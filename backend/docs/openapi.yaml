@@ -17,7 +17,13 @@ tags:
   - name: Admin
     description: Endpoints réservés au dashboard Administrateur.
   - name: Garage
-    description: Endpoints du dashboard Garagiste (compte Garagiste requis).
+    description: >
+      Endpoints du dashboard Garagiste (compte Garagiste requis). Hors routes
+      de profil, toutes les routes exigent un dossier approuvé (403
+      `registration_not_approved`, avec registration_status) puis un profil
+      complet (403 `profile_incomplete`) — CLAUDE.md §5, ajouts v0.20 et
+      v0.26. Les écritures de profil renvoient 409 `registration_under_review`
+      pendant l'examen du dossier. Mêmes règles pour Market Space.
   - name: MarketSpace
     description: Endpoints du dashboard Market Space (compte Market Space requis).
   - name: Mobile
@@ -51,6 +57,15 @@ components:
           type: integer
         name:
           type: string
+          description: >
+            Nom d'affichage. Recomposé en « Prénom Nom » quand first_name et
+            last_name sont renseignés (CLAUDE.md §5, ajout v0.26).
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
         email:
           type: string
           nullable: true
@@ -72,6 +87,8 @@ components:
             Compte automobiliste créé par un garagiste pour un client
             walk-in sans app, pas encore "réclamé" par son propriétaire réel
             (CLAUDE.md §5, ajout v0.9 ; §7 point ouvert).
+        profile_status:
+          $ref: '#/components/schemas/CompletenessStatus'
         professional_registration:
           $ref: '#/components/schemas/ProfessionalRegistration'
 
@@ -83,16 +100,48 @@ components:
           type: integer
         structure_name:
           type: string
+          nullable: true
+          description: Lu depuis le profil Garage/Market Space (CLAUDE.md §5, ajout v0.26).
         address:
           type: string
+          nullable: true
+          description: Lu depuis le profil Garage/Market Space (CLAUDE.md §5, ajout v0.26).
         business_registration_number:
           type: string
+          nullable: true
+          description: Numéro RCCM, saisi à l'étape profil.
+        ifu:
+          type: string
+          description: Admin uniquement. 13 chiffres.
+        npi:
+          type: string
+          description: Admin uniquement. 10 chiffres.
+        legal_status:
+          allOf:
+            - $ref: '#/components/schemas/CompletenessStatus'
+          description: Admin uniquement.
         status:
           type: string
-          enum: [pending, approved, rejected]
+          enum: [profile_incomplete, pending, approved, rejected]
+        status_label:
+          type: string
         rejection_reason:
           type: string
           nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        decisions:
+          type: array
+          description: Admin uniquement, fiche détail. Plus récente en premier.
+          items:
+            $ref: '#/components/schemas/RegistrationDecision'
+        profile:
+          type: object
+          description: >
+            Admin uniquement, fiche détail : profil Garage ou Market Space
+            complet (infos, localisation, horaires, photos).
         reviewed_at:
           type: string
           format: date-time
@@ -125,6 +174,73 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    CompletenessStatus:
+      type: object
+      nullable: true
+      properties:
+        is_complete: {type: boolean}
+        missing_fields:
+          type: array
+          items: {type: string}
+
+    RegistrationDecision:
+      type: object
+      properties:
+        id: {type: integer}
+        decision: {type: string, enum: [approved, rejected]}
+        decision_label: {type: string}
+        reason: {type: string, nullable: true}
+        decided_by:
+          type: object
+          nullable: true
+          properties:
+            id: {type: integer}
+            name: {type: string}
+        decided_at: {type: string, format: date-time}
+
+    CodedError:
+      type: object
+      description: >
+        Erreur métier avec un code stable testable par le frontend
+        (ex. verification_expired, registration_not_approved).
+      properties:
+        message: {type: string}
+        code: {type: string}
+
+    PendingProfessionalRegistration:
+      type: object
+      properties:
+        verification_id: {type: string, format: uuid}
+        email: {type: string}
+        code_expires_at: {type: string, format: date-time}
+        resend_available_at: {type: string, format: date-time}
+
+    ProfessionalProfileMeta:
+      type: object
+      description: >
+        meta des réponses de la page profil (CLAUDE.md §5, ajouts v0.20 et
+        v0.26). Les informations légales ne sont renvoyées qu'ici, à leur
+        propriétaire.
+      properties:
+        profile_status:
+          $ref: '#/components/schemas/CompletenessStatus'
+        legal_status:
+          $ref: '#/components/schemas/CompletenessStatus'
+        registration:
+          type: object
+          properties:
+            status: {type: string, enum: [profile_incomplete, pending, approved, rejected]}
+            status_label: {type: string}
+            rejection_reason: {type: string, nullable: true}
+            submitted_at: {type: string, format: date-time, nullable: true}
+        legal:
+          type: object
+          properties:
+            business_registration_number: {type: string, nullable: true}
+            ifu: {type: string, nullable: true}
+            npi: {type: string, nullable: true}
+            has_business_registration_document: {type: boolean}
 
     AuthPayload:
       type: object
@@ -575,45 +691,114 @@ paths:
   /auth/register/professionnel:
     post:
       summary: >
-        Inscription d'un compte Garagiste ou Market Space avec justificatifs.
-        Le compte est créé immédiatement (token émis) mais reste en attente de
-        validation admin — aucun service/produit ne sera publiable tant que le
-        statut n'est pas "approved" (CLAUDE.md §5, règle 4).
+        Étape 1 de l'inscription Garagiste/Market Space (CLAUDE.md §5, ajout
+        v0.26) : formulaire court. Aucun compte n'est créé — seule une demande
+        en attente, et un code à 6 chiffres est envoyé par email (valable
+        15 min). Rappeler cet endpoint avec un autre email = « modifier
+        l'email » (la demande précédente pour le même email est remplacée).
+        Limité à 10 requêtes/minute par IP.
       tags: [Auth]
       security: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required:
-                - name, email, password, password_confirmation, account_type
-                - structure_name, address, business_registration_number
-                - business_registration_document, premises_photos
+              required: [first_name, last_name, email, phone, password, password_confirmation, account_type]
               properties:
-                name: {type: string}
-                email: {type: string}
-                phone: {type: string, nullable: true}
+                first_name: {type: string, maxLength: 100}
+                last_name: {type: string, maxLength: 100}
+                email: {type: string, description: Unique dans users.}
+                phone: {type: string, description: "Obligatoire, format +229 01XXXXXXXX (v0.21), unique dans users."}
                 password: {type: string}
                 password_confirmation: {type: string}
                 account_type: {type: string, enum: [garagiste, market_space]}
-                structure_name: {type: string}
-                address: {type: string}
-                business_registration_number: {type: string}
-                business_registration_document: {type: string, format: binary}
-                premises_photos:
-                  type: array
-                  items: {type: string, format: binary}
       responses:
         '201':
-          description: Dossier créé, en attente de validation admin.
+          description: Demande créée, code envoyé. Aucun token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthPayload'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PendingProfessionalRegistration'
+                  message: {type: string}
         '422':
-          description: Erreur de validation.
+          description: Erreur de validation (email/téléphone déjà pris, format…).
+        '429':
+          description: Limite de requêtes par IP dépassée.
+
+  /auth/register/professionnel/{uuid}/verify:
+    post:
+      summary: >
+        Étape 2 : saisie du code. Code correct → création du compte (email
+        vérifié), du profil Garage/Market Space vide et du dossier
+        `profile_incomplete`, puis email « compte créé » avec le lien vers la
+        page profil. Pas de connexion automatique (aucun token).
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string, pattern: '^\d{6}$'}
+      responses:
+        '201':
+          description: Compte créé (data = email, account_type). Aucun token.
+        '404':
+          description: "code: verification_not_found — demande inconnue, déjà utilisée ou de plus de 24 h."
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CodedError'}
+        '422':
+          description: >
+            code: verification_code_invalid (avec remaining_attempts),
+            verification_locked (5 essais épuisés) ou verification_expired ;
+            ou erreur de validation classique (code mal formé, sans consommer
+            d'essai ; email/téléphone pris par un autre compte entre-temps).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CodedError'}
+        '429':
+          description: Limite de requêtes par IP dépassée.
+
+  /auth/register/professionnel/{uuid}/resend:
+    post:
+      summary: >
+        Renvoie un nouveau code (nouvelle expiration, 5 essais) — au plus un
+        envoi toutes les 60 secondes. L'ancien code devient invalide.
+      tags: [Auth]
+      security: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Nouveau code envoyé.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PendingProfessionalRegistration'
+        '404':
+          description: "code: verification_not_found."
+        '429':
+          description: "code: resend_too_soon, avec retry_after_seconds (ou limite par IP)."
 
   /auth/login:
     post:
@@ -803,12 +988,14 @@ paths:
 
   /admin/registrations:
     get:
-      summary: Liste les dossiers d'inscription professionnelle (admin uniquement).
+      summary: >
+        Liste les dossiers d'inscription professionnelle (admin uniquement).
+        Sans filtre, les dossiers `profile_incomplete` sont exclus.
       tags: [Admin]
       parameters:
         - name: status
           in: query
-          schema: {type: string, enum: [pending, approved, rejected]}
+          schema: {type: string, enum: [profile_incomplete, pending, approved, rejected]}
       responses:
         '200':
           description: Liste paginée (enveloppe standard Laravel data/links/meta).
@@ -817,7 +1004,10 @@ paths:
 
   /admin/registrations/{registration}:
     get:
-      summary: Détail d'un dossier d'inscription.
+      summary: >
+        Détail d'un dossier d'inscription : profil complet, informations
+        légales (RCCM, IFU, NPI), documents, submitted_at et historique des
+        décisions.
       tags: [Admin]
       parameters:
         - name: registration
@@ -853,7 +1043,10 @@ paths:
 
   /admin/registrations/{registration}/approve:
     post:
-      summary: Valide un dossier en attente (CLAUDE.md §5, règle 4).
+      summary: >
+        Valide un dossier `pending` (CLAUDE.md §5, règle 4 et ajout v0.26) :
+        décision historisée, notification push et email « compte validé ».
+        Ne crée plus le profil (il existe depuis la vérification de l'email).
       tags: [Admin]
       parameters:
         - name: registration
@@ -864,11 +1057,16 @@ paths:
         '200':
           description: Dossier validé.
         '403':
-          description: Réservé aux administrateurs, ou dossier déjà traité.
+          description: Réservé aux administrateurs.
+        '409':
+          description: 'code: invalid_status (dossier pas au statut pending)'
 
   /admin/registrations/{registration}/reject:
     post:
-      summary: Rejette un dossier en attente, avec motif obligatoire.
+      summary: >
+        Refuse un dossier `pending`, motif obligatoire : décision historisée,
+        notification push et email avec le motif. Le professionnel peut
+        corriger puis soumettre à nouveau.
       tags: [Admin]
       parameters:
         - name: registration
@@ -887,6 +1085,8 @@ paths:
       responses:
         '200':
           description: Dossier rejeté.
+        '409':
+          description: 'code: invalid_status (dossier pas au statut pending)'
         '422':
           description: Motif manquant.
 
@@ -1482,9 +1682,10 @@ paths:
   /garage/profile:
     get:
       summary: >
-        Profil du garage du compte Garagiste authentifié. Créé automatiquement
-        à l'approbation du dossier KYC (voir /admin/registrations/{id}/approve) ;
-        404 tant que le compte n'est pas encore validé.
+        Profil du garage du compte Garagiste authentifié, créé vide dès la
+        vérification de l'email (CLAUDE.md §5, ajout v0.26). Accessible quel
+        que soit le statut du dossier. Même contrat pour
+        GET /market-space/profile.
       tags: [Garage]
       responses:
         '200':
@@ -1496,8 +1697,10 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Garage'
+                  meta:
+                    $ref: '#/components/schemas/ProfessionalProfileMeta'
         '404':
-          description: Profil pas encore créé (compte non validé).
+          description: Filet de sécurité (compte sans profil, incohérent).
     put:
       summary: >
         Met à jour le profil du garage (nom, adresse, ville/région
@@ -1592,6 +1795,79 @@ paths:
           description: Photo supprimée.
         '404':
           description: Photo introuvable ou appartenant à un autre garage.
+
+  /garage/profile/legal:
+    put:
+      summary: >
+        Informations légales privées du dossier (CLAUDE.md §5, ajout v0.26).
+        Jamais exposées publiquement. IFU/NPI non uniques (règle 2). Même
+        contrat pour PUT /market-space/profile/legal.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [business_registration_number, ifu, npi]
+              properties:
+                business_registration_number: {type: string, maxLength: 100, description: Numéro RCCM.}
+                ifu: {type: string, pattern: '^\d{13}$'}
+                npi: {type: string, pattern: '^\d{10}$', description: "NPI (10 chiffres), pas le numéro du certificat ANIP (14 chiffres)."}
+      responses:
+        '200':
+          description: Enregistré (meta = legal_status, registration, legal).
+        '409':
+          description: "code: registration_under_review (dossier pending) ou legal_info_locked (dossier approuvé)."
+        '422':
+          description: Erreur de validation.
+
+  /garage/profile/legal/document:
+    post:
+      summary: >
+        Document du registre de commerce (pdf/jpg/jpeg/png, 10 Mo max). Remplace
+        le précédent, dont le fichier est supprimé. Même contrat pour
+        /market-space/profile/legal/document.
+      tags: [Garage]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [document]
+              properties:
+                document: {type: string, format: binary}
+      responses:
+        '201':
+          description: Document enregistré.
+        '409':
+          description: "code: registration_under_review ou legal_info_locked."
+        '422':
+          description: Fichier manquant, mauvais format ou trop lourd.
+    get:
+      summary: Télécharge son propre document du registre de commerce (tout statut).
+      tags: [Garage]
+      responses:
+        '200':
+          description: Fichier binaire.
+        '404':
+          description: Aucun document envoyé.
+
+  /garage/profile/submit:
+    post:
+      summary: >
+        « Soumettre pour validation » : `profile_incomplete` ou `rejected` →
+        `pending`. Exige un profil complet (v0.20) et toutes les informations
+        légales. Même contrat pour /market-space/profile/submit.
+      tags: [Garage]
+      responses:
+        '200':
+          description: Dossier soumis (meta.registration.status = pending).
+        '409':
+          description: "code: invalid_status (dossier pending ou approuvé)."
+        '422':
+          description: "code: registration_incomplete, avec missing_fields et missing_legal_fields."
 
   /garage/products:
     get:

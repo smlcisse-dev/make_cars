@@ -5,17 +5,17 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 **Vérifié dans le code / par commande**
 - **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **69 commits** au total, dont 27 depuis la passation précédente.
 - **Dernier commit** : `528ef98` chore(http): relève temporairement le timeout Axios à 30 s.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **475 tests, 475 réussis, 1232 assertions**. Avant : 425 tests et 1004 assertions.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **523 tests, 523 réussis, 1589 assertions** après le backend v0.26 (475 tests et 1232 assertions juste avant).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **173 routes** au total, contre 164 avant.
+- **Routes** (`php artisan route:list`) : **183 routes** au total (173 avant le parcours d'inscription v0.26 : +4 par espace pro, +2 en auth).
 
 | Espace | Routes | Détail |
 |---|---|---|
-| `api/garage/*` | 49 | profil 5, services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
-| `api/market-space/*` | 26 | profil 5, produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
+| `api/garage/*` | 53 | profil 9 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
+| `api/market-space/*` | 30 | profil 9 (mêmes routes de dossier v0.26), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
 | `api/admin/*` | 39 | inscriptions 7, litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
-| `api/auth/*` | 7 | login, login Google, logout, me, inscription automobiliste, inscription pro, `express-claim` |
+| `api/auth/*` | 9 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim` |
 | Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2, réclamation de compte express 2, `health` 1 |
 | Hors `api/` | 5 | `sanctum/csrf-cookie`, `storage/{path}` ×2, `up`, `_boost/browser-logs` |
 
@@ -106,7 +106,8 @@ Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profi
   - Avis et réclamations sur un devis ou une commande.
   - Notifications, jeton d'appareil.
 - **Auth et routes publiques** :
-  - inscriptions automobiliste et professionnelle ;
+  - inscription automobiliste ;
+  - inscription professionnelle en deux temps (v0.26) : formulaire court + code email, puis dossier (informations légales, document RCCM, soumission) depuis l'espace pro ;
   - login Google ;
   - `express-claim` ;
   - liens signés de décision de devis et de réclamation de compte express (réponse JSON brute) ;
@@ -120,7 +121,7 @@ Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profi
 ## 3. Ce qui n'existe nulle part
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
-- **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe.
+- **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe. Pour le parcours pro v0.26 : formulaire court, saisie du code, informations légales + document sur « Mon profil », bouton « Soumettre pour validation », page de suivi du dossier.
 - **Tableaux de bord d'accueil** Garagiste et Market Space : un message de bienvenue seulement, sans chiffres clés ni raccourcis.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
@@ -158,15 +159,16 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 | Compte | Email | Origine |
 |---|---|---|
 | Admin | `admin@makecars.test` | `DatabaseSeeder` |
-| Garagiste en attente | `garage.etoile.pending@makecars.test` | `ProfessionalRegistrationTestSeeder` |
-| Market Space en attente | `pieces.express.pending@makecars.test` | idem |
-| **Garagiste approuvé, profil complet** | `garage.excellence.approved@makecars.test` | idem (`completeProfile()`, commit `d3cf4ed`) |
-| Market Space rejeté | `auto.pieces.rejected@makecars.test` | idem |
-| **Market Space approuvé, profil complet** | `marche.pieces.approved@makecars.test` | `CatalogTestSeeder` (`completeProfile()`, commit `10f3cee`) |
+| Garagiste « profil à compléter » (profil vide) | `garage.nouveau.incomplete@makecars.test` | `ProfessionalRegistrationTestSeeder` |
+| Garagiste en attente, profil + infos légales complets | `garage.etoile.pending@makecars.test` | idem |
+| Market Space en attente, complet | `pieces.express.pending@makecars.test` | idem |
+| **Garagiste approuvé, profil complet** | `garage.excellence.approved@makecars.test` | idem |
+| Market Space rejeté (avec motif) | `auto.pieces.rejected@makecars.test` | idem |
+| **Market Space approuvé, profil complet** | `marche.pieces.approved@makecars.test` | `CatalogTestSeeder` |
 
-- **Changement par rapport à la passation précédente** : les deux comptes approuvés sortent désormais du seeder avec un profil complet. Ils ne sont plus bloqués sur « Mon profil ».
+- **Changement v0.26** : les seeders suivent le nouveau parcours (trait `SeedsProfessionalAccounts` : compte email vérifié, profil, informations légales avec IFU/NPI fictifs au bon format, document RCCM, soumission puis décision via `ProfessionalRegistrationService`). Aucun email réel n'est envoyé (`Mail::fake`). Nouveau compte `garage.nouveau.incomplete`.
+- **Base de dev après la migration v0.26 (2026-09-23)** : les anciens dossiers `pending` (`garage.etoile`, `pieces.express`) sont passés `profile_incomplete` sans IFU/NPI ; les seeders n'ont **pas** été relancés sur Supabase — les relancer pour retrouver exactement les états du tableau.
 - **Ordre d'exécution** : `ProfessionalRegistrationTestSeeder` puis `CatalogTestSeeder`. Les deux sont idempotents.
-- **Contenu réel de la base de dev non vérifié** (aucune requête lancée sur Supabase pour ce document) : relancer les seeders en cas de doute.
 - Après un `switch-env`, relancer `php artisan serve --no-reload`.
 - Le mot de passe Supabase se renseigne à la main dans `.env.development`, jamais par l'assistant.
 
@@ -184,12 +186,18 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 10. **Fuseau horaire unique** `Africa/Porto-Novo`.
 11. **Design system / identité visuelle** non choisis.
 12. **Téléphone d'un automobiliste non béninois** (nouveau, commit `7068c44`) : `BeninPhoneNumber` refuse tout numéro hors `+229`. Il faut choisir en V2 entre assouplir ou assumer.
+13. **Parcours d'inscription pro v0.26, suites** : écrans frontend du parcours, landing page (projet séparé), notification de l'admin à chaque soumission, prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
 
 **Autres pistes ouvertes**
 - `scopePubliclyVisible()` ne filtre toujours pas sur la complétude du profil (vérifié dans `Garage.php`). Une fiche incomplète reste visible côté mobile.
 - Vérification téléphone pour la finalisation d'un compte express.
 - Index géospatial si le volume de professionnels croît.
-- À Natitingou, `Peporiyakou` (source) = `Natitingou IV` (Wikipédia) : à confirmer.
+- **Frontend, sujets mis de côté lors du backend v0.26** :
+  - rafraîchissement de la session : `fetchCurrentUser()` n'est jamais appelée, donc un changement de statut du dossier n'est vu qu'après reconnexion ;
+  - bandeau « compte suspendu » avec motif ;
+  - limites d'envoi de fichiers de PHP (`upload_max_filesize`, `post_max_size`) à vérifier au regard des 10 Mo du registre de commerce ;
+  - le commentaire de `frontend-web/src/types/user.ts` sur `profile_status` est périmé : il est désormais renseigné pour tout professionnel qui a un profil, quel que soit le statut du dossier ;
+  - le nouveau 403 `registration_not_approved` n'est pas géré par l'intercepteur Axios (seul `profile_incomplete` l'est).
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
@@ -208,6 +216,11 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 ## 8. Derniers changements (depuis le 2026-09-20)
 
 **Règles métier**
+- **Parcours d'inscription professionnelle en deux temps (v0.26, 2026-09-23)**, backend uniquement :
+  - prénom/nom séparés, `name` recomposé (`926850d`) ;
+  - inscription courte + vérification de l'email par code, table `pending_professional_registrations` (`e421d74`) ;
+  - statut `profile_incomplete`, informations légales (RCCM + document, IFU 13 chiffres, NPI 10 chiffres), soumission, middlewares `registration.approved` / `registration.editable`, historique `registration_decisions`, emails approbation/refus, migration des données existantes (`3555d53`) ;
+  - l'ancien endpoint multipart `register/professionnel` (justificatifs + photos) est supprimé.
 - **Motif obligatoire pour le refus d'un RDV (v0.24, `b3b639a`)** : `reason` passe de `nullable` à `required`.
 - **Image obligatoire pour un service ou un produit (v0.23, `958cbf6`)** : obligatoire à la création. En modification, l'image existante suffit. Aucune action « supprimer l'image ».
 - **Chat Market Space ↔ automobiliste (v0.22, `dcec7dc`)** :
