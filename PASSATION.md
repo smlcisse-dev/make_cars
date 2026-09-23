@@ -31,7 +31,7 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
   - corrections issues des tests de « Mon profil » : champs grisés, badge « Profil à compléter », suppression des références techniques à l'écran, rubrique active du menu ;
   - CIP (v0.27) côté professionnel et côté admin ;
   - demande de réactivation (v0.28) complète : demande, refus avec motif, nouvelle demande, réactivation, historique.
-  - *Source : déclaration de l'utilisateur, 2026-09-23.* Les **pièces jointes** de la demande de réactivation, ajoutées ensuite (§8), sont **construites, pas encore testées** en navigateur.
+  - *Source : déclaration de l'utilisateur, 2026-09-23.* Les **pièces jointes** de la demande de réactivation, ajoutées ensuite (§8), sont **considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23)**.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
@@ -49,7 +49,8 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 - `views/garage/QuoteLineEditor.vue` n'est pas une page : c'est un composant importé par `QuoteCreateView` et `QuoteDetailView`.
 
 **Commun**
-- `/login` : connexion email/mot de passe.
+- `/login` : connexion email/mot de passe, avec lien vers l'inscription professionnelle.
+- `/inscription` et ses étapes (v0.26) : choix du type de compte, formulaire court, saisie du code, confirmation (construits, pas encore testés).
 - `/403` et page 404.
 - Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28).
 - Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
@@ -59,7 +60,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 | Menu | Routes | Périmètre |
 |---|---|---|
 | Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`), en cartes et tableaux, sans graphiques |
-| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — testé en navigateur (déclaration utilisateur, 2026-09-23) ; pièces jointes de la demande (bouton « Consulter », dans la demande en attente et dans l'historique) — **construit, pas encore testé** |
+| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — testé en navigateur (déclaration utilisateur, 2026-09-23) ; pièces jointes de la demande (bouton « Consulter », dans la demande en attente et dans l'historique) — considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23) |
 | Services | `/admin/services`, `/:id` | Validation des services de garage |
 | Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
 | Avis | `/admin/avis`, `/:id` | Masquage avec motif |
@@ -98,7 +99,7 @@ Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran 
 | Notifications | `/market-space/notifications` | `shared/NotificationsView.vue` |
 | Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`). Testé en navigateur (déclaration utilisateur, 2026-09-23), hors bloc CIP (v0.27) |
 
-Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`SuspensionBanner` dans `DashboardShell`), sans blocage d'accès ; depuis v0.28, il peut y demander la réactivation (testé en navigateur, déclaration utilisateur du 2026-09-23), avec pièces jointes facultatives (construit, pas encore testé). La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
+Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`SuspensionBanner` dans `DashboardShell`), sans blocage d'accès ; depuis v0.28, il peut y demander la réactivation (testé en navigateur, déclaration utilisateur du 2026-09-23), avec pièces jointes facultatives (considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23)). La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
 
 ## 2. Backend construit et testé, sans écran frontend
 
@@ -129,7 +130,7 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 ## 3. Ce qui n'existe nulle part
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
-- **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe. Pour le parcours pro v0.26 manquent le formulaire court et la saisie du code ; les informations légales, le document, la soumission et le suivi du dossier sont sur « Mon profil » (2026-09-23).
+- **Écran d'inscription automobiliste** côté web : volontairement absent (l'automobiliste passe par l'application mobile). Le parcours pro v0.26 est complet côté web : formulaire court et saisie du code (`/inscription`, 2026-09-23), puis informations légales, document, soumission et suivi du dossier sur « Mon profil ».
 - **Tableaux de bord d'accueil** Garagiste et Market Space : un message de bienvenue seulement, sans chiffres clés ni raccourcis.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
@@ -209,7 +210,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 10. **Fuseau horaire unique** `Africa/Porto-Novo`.
 11. **Design system / identité visuelle** non choisis.
 12. **Téléphone d'un automobiliste non béninois** (nouveau, commit `7068c44`) : `BeninPhoneNumber` refuse tout numéro hors `+229`. Il faut choisir en V2 entre assouplir ou assumer.
-13. **Parcours d'inscription pro v0.26, suites** : écrans frontend du parcours, landing page (projet séparé), notification de l'admin à chaque soumission et à chaque nouvelle demande de réactivation (v0.28 : aujourd'hui l'admin doit penser à consulter le filtre « Réactivation demandée »), prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
+13. **Parcours d'inscription pro v0.26, suites** : test en navigateur des écrans d'inscription (construits le 2026-09-23), landing page (projet séparé), notification de l'admin à chaque soumission et à chaque nouvelle demande de réactivation (v0.28 : aujourd'hui l'admin doit penser à consulter le filtre « Réactivation demandée »), prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
 14. **Suppression d'un compte professionnel** (nouveau, 2026-09-23) : supprimer un utilisateur pro supprime en cascade son profil, puis ses RDV, devis et conversations. Commandes, avis et réclamations, polymorphes, resteraient orphelins. Aucun endpoint ne supprime de compte aujourd'hui, mais le cahier des charges prévoit la suppression de comptes par l'admin. Avant de la construire, il faut garantir qu'aucun devis, facture ou commande ne disparaisse (CLAUDE.md §6, traçabilité) : désactivation ou suppression logique plutôt que suppression réelle.
 
 **Autres pistes ouvertes**
@@ -217,7 +218,6 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - Vérification téléphone pour la finalisation d'un compte express.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
-  - écrans d'inscription (formulaire court, saisie du code) toujours absents : le parcours v0.26 n'est utilisable côté web qu'à partir de « Mon profil ».
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
 ## Bloquant avant la mise en production
@@ -281,7 +281,12 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
   - Pas de mutualisation avec `DisputeAttachment` : colonnes différentes (position vs nom d'origine, type, taille) et clé étrangère différente ; le seul point commun serait `download()`, une ligne.
   - Frontend : `ReactivationRequestModal` (nouvelle fenêtre, `ReasonPromptModal` inchangé), nombre de pièces jointes dans le bandeau, `ReactivationAttachmentList` sur la fiche admin.
   - Migration `create_reactivation_request_attachments_table` appliquée sur la base de **développement** uniquement.
-  - **Construit, pas encore testé** en navigateur.
+  - **Considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23).**
+- **Écrans d'inscription professionnelle (v0.26, frontend)** : `f737da2`.
+  - Routes publiques `/inscription` (choix), `/inscription/garagiste` et `/inscription/boutique` (même écran `SignupFormView`, prop `accountType`), `/inscription/verification/:id` (saisie du code), `/inscription/confirmation`. Lien depuis `/login`. Un utilisateur connecté est renvoyé vers son espace (`meta.guestOnly`).
+  - Store `signup` en mémoire seulement (mot de passe), vidé après vérification et à la sortie du parcours (`meta.signupFlow`) ; l'id de vérification dans l'URL permet de saisir le code après un rechargement.
+  - Aucun changement backend.
+  - **Construits, pas encore testés** en navigateur.
 
 **Règles métier**
 - **Parcours d'inscription professionnelle en deux temps (v0.26, 2026-09-23)**, backend uniquement :
