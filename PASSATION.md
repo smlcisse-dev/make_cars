@@ -64,7 +64,7 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 
 | Menu | Routes | Vue(s) |
 |---|---|---|
-| Tableau de bord | `/garage` | `DashboardView.vue`. **Toujours un placeholder** : message de bienvenue, avec un texte périmé (« arrive dans un prochain module ») |
+| Tableau de bord | `/garage` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, sans chiffres ni raccourcis |
 | Services | `/garage/services` | `ServicesView.vue` : CRUD, disponibilité, image obligatoire à la création (v0.23) |
 | Produits | `/garage/products` | `ProductsView.vue` : CRUD, correction de stock, seuil bas, image obligatoire (v0.23) |
 | Rendez-vous | `/garage/appointments`, `/:id` | `AppointmentsView`, `AppointmentDetailView` : confirmer, refuser (motif obligatoire, v0.24), reprogrammer |
@@ -82,7 +82,7 @@ Ordre du menu dans `MarketSpaceLayout.vue` :
 
 | Menu | Routes | Vue(s) |
 |---|---|---|
-| Tableau de bord | `/market-space` | **Placeholder**, texte périmé comme côté Garagiste |
+| Tableau de bord | `/market-space` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, comme côté Garagiste |
 | Produits | `/market-space/products` | `ProductsView.vue` |
 | Commandes | `/market-space/orders`, `/:id` | `OrdersView`, `OrderDetailView` |
 | Messages | `/market-space/conversations` | `ConversationsView.vue` (chat Market Space, v0.22) |
@@ -121,7 +121,7 @@ Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profi
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
 - **Écrans d'inscription** (automobiliste et professionnel) côté web : seul `/login` existe.
-- **Tableaux de bord d'accueil** Garagiste et Market Space : placeholders uniquement.
+- **Tableaux de bord d'accueil** Garagiste et Market Space : un message de bienvenue seulement, sans chiffres clés ni raccourcis.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
 - **Chat temps réel** : ni WebSocket ni Reverb. Il faut recharger pour voir les nouveaux messages.

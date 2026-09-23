@@ -8,8 +8,8 @@ const auth = useAuthStore()
   <div class="rounded-lg border border-slate-200 bg-white p-6">
     <h2 class="text-lg font-semibold text-slate-900">Bienvenue, {{ auth.user?.name }}</h2>
     <p class="mt-1 text-sm text-slate-500">
-      Le tableau de bord garagiste (profil, services, RDV, devis...) arrive dans un prochain
-      module.
+      Gérez votre garage depuis le menu : services, produits et stock, rendez-vous, devis et
+      factures, commandes, messages, avis, réclamations et notifications.
     </p>
   </div>
 </template>
