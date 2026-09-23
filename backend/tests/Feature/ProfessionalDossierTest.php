@@ -49,6 +49,7 @@ class ProfessionalDossierTest extends TestCase
 
         if ($withLegal) {
             $registration->documents()->create(['type' => RegistrationDocumentType::BusinessRegistration, 'disk' => 'local', 'path' => 'registration-documents/rccm.pdf']);
+            $registration->documents()->create(['type' => RegistrationDocumentType::IdentityCertificate, 'disk' => 'local', 'path' => 'registration-documents/cip.pdf']);
         }
 
         ($completeProfile ? Garage::factory()->complete() : Garage::factory())->for($user)->create();
@@ -99,7 +100,7 @@ class ProfessionalDossierTest extends TestCase
         $this->postJson('/api/garage/profile/submit')
             ->assertUnprocessable()
             ->assertJsonPath('missing_fields', [])
-            ->assertJsonPath('missing_legal_fields', ['business_registration_number', 'business_registration_document', 'ifu', 'npi']);
+            ->assertJsonPath('missing_legal_fields', ['business_registration_number', 'business_registration_document', 'ifu', 'npi', 'identity_certificate_document']);
     }
 
     public function test_submission_is_refused_from_a_pending_or_approved_status(): void
@@ -133,6 +134,7 @@ class ProfessionalDossierTest extends TestCase
 
         $this->putJson('/api/market-space/profile/legal', $this->legalPayload())->assertOk();
         $this->post('/api/market-space/profile/legal/document', ['document' => UploadedFile::fake()->create('rccm.pdf', 100, 'application/pdf')], ['Accept' => 'application/json'])->assertCreated();
+        $this->post('/api/market-space/profile/legal/identity-document', ['document' => UploadedFile::fake()->create('cip.pdf', 100, 'application/pdf')], ['Accept' => 'application/json'])->assertCreated();
         $this->postJson('/api/market-space/profile/submit')->assertOk();
 
         $this->assertSame(RegistrationStatus::Pending, $registration->fresh()->status);
@@ -259,7 +261,7 @@ class ProfessionalDossierTest extends TestCase
 
         $this->post('/api/garage/profile/legal/document', ['document' => UploadedFile::fake()->image('rccm-2.jpg')], ['Accept' => 'application/json'])->assertCreated();
 
-        $this->assertSame(1, $registration->documents()->count());
+        $this->assertSame(1, $registration->documents()->where('type', RegistrationDocumentType::BusinessRegistration)->count());
         Storage::disk('local')->assertMissing($first->path);
         Storage::disk('local')->assertExists($registration->businessRegistrationDocument()->first()->path);
     }
@@ -303,6 +305,7 @@ class ProfessionalDossierTest extends TestCase
             ->assertJsonPath('meta.legal.npi', '1234567890')
             ->assertJsonPath('meta.legal.business_registration_number', 'RB/COT/24 B 12345')
             ->assertJsonPath('meta.legal.has_business_registration_document', true)
+            ->assertJsonPath('meta.legal.has_identity_certificate_document', true)
             ->assertJsonMissingPath('data.ifu')
             ->assertJsonMissingPath('data.npi');
     }

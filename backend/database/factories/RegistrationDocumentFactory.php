@@ -27,6 +27,13 @@ class RegistrationDocumentFactory extends Factory
         ];
     }
 
+    public function identityCertificate(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => RegistrationDocumentType::IdentityCertificate,
+        ]);
+    }
+
     public function premisesPhoto(): static
     {
         return $this->state(fn (array $attributes) => [

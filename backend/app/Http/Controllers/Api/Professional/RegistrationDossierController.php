@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api\Professional;
 
+use App\Enums\RegistrationDocumentType;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Controllers\Concerns\BuildsProfessionalProfileMeta;
 use App\Http\Requests\Professional\UpdateLegalInfoRequest;
-use App\Http\Requests\Professional\UploadBusinessRegistrationDocumentRequest;
+use App\Http\Requests\Professional\UploadLegalDocumentRequest;
 use App\Models\ProfessionalRegistration;
 use App\Services\ProfessionalRegistrationService;
 use Illuminate\Http\JsonResponse;
@@ -32,21 +33,28 @@ class RegistrationDossierController extends Controller
         return $this->success(null, 'Informations légales enregistrées.', meta: $this->registrationMeta($registration));
     }
 
-    public function uploadDocument(UploadBusinessRegistrationDocumentRequest $request): JsonResponse
+    public function uploadDocument(UploadLegalDocumentRequest $request): JsonResponse
     {
-        $registration = $this->registration($request);
-        $this->registrationService->replaceBusinessRegistrationDocument($registration, $request->file('document'));
-
-        return $this->success(null, 'Document du registre de commerce enregistré.', 201, meta: $this->registrationMeta($registration));
+        return $this->storeDocument($request, RegistrationDocumentType::BusinessRegistration, 'Document du registre de commerce enregistré.');
     }
 
     public function downloadDocument(Request $request): StreamedResponse
     {
-        $document = $this->registration($request)->businessRegistrationDocument()->first();
+        return $this->downloadLatest($request, RegistrationDocumentType::BusinessRegistration, 'Aucun document du registre de commerce n\'a encore été envoyé.');
+    }
 
-        abort_if($document === null, 404, 'Aucun document du registre de commerce n\'a encore été envoyé.');
+    /**
+     * Certificat d'Identification Personnelle (CLAUDE.md §5, ajout v0.27) :
+     * mêmes règles et mêmes verrous que le document du registre de commerce.
+     */
+    public function uploadIdentityDocument(UploadLegalDocumentRequest $request): JsonResponse
+    {
+        return $this->storeDocument($request, RegistrationDocumentType::IdentityCertificate, 'Certificat d\'Identification Personnelle enregistré.');
+    }
 
-        return Storage::disk($document->disk)->download($document->path);
+    public function downloadIdentityDocument(Request $request): StreamedResponse
+    {
+        return $this->downloadLatest($request, RegistrationDocumentType::IdentityCertificate, 'Aucun Certificat d\'Identification Personnelle n\'a encore été envoyé.');
     }
 
     public function submit(Request $request): JsonResponse
@@ -54,6 +62,23 @@ class RegistrationDossierController extends Controller
         $registration = $this->registrationService->submit($this->registration($request));
 
         return $this->success(null, 'Votre dossier a été soumis pour validation.', meta: $this->registrationMeta($registration));
+    }
+
+    private function storeDocument(UploadLegalDocumentRequest $request, RegistrationDocumentType $type, string $message): JsonResponse
+    {
+        $registration = $this->registration($request);
+        $this->registrationService->replaceLegalDocument($registration, $type, $request->file('document'));
+
+        return $this->success(null, $message, 201, meta: $this->registrationMeta($registration));
+    }
+
+    private function downloadLatest(Request $request, RegistrationDocumentType $type, string $notFoundMessage): StreamedResponse
+    {
+        $document = $this->registration($request)->latestDocumentOfType($type)->first();
+
+        abort_if($document === null, 404, $notFoundMessage);
+
+        return Storage::disk($document->disk)->download($document->path);
     }
 
     private function registration(Request $request): ProfessionalRegistration

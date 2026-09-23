@@ -117,4 +117,15 @@ class ProfessionalRegistrationFactory extends Factory
             RegistrationDocument::factory()->for($registration)->create();
         });
     }
+
+    /**
+     * Certificat d'Identification Personnelle (CLAUDE.md §5, ajout v0.27),
+     * exigé à la soumission comme le registre de commerce.
+     */
+    public function withIdentityCertificateDocument(): static
+    {
+        return $this->afterCreating(function (ProfessionalRegistration $registration) {
+            RegistrationDocument::factory()->identityCertificate()->for($registration)->create();
+        });
+    }
 }

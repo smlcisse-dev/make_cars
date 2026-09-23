@@ -19,6 +19,7 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     // soumission pour validation.
     Route::get('profile', [ProfileController::class, 'show']);
     Route::get('profile/legal/document', [RegistrationDossierController::class, 'downloadDocument']);
+    Route::get('profile/legal/identity-document', [RegistrationDossierController::class, 'downloadIdentityDocument']);
     Route::post('profile/submit', [RegistrationDossierController::class, 'submit']);
 
     // Écritures du profil : verrouillées pendant l'examen du dossier.
@@ -29,6 +30,7 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
         Route::delete('profile/images/{image}', [MarketSpaceImageController::class, 'destroy']);
         Route::put('profile/legal', [RegistrationDossierController::class, 'updateLegal']);
         Route::post('profile/legal/document', [RegistrationDossierController::class, 'uploadDocument']);
+        Route::post('profile/legal/identity-document', [RegistrationDossierController::class, 'uploadIdentityDocument']);
     });
 
     // Tout le reste de l'espace pro exige un dossier approuvé (CLAUDE.md §5,

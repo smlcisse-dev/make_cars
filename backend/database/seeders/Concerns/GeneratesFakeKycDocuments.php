@@ -21,6 +21,18 @@ trait GeneratesFakeKycDocuments
         );
     }
 
+    /**
+     * Certificat d'Identification Personnelle factice (CLAUDE.md §5, ajout
+     * v0.27), exigé à la soumission du dossier.
+     */
+    private function fakeIdentityCertificateDocument(): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent(
+            'certificat-identification-personnelle.pdf',
+            $this->minimalPdfContent('Certificat d Identification Personnelle - Document de test (Make Cars)'),
+        );
+    }
+
     private function fakePremisesPhoto(): UploadedFile
     {
         return UploadedFile::fake()->image('photo-local.jpg', 640, 480);

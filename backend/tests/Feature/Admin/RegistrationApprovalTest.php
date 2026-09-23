@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Enums\AccountType;
+use App\Enums\RegistrationDocumentType;
 use App\Enums\RegistrationStatus;
 use App\Mail\RegistrationApprovedMail;
 use App\Mail\RegistrationRejectedMail;
@@ -84,7 +85,7 @@ class RegistrationApprovalTest extends TestCase
     {
         $admin = User::factory()->admin()->create();
         Sanctum::actingAs($admin);
-        $registration = ProfessionalRegistration::factory()->withProfile()->withBusinessRegistrationDocument()->create([
+        $registration = ProfessionalRegistration::factory()->withProfile()->withBusinessRegistrationDocument()->withIdentityCertificateDocument()->create([
             'ifu' => '1234567890123',
             'npi' => '1234567890',
         ]);
@@ -99,7 +100,11 @@ class RegistrationApprovalTest extends TestCase
             ->assertJsonPath('data.profile.name', $registration->user->garage->name)
             ->assertJsonCount(7, 'data.profile.opening_hours')
             ->assertJsonCount(1, 'data.profile.images')
-            ->assertJsonCount(1, 'data.documents')
+            ->assertJsonCount(2, 'data.documents')
+            ->assertJsonPath('data.documents', fn ($documents) => collect($documents)->contains(
+                fn ($document) => $document['type'] === RegistrationDocumentType::IdentityCertificate->value
+                    && $document['type_label'] === "Certificat d'Identification Personnelle (CIP)",
+            ))
             ->assertJsonPath('data.decisions.0.decision', RegistrationStatus::Rejected->value)
             ->assertJsonPath('data.decisions.0.reason', 'Photo floue.')
             ->assertJsonPath('data.decisions.0.decided_by.id', $admin->id);
@@ -234,7 +239,7 @@ class RegistrationApprovalTest extends TestCase
     public function test_the_decision_history_accumulates_across_resubmissions(): void
     {
         Sanctum::actingAs(User::factory()->admin()->create());
-        $registration = ProfessionalRegistration::factory()->withProfile()->withBusinessRegistrationDocument()->create();
+        $registration = ProfessionalRegistration::factory()->withProfile()->withBusinessRegistrationDocument()->withIdentityCertificateDocument()->create();
 
         $this->postJson("/api/admin/registrations/{$registration->id}/reject", ['reason' => 'Photo floue.'])->assertOk();
 

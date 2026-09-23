@@ -51,18 +51,19 @@ class ProfessionalRegistrationService
     }
 
     /**
-     * Un seul document du registre de commerce à la fois : le nouveau
-     * remplace le précédent, dont le fichier est supprimé du disque.
+     * Un seul document de chaque type à la fois (registre de commerce, v0.26 ;
+     * Certificat d'Identification Personnelle, v0.27) : le nouveau remplace
+     * le précédent du même type, dont le fichier est supprimé du disque.
      */
-    public function replaceBusinessRegistrationDocument(ProfessionalRegistration $registration, UploadedFile $file): RegistrationDocument
+    public function replaceLegalDocument(ProfessionalRegistration $registration, RegistrationDocumentType $type, UploadedFile $file): RegistrationDocument
     {
         $this->assertLegalInfoEditable($registration);
 
-        $previous = $registration->documents()->where('type', RegistrationDocumentType::BusinessRegistration)->get();
+        $previous = $registration->documents()->where('type', $type)->get();
 
         $disk = $this->disk();
         $document = $registration->documents()->create([
-            'type' => RegistrationDocumentType::BusinessRegistration,
+            'type' => $type,
             'disk' => $disk,
             'path' => $file->store('registration-documents/'.$registration->id, $disk),
         ]);

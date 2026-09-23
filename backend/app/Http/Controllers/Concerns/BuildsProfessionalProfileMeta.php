@@ -44,6 +44,7 @@ trait BuildsProfessionalProfileMeta
                 'ifu' => $registration->ifu,
                 'npi' => $registration->npi,
                 'has_business_registration_document' => $registration->businessRegistrationDocument()->exists(),
+                'has_identity_certificate_document' => $registration->identityCertificateDocument()->exists(),
             ],
         ];
     }

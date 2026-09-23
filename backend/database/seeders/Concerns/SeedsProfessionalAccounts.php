@@ -3,6 +3,7 @@
 namespace Database\Seeders\Concerns;
 
 use App\Enums\AccountType;
+use App\Enums\RegistrationDocumentType;
 use App\Enums\RegistrationStatus;
 use App\Models\Arrondissement;
 use App\Models\Garage;
@@ -181,7 +182,8 @@ trait SeedsProfessionalAccounts
             'ifu' => '32024'.random_int(10000000, 99999999),
             'npi' => (string) random_int(1000000000, 9999999999),
         ]);
-        $registrationService->replaceBusinessRegistrationDocument($registration, $this->fakeBusinessRegistrationDocument());
+        $registrationService->replaceLegalDocument($registration, RegistrationDocumentType::BusinessRegistration, $this->fakeBusinessRegistrationDocument());
+        $registrationService->replaceLegalDocument($registration, RegistrationDocumentType::IdentityCertificate, $this->fakeIdentityCertificateDocument());
 
         if ($status === RegistrationStatus::ProfileIncomplete) {
             return $user;

@@ -5,7 +5,12 @@ namespace App\Http\Requests\Professional;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
-class UploadBusinessRegistrationDocumentRequest extends FormRequest
+/**
+ * Justificatif légal du dossier d'inscription : document du registre de
+ * commerce (CLAUDE.md §5, ajout v0.26) ou Certificat d'Identification
+ * Personnelle (ajout v0.27) — mêmes règles pour les deux.
+ */
+class UploadLegalDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {

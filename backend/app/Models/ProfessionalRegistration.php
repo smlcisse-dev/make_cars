@@ -81,9 +81,31 @@ class ProfessionalRegistration extends Model
      */
     public function businessRegistrationDocument(): HasOne
     {
+        return $this->latestDocumentOfType(RegistrationDocumentType::BusinessRegistration);
+    }
+
+    /**
+     * Certificat d'Identification Personnelle (CIP) actuel, qui permet à
+     * l'admin de vérifier le NPI : un seul à la fois, comme le registre de
+     * commerce (CLAUDE.md §5, ajout v0.27).
+     *
+     * @return HasOne<RegistrationDocument, $this>
+     */
+    public function identityCertificateDocument(): HasOne
+    {
+        return $this->latestDocumentOfType(RegistrationDocumentType::IdentityCertificate);
+    }
+
+    /**
+     * Document le plus récent d'un type donné.
+     *
+     * @return HasOne<RegistrationDocument, $this>
+     */
+    public function latestDocumentOfType(RegistrationDocumentType $type): HasOne
+    {
         return $this->hasOne(RegistrationDocument::class)->ofMany(
             ['id' => 'max'],
-            fn ($query) => $query->where('type', RegistrationDocumentType::BusinessRegistration),
+            fn ($query) => $query->where('type', $type),
         );
     }
 
@@ -109,7 +131,9 @@ class ProfessionalRegistration extends Model
     /**
      * Informations légales privées manquantes pour pouvoir soumettre le
      * dossier : numéro RCCM et son document, IFU, NPI (CLAUDE.md §5, ajout
-     * v0.26).
+     * v0.26) et Certificat d'Identification Personnelle (ajout v0.27). Un
+     * dossier déjà approuvé ou en cours d'examen sans CIP n'est pas bloqué :
+     * cette liste n'est vérifiée qu'à la soumission.
      *
      * @return array<int, string>
      */
@@ -129,6 +153,10 @@ class ProfessionalRegistration extends Model
             if (trim((string) $this->{$field}) === '') {
                 $missing[] = $field;
             }
+        }
+
+        if ($this->identityCertificateDocument()->doesntExist()) {
+            $missing[] = 'identity_certificate_document';
         }
 
         return $missing;
