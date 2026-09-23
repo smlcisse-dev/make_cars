@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { homePathForRole, profilePathForRole, useAuthStore } from '@/stores/auth'
+import { useSignupStore } from '@/stores/signup'
 import type { AccountType } from '@/types/user'
 
 // Étend le type `RouteMeta` de vue-router (module augmentation TypeScript) :
@@ -11,6 +12,12 @@ declare module 'vue-router' {
     // Rôle requis pour accéder à la route (CLAUDE.md §3) ; absent = route
     // publique (login) ou déjà filtrée par une route parente qui en porte un.
     role?: Exclude<AccountType, 'automobiliste'>
+    // Page réservée aux visiteurs non connectés (login, inscription) : un
+    // utilisateur déjà connecté est renvoyé vers son espace.
+    guestOnly?: boolean
+    // Étape du parcours d'inscription professionnelle (CLAUDE.md §5, ajout
+    // v0.26) : quitter ces pages vide l'inscription en cours (stores/signup.ts).
+    signupFlow?: boolean
   }
 }
 
@@ -28,6 +35,44 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/auth/LoginView.vue'),
+      meta: { guestOnly: true },
+    },
+    // Inscription professionnelle (CLAUDE.md §5, ajout v0.26), pages publiques.
+    {
+      path: '/inscription',
+      name: 'signup',
+      component: () => import('@/views/auth/SignupChoiceView.vue'),
+      meta: { guestOnly: true, signupFlow: true },
+    },
+    {
+      path: '/inscription/garagiste',
+      name: 'signup.garagiste',
+      component: () => import('@/views/auth/SignupFormView.vue'),
+      props: { accountType: 'garagiste' },
+      meta: { guestOnly: true, signupFlow: true },
+    },
+    {
+      path: '/inscription/boutique',
+      name: 'signup.market-space',
+      component: () => import('@/views/auth/SignupFormView.vue'),
+      props: { accountType: 'market_space' },
+      meta: { guestOnly: true, signupFlow: true },
+    },
+    {
+      // `:id` = `verification_id` renvoyé par le backend, dans l'URL pour
+      // qu'un rechargement permette encore de saisir le code. `props: true`
+      // transmet les paramètres de l'URL comme props du composant.
+      path: '/inscription/verification/:id',
+      name: 'signup.verify',
+      component: () => import('@/views/auth/SignupVerifyView.vue'),
+      props: true,
+      meta: { guestOnly: true, signupFlow: true },
+    },
+    {
+      path: '/inscription/confirmation',
+      name: 'signup.done',
+      component: () => import('@/views/auth/SignupDoneView.vue'),
+      meta: { guestOnly: true, signupFlow: true },
     },
     {
       path: '/admin',
@@ -284,8 +329,15 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role
 
-  if (to.name === 'login') {
-    // Déjà connecté : inutile de repasser par le login, direction son espace.
+  // Sortie du parcours d'inscription : le mot de passe saisi ne doit pas
+  // rester en mémoire plus longtemps que nécessaire.
+  if (!to.meta.signupFlow) {
+    useSignupStore().reset()
+  }
+
+  if (to.meta.guestOnly) {
+    // Déjà connecté : inutile de repasser par le login ou l'inscription,
+    // direction son espace.
     // On vérifie `isAuthenticated` (token ET utilisateur), pas `user` seul :
     // un `user` sans token valide ne doit jamais faire croire à une session
     // active (voir le commentaire de clearStoredSession() dans lib/token.ts).

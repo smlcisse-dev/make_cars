@@ -84,6 +84,13 @@ async function handleSubmit(): Promise<void> {
           {{ isSubmitting ? 'Connexion...' : 'Se connecter' }}
         </button>
       </form>
+
+      <p class="mt-6 text-sm text-slate-500">
+        Vous êtes un garage ou un vendeur de pièces ?
+        <RouterLink :to="{ name: 'signup' }" class="font-medium text-slate-900 underline">
+          Créer un compte professionnel
+        </RouterLink>
+      </p>
     </div>
   </div>
 </template>
