@@ -83,10 +83,11 @@ class AdminStatisticsService
 
     /**
      * Répartition géographique par département, séparément pour les garages
-     * et pour les Market Space (CLAUDE.md §5, ajouts v0.17 et v0.19). Depuis
-     * v0.26, un profil existe dès la vérification de l'email : les profils des
-     * dossiers pas encore approuvés sont donc comptés aussi (souvent dans
-     * « Non renseigné » tant que leur localisation n'est pas saisie). Une entrée à
+     * et pour les Market Space (CLAUDE.md §5, ajouts v0.17 et v0.19) —
+     * uniquement les structures au dossier approuvé, suspendues comprises :
+     * données destinées aux autorités, qui ne doivent compter que des
+     * structures validées. Depuis v0.26 un profil existe dès la vérification
+     * de l'email, d'où le filtre explicite sur le statut du dossier. Une entrée à
      * `department_id` null ("Non renseigné") regroupe les profils qui n'ont
      * pas encore renseigné leur localisation ; elle est toujours en dernier.
      *
@@ -106,6 +107,8 @@ class AdminStatisticsService
     private function departmentBreakdown(string $profileTable): array
     {
         return DB::table($profileTable)
+            ->join('professional_registrations', 'professional_registrations.user_id', '=', "{$profileTable}.user_id")
+            ->where('professional_registrations.status', RegistrationStatus::Approved->value)
             ->leftJoin('departments', 'departments.id', '=', "{$profileTable}.department_id")
             ->selectRaw('departments.id as department_id, departments.name as department_name, count(*) as aggregate')
             ->groupBy('departments.id', 'departments.name')

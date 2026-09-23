@@ -96,6 +96,7 @@ Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profi
 ## 2. Backend construit et testé, sans écran frontend
 
 - **Supervision admin en lecture** (12 routes, aucun écran, absentes du menu) : `admin/garages`, `admin/market-space-accounts`, `admin/appointments`, `admin/quotes`, `admin/orders`, `admin/conversations`, chacune en liste et en détail.
+  - Depuis v0.26, `admin/garages` et `admin/market-space-accounts` (liste et fiche) ne portent que sur les structures au dossier `approved`, suspendues comprises (404 sur la fiche sinon) ; les dossiers en cours se consultent via `admin/registrations`. Même périmètre pour la répartition géographique de `admin/statistics` (données destinées aux autorités : structures validées uniquement).
 - **Côté automobiliste (`/mobile/*`, 39 routes)** : l'API est complète, mais il n'existe pas d'application Flutter.
   - Listes et fiches garages et Market Space, avec leurs avis.
   - Recherche `nearby` : position, rayon, nom, service, produit, prix, tri.

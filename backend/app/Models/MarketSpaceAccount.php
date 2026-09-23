@@ -78,6 +78,33 @@ class MarketSpaceAccount extends Model
     }
 
     /**
+     * Structures au dossier approuvé, suspendues comprises : périmètre de la
+     * supervision admin et des statistiques destinées aux autorités. Depuis
+     * v0.26 un profil existe dès la vérification de l'email ; les dossiers
+     * en cours se consultent via /admin/registrations (CLAUDE.md §5, ajout
+     * v0.26).
+     *
+     * @param  Builder<MarketSpaceAccount>  $query
+     * @return Builder<MarketSpaceAccount>
+     */
+    public function scopeWithApprovedRegistration(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'user.professionalRegistration',
+            fn ($q) => $q->where('status', RegistrationStatus::Approved)
+        );
+    }
+
+    /**
+     * Vrai si le dossier du compte est approuvé (suspendu ou non) — même
+     * périmètre que scopeWithApprovedRegistration().
+     */
+    public function hasApprovedRegistration(): bool
+    {
+        return $this->user?->professionalRegistration?->status === RegistrationStatus::Approved;
+    }
+
+    /**
      * Même filtre qu'isPubliclyVisible(), utilisable directement dans une
      * requête de liste (recherche géolocalisée notamment — CLAUDE.md §5,
      * ajout v0.13) sans charger chaque boutique une par une.

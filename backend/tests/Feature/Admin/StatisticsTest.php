@@ -64,14 +64,16 @@ class StatisticsTest extends TestCase
         $response->assertJsonPath('data.structures.'.AccountType::MarketSpace->value.'.approved', 1);
     }
 
-    public function test_it_breaks_down_geography_by_department_separately_for_garages_and_market_space(): void
+    public function test_it_breaks_down_geography_by_department_separately_for_approved_garages_and_market_space(): void
     {
         $littoral = Department::where('slug', 'littoral')->firstOrFail();
         $borgou = Department::where('slug', 'borgou')->firstOrFail();
 
-        Garage::factory()->count(2)->create(['department_id' => $littoral->id]);
-        Garage::factory()->create(['department_id' => null]);
-        MarketSpaceAccount::factory()->create(['department_id' => $borgou->id]);
+        Garage::factory()->withApprovedRegistration()->create(['department_id' => $littoral->id]);
+        $suspended = ProfessionalRegistration::factory()->suspended()->create();
+        Garage::factory()->for($suspended->user)->create(['department_id' => $littoral->id]);
+        Garage::factory()->withApprovedRegistration()->create(['department_id' => null]);
+        MarketSpaceAccount::factory()->withApprovedRegistration()->create(['department_id' => $borgou->id]);
         Sanctum::actingAs($this->admin());
 
         $response = $this->getJson('/api/admin/statistics');
@@ -86,6 +88,29 @@ class StatisticsTest extends TestCase
         $this->assertNull($garages->last()['department_id']);
         $this->assertSame(1, $marketSpace->firstWhere('department_id', $borgou->id)['count']);
         $this->assertCount(1, $marketSpace);
+    }
+
+    public function test_geography_ignores_structures_whose_dossier_is_not_approved(): void
+    {
+        $littoral = Department::where('slug', 'littoral')->firstOrFail();
+
+        Garage::factory()->withApprovedRegistration()->create(['department_id' => $littoral->id]);
+        foreach (['profileIncomplete', 'pending'] as $state) {
+            $garageRegistration = ProfessionalRegistration::factory()->{$state}()->create();
+            Garage::factory()->for($garageRegistration->user)->create(['department_id' => $littoral->id]);
+            Garage::factory()->for(ProfessionalRegistration::factory()->{$state}()->create()->user)->create(['department_id' => null]);
+            $marketRegistration = ProfessionalRegistration::factory()->marketSpace()->{$state}()->create();
+            MarketSpaceAccount::factory()->for($marketRegistration->user)->create(['department_id' => $littoral->id]);
+        }
+        Sanctum::actingAs($this->admin());
+
+        $response = $this->getJson('/api/admin/statistics');
+
+        $response->assertOk();
+        $garages = collect($response->json('data.geography.'.AccountType::Garagiste->value));
+        $this->assertCount(1, $garages);
+        $this->assertSame(1, $garages->firstWhere('department_id', $littoral->id)['count']);
+        $this->assertSame([], $response->json('data.geography.'.AccountType::MarketSpace->value));
     }
 
     public function test_it_reports_activity_volume_within_a_period(): void

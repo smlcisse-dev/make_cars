@@ -10,18 +10,22 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class MarketSpaceController extends Controller
 {
     /**
-     * Supervision admin : accès en lecture à tous les comptes Market Space,
-     * validés ou non (CLAUDE.md §5, règle 8).
+     * Supervision admin en lecture (CLAUDE.md §5, règle 8) : comptes Market
+     * Space au dossier approuvé, suspendus compris. Les dossiers en cours
+     * (profil créé dès la vérification de l'email) se consultent via
+     * /admin/registrations (CLAUDE.md §5, ajout v0.26).
      */
     public function index(): AnonymousResourceCollection
     {
-        $accounts = MarketSpaceAccount::query()->with(['user', 'openingHours', 'images'])->paginate();
+        $accounts = MarketSpaceAccount::query()->withApprovedRegistration()->with(['user', 'openingHours', 'images'])->paginate();
 
         return MarketSpaceAccountResource::collection($accounts);
     }
 
     public function show(MarketSpaceAccount $marketSpaceAccount): MarketSpaceAccountResource
     {
+        abort_unless($marketSpaceAccount->hasApprovedRegistration(), 404, 'Structure introuvable : son dossier n\'est pas approuvé (voir /admin/registrations).');
+
         return new MarketSpaceAccountResource($marketSpaceAccount->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']));
     }
 }
