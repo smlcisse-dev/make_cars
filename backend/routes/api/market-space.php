@@ -21,6 +21,7 @@ Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
     Route::get('profile/legal/document', [RegistrationDossierController::class, 'downloadDocument']);
     Route::get('profile/legal/identity-document', [RegistrationDossierController::class, 'downloadIdentityDocument']);
     Route::post('profile/submit', [RegistrationDossierController::class, 'submit']);
+    Route::post('profile/reactivation-request', [RegistrationDossierController::class, 'requestReactivation']);
 
     // Écritures du profil : verrouillées pendant l'examen du dossier.
     Route::middleware('registration.editable')->group(function () {

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\Professional;
 use App\Enums\RegistrationDocumentType;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Controllers\Concerns\BuildsProfessionalProfileMeta;
+use App\Http\Requests\Professional\RequestReactivationRequest;
 use App\Http\Requests\Professional\UpdateLegalInfoRequest;
 use App\Http\Requests\Professional\UploadLegalDocumentRequest;
+use App\Http\Resources\ReactivationRequestResource;
 use App\Models\ProfessionalRegistration;
 use App\Services\ProfessionalRegistrationService;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +64,20 @@ class RegistrationDossierController extends Controller
         $registration = $this->registrationService->submit($this->registration($request));
 
         return $this->success(null, 'Votre dossier a été soumis pour validation.', meta: $this->registrationMeta($registration));
+    }
+
+    /**
+     * Demande de réactivation d'un compte suspendu (CLAUDE.md §5, ajout
+     * v0.28) : accessible quel que soit le statut, seul l'admin décide.
+     */
+    public function requestReactivation(RequestReactivationRequest $request): JsonResponse
+    {
+        $reactivationRequest = $this->registrationService->requestReactivation(
+            $this->registration($request),
+            $request->string('message')->toString(),
+        );
+
+        return $this->success(new ReactivationRequestResource($reactivationRequest), 'Votre demande de réactivation a été envoyée.', 201);
     }
 
     private function storeDocument(UploadLegalDocumentRequest $request, RegistrationDocumentType $type, string $message): JsonResponse

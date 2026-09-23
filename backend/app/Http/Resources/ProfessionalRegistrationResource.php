@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Enums\AccountType;
+use App\Enums\ReactivationRequestStatus;
 use App\Models\Garage;
 use App\Models\ProfessionalRegistration;
 use Illuminate\Http\Request;
@@ -47,6 +48,25 @@ class ProfessionalRegistrationResource extends JsonResource
             'is_suspended' => $this->isSuspended(),
             'suspension_reason' => $this->suspension_reason,
             'suspended_at' => $this->suspended_at?->toIso8601String(),
+            // Demande de réactivation (CLAUDE.md §5, ajout v0.28) : la
+            // dernière, pour le professionnel (bandeau de suspension) comme
+            // pour l'admin. Une seule demande peut être en attente, donc la
+            // dernière suffit à savoir s'il y en a une.
+            'latest_reactivation_request' => $this->whenLoaded(
+                'latestReactivationRequest',
+                fn () => $this->latestReactivationRequest ? new ReactivationRequestResource($this->latestReactivationRequest) : null,
+            ),
+            // `when(relationLoaded)` plutôt que `whenLoaded` : ce dernier
+            // renvoie null (et non false) quand il n'y a aucune demande.
+            'has_pending_reactivation_request' => $this->when(
+                $this->relationLoaded('latestReactivationRequest'),
+                fn () => $this->latestReactivationRequest?->status === ReactivationRequestStatus::Pending,
+            ),
+            // Historique complet, du plus récent au plus ancien : fiche admin.
+            'reactivation_requests' => $this->when(
+                $isAdmin && $this->relationLoaded('reactivationRequests'),
+                fn () => ReactivationRequestResource::collection($this->reactivationRequests),
+            ),
             'documents' => RegistrationDocumentResource::collection($this->whenLoaded('documents')),
             'decisions' => $this->when(
                 $isAdmin && $this->relationLoaded('decisions'),

@@ -164,7 +164,7 @@ class PushNotificationTriggersTest extends TestCase
         $service->suspend($approvedRegistration, User::factory()->admin()->create(), 'Plaintes répétées.');
         $this->assertDatabaseHas('push_notifications', ['user_id' => $approvedRegistration->user_id, 'type' => PushNotificationType::AccountSuspended->value]);
 
-        $service->reactivate($approvedRegistration->fresh());
+        $service->reactivate($approvedRegistration->fresh(), User::factory()->admin()->create());
         $this->assertDatabaseHas('push_notifications', ['user_id' => $approvedRegistration->user_id, 'type' => PushNotificationType::AccountReactivated->value]);
     }
 

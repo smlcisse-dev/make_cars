@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Enums\ReactivationRequestStatus;
 use App\Enums\RegistrationStatus;
 use App\Http\Controllers\Api\Controller;
+use App\Http\Requests\Admin\RefuseReactivationRequestRequest;
 use App\Http\Requests\Admin\RejectRegistrationRequest;
 use App\Http\Requests\Admin\SuspendRegistrationRequest;
 use App\Http\Resources\ProfessionalRegistrationResource;
@@ -23,7 +25,7 @@ class RegistrationController extends Controller
      * Le profil est chargé pour exposer `structure_name`/`address`, lus
      * depuis lui (CLAUDE.md §5, ajout v0.26).
      */
-    private const LIST_RELATIONS = ['documents', 'user.garage', 'user.marketSpaceAccount'];
+    private const LIST_RELATIONS = ['documents', 'user.garage', 'user.marketSpaceAccount', 'latestReactivationRequest'];
 
     /**
      * Fiche d'examen : profil complet, documents et historique des décisions.
@@ -31,6 +33,8 @@ class RegistrationController extends Controller
     private const DETAIL_RELATIONS = [
         'documents',
         'decisions.decidedBy',
+        'latestReactivationRequest',
+        'reactivationRequests.decidedBy',
         'user.garage.openingHours', 'user.garage.images', 'user.garage.department', 'user.garage.commune', 'user.garage.arrondissement',
         'user.marketSpaceAccount.openingHours', 'user.marketSpaceAccount.images', 'user.marketSpaceAccount.department',
         'user.marketSpaceAccount.commune', 'user.marketSpaceAccount.arrondissement',
@@ -55,6 +59,11 @@ class RegistrationController extends Controller
                 $request->filled('status'),
                 fn ($query) => $query->where('status', $request->string('status')),
                 fn ($query) => $query->where('status', '!=', RegistrationStatus::ProfileIncomplete),
+            )
+            // Dossiers ayant une demande de réactivation en attente (v0.28).
+            ->when(
+                $request->boolean('reactivation_requested'),
+                fn ($query) => $query->whereHas('reactivationRequests', fn ($requests) => $requests->where('status', ReactivationRequestStatus::Pending)),
             )
             ->with(self::LIST_RELATIONS)
             ->latest()
@@ -104,9 +113,23 @@ class RegistrationController extends Controller
     {
         Gate::authorize('reactivate', $registration);
 
-        $registration = $this->registrationService->reactivate($registration)->load(self::LIST_RELATIONS);
+        $registration = $this->registrationService->reactivate($registration, $request->user())->load(self::LIST_RELATIONS);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Compte réactivé.');
+    }
+
+    /**
+     * Refuse la demande de réactivation en attente (CLAUDE.md §5, ajout
+     * v0.28) : motif obligatoire, le compte reste suspendu.
+     */
+    public function refuseReactivationRequest(RefuseReactivationRequestRequest $request, ProfessionalRegistration $registration): JsonResponse
+    {
+        $this->registrationService->refuseReactivationRequest($registration, $request->user(), $request->string('reason')->toString());
+
+        return $this->success(
+            new ProfessionalRegistrationResource($registration->load(self::DETAIL_RELATIONS)),
+            'Demande de réactivation refusée.',
+        );
     }
 
     public function downloadDocument(ProfessionalRegistration $registration, RegistrationDocument $document): StreamedResponse

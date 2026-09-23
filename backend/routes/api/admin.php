@@ -21,6 +21,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('registrations/{registration}/reject', [RegistrationController::class, 'reject']);
     Route::post('registrations/{registration}/suspend', [RegistrationController::class, 'suspend']);
     Route::post('registrations/{registration}/reactivate', [RegistrationController::class, 'reactivate']);
+    Route::post('registrations/{registration}/reactivation-request/refuse', [RegistrationController::class, 'refuseReactivationRequest']);
     Route::get('registrations/{registration}/documents/{document}', [RegistrationController::class, 'downloadDocument'])
         ->name('admin.registrations.documents.download');
 

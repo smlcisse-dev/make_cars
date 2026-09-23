@@ -23,6 +23,7 @@ enum PushNotificationType: string
     case RegistrationRejected = 'registration_rejected';
     case AccountSuspended = 'account_suspended';
     case AccountReactivated = 'account_reactivated';
+    case ReactivationRequestRefused = 'reactivation_request_refused';
     case DisputeSubmitted = 'dispute_submitted';
     case DisputeDecided = 'dispute_decided';
     case OrderStatusChanged = 'order_status_changed';

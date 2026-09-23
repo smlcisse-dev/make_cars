@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\ReactivationRequestStatus;
 use App\Enums\RegistrationDocumentType;
 use App\Enums\RegistrationStatus;
 use App\Exceptions\ApiException;
 use App\Mail\RegistrationApprovedMail;
 use App\Mail\RegistrationRejectedMail;
 use App\Models\ProfessionalRegistration;
+use App\Models\ReactivationRequest;
 use App\Models\RegistrationDocument;
 use App\Models\User;
 use App\Support\FrontendUrl;
@@ -174,17 +176,85 @@ class ProfessionalRegistrationService
         return $registration;
     }
 
-    public function reactivate(ProfessionalRegistration $registration): ProfessionalRegistration
+    /**
+     * Lève la suspension. Une demande de réactivation en attente (CLAUDE.md
+     * §5, ajout v0.28) est close du même coup : `accepted`, décision tracée.
+     */
+    public function reactivate(ProfessionalRegistration $registration, User $admin): ProfessionalRegistration
     {
-        $registration->update([
-            'suspension_reason' => null,
-            'suspended_by' => null,
-            'suspended_at' => null,
-        ]);
+        DB::transaction(function () use ($registration, $admin) {
+            $registration->update([
+                'suspension_reason' => null,
+                'suspended_by' => null,
+                'suspended_at' => null,
+            ]);
+
+            $registration->pendingReactivationRequest()?->update([
+                'status' => ReactivationRequestStatus::Accepted,
+                'decided_by' => $admin->id,
+                'decided_at' => now(),
+            ]);
+        });
 
         $this->notificationService->notifyAccountReactivated($registration);
 
         return $registration;
+    }
+
+    /**
+     * Demande de réactivation par le professionnel suspendu (CLAUDE.md §5,
+     * ajout v0.28) : seul l'administrateur décide ensuite. Une seule demande
+     * en attente à la fois ; les demandes déjà décidées (y compris celles
+     * d'une suspension antérieure) ne bloquent jamais une nouvelle demande.
+     *
+     * @throws ApiException compte non suspendu, ou demande déjà en attente (409).
+     */
+    public function requestReactivation(ProfessionalRegistration $registration, string $message): ReactivationRequest
+    {
+        return DB::transaction(function () use ($registration, $message) {
+            // Verrou sur le dossier : deux envois simultanés ne peuvent pas
+            // créer deux demandes en attente.
+            $registration = ProfessionalRegistration::query()->lockForUpdate()->findOrFail($registration->id);
+
+            if (! $registration->isSuspended()) {
+                throw new ApiException('Votre compte n\'est pas suspendu.', 409, 'not_suspended');
+            }
+
+            if ($registration->pendingReactivationRequest() !== null) {
+                throw new ApiException('Une demande de réactivation est déjà en cours d\'examen.', 409, 'reactivation_already_requested');
+            }
+
+            return $registration->reactivationRequests()->create([
+                'message' => $message,
+                'status' => ReactivationRequestStatus::Pending,
+            ]);
+        });
+    }
+
+    /**
+     * Refus motivé de la demande en attente : le compte reste suspendu, le
+     * professionnel peut en faire une nouvelle.
+     *
+     * @throws ApiException aucune demande en attente (409).
+     */
+    public function refuseReactivationRequest(ProfessionalRegistration $registration, User $admin, string $reason): ReactivationRequest
+    {
+        $request = $registration->pendingReactivationRequest();
+
+        if ($request === null) {
+            throw new ApiException('Aucune demande de réactivation en attente pour ce dossier.', 409, 'no_pending_reactivation_request');
+        }
+
+        $request->update([
+            'status' => ReactivationRequestStatus::Refused,
+            'response_reason' => $reason,
+            'decided_by' => $admin->id,
+            'decided_at' => now(),
+        ]);
+
+        $this->notificationService->notifyReactivationRequestRefused($request);
+
+        return $request;
     }
 
     /**

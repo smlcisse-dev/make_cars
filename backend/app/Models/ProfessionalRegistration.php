@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ReactivationRequestStatus;
 use App\Enums\RegistrationDocumentType;
 use App\Enums\RegistrationStatus;
 use Database\Factories\ProfessionalRegistrationFactory;
@@ -117,6 +118,35 @@ class ProfessionalRegistration extends Model
     public function decisions(): HasMany
     {
         return $this->hasMany(RegistrationDecision::class)->latest('decided_at')->latest('id');
+    }
+
+    /**
+     * Demandes de réactivation (CLAUDE.md §5, ajout v0.28), la plus récente
+     * en premier : l'historique complet, jamais purgé.
+     *
+     * @return HasMany<ReactivationRequest, $this>
+     */
+    public function reactivationRequests(): HasMany
+    {
+        return $this->hasMany(ReactivationRequest::class)->latest('id');
+    }
+
+    /**
+     * Dernière demande de réactivation (bandeau de suspension, fiche admin).
+     *
+     * @return HasOne<ReactivationRequest, $this>
+     */
+    public function latestReactivationRequest(): HasOne
+    {
+        return $this->hasOne(ReactivationRequest::class)->latestOfMany('id');
+    }
+
+    /**
+     * Demande en attente de décision : une seule à la fois.
+     */
+    public function pendingReactivationRequest(): ?ReactivationRequest
+    {
+        return $this->reactivationRequests()->where('status', ReactivationRequestStatus::Pending)->first();
     }
 
     /**

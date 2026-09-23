@@ -18,6 +18,7 @@ use App\Models\ProfessionalRegistration;
 use App\Models\PushNotification;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
+use App\Models\ReactivationRequest;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -261,6 +262,21 @@ class PushNotificationService
             PushNotificationType::AccountReactivated,
             'Compte réactivé',
             'Votre compte professionnel est de nouveau visible.',
+        );
+    }
+
+    /**
+     * Refus d'une demande de réactivation (CLAUDE.md §5, ajout v0.28) : le
+     * compte reste suspendu, le motif est transmis au professionnel.
+     */
+    public function notifyReactivationRequestRefused(ReactivationRequest $request): void
+    {
+        $this->notify(
+            $request->professionalRegistration->user,
+            PushNotificationType::ReactivationRequestRefused,
+            'Demande de réactivation refusée',
+            $request->response_reason,
+            ['reactivation_request_id' => $request->id],
         );
     }
 

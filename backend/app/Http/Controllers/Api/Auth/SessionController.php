@@ -24,7 +24,7 @@ class SessionController extends Controller
         $token = $this->authService->issueToken($user);
 
         return $this->success([
-            'user' => new UserResource($user->load('professionalRegistration')),
+            'user' => new UserResource($user->load('professionalRegistration.latestReactivationRequest')),
             'token' => $token->plainTextToken,
         ], 'Connexion réussie.');
     }
@@ -46,7 +46,7 @@ class SessionController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return $this->success(new UserResource($request->user()->load('professionalRegistration')));
+        return $this->success(new UserResource($request->user()->load('professionalRegistration.latestReactivationRequest')));
     }
 
     public function destroy(Request $request): JsonResponse
