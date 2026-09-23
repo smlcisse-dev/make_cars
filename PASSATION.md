@@ -3,17 +3,17 @@
 Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23 par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **92 commits** au total après le lot v0.27/v0.28 (69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `91a9cb8` feat(frontend): demande de réactivation d'un compte suspendu (v0.28), suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **558 tests, 558 réussis, 1796 assertions** après v0.27/v0.28 (523 tests après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **98 commits** au total après les pièces jointes de la demande de réactivation (69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `80c84c6` feat(frontend): pièces jointes sur la demande de réactivation (v0.28), suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **571 tests, 571 réussis, 1840 assertions** après les pièces jointes de la demande de réactivation (558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **190 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28).
+- **Routes** (`php artisan route:list`) : **193 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation).
 
 | Espace | Routes | Détail |
 |---|---|---|
-| `api/garage/*` | 56 | profil 12 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit` ; CIP v0.27 : `profile/legal/identity-document` ×2 ; v0.28 : `profile/reactivation-request`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
-| `api/market-space/*` | 33 | profil 12 (mêmes routes de dossier v0.26, v0.27 et v0.28), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
-| `api/admin/*` | 40 | inscriptions 8 (dont `reactivation-request/refuse`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
+| `api/garage/*` | 57 | profil 13 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit` ; CIP v0.27 : `profile/legal/identity-document` ×2 ; v0.28 : `profile/reactivation-request`, `profile/reactivation-requests/{reactivationRequest}/attachments/{attachment}`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
+| `api/market-space/*` | 34 | profil 13 (mêmes routes de dossier v0.26, v0.27 et v0.28), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
+| `api/admin/*` | 41 | inscriptions 9 (dont `reactivation-request/refuse` et `reactivation-requests/{reactivationRequest}/attachments/{attachment}`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 9 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim` |
 | Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2, réclamation de compte express 2, `health` 1 |
@@ -26,7 +26,12 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Testé manuellement en navigateur, écran par écran** : le **dashboard Garagiste au complet**, c'est-à-dire Services, Produits, Rendez-vous, Devis/Factures, Chat, Commandes, Avis, Réclamations et Notifications (plus Mon profil).
   - *Source : déclaration de l'utilisateur. Rien dans le dépôt ne permet de le constater.*
 - **« Mon profil » v0.26 (espaces Garagiste et Market Space)** : testé manuellement en navigateur — remplissage et soumission, verrouillage pendant l'examen, approbation puis « Actualiser », bandeau de suspension, dossier refusé corrigeable.
-  - *Source : déclaration de l'utilisateur, 2026-09-23.* Les corrections qui en sont issues (lot du 2026-09-23, §8) et les ajouts v0.27/v0.28 ne sont **pas encore testés** en navigateur.
+  - *Source : déclaration de l'utilisateur, 2026-09-23.*
+- **Lot du 2026-09-23 (corrections, CIP, demande de réactivation)** : testé manuellement en navigateur —
+  - corrections issues des tests de « Mon profil » : champs grisés, badge « Profil à compléter », suppression des références techniques à l'écran, rubrique active du menu ;
+  - CIP (v0.27) côté professionnel et côté admin ;
+  - demande de réactivation (v0.28) complète : demande, refus avec motif, nouvelle demande, réactivation, historique.
+  - *Source : déclaration de l'utilisateur, 2026-09-23.* Les **pièces jointes** de la demande de réactivation, ajoutées ensuite (§8), sont **construites, pas encore testées** en navigateur.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
@@ -46,7 +51,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 **Commun**
 - `/login` : connexion email/mot de passe.
 - `/403` et page 404.
-- Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28).
+- Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28).
 - Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
 
 **Espace Admin (`/admin`)** : construit, relu, jamais testé en navigateur
@@ -54,7 +59,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 | Menu | Routes | Périmètre |
 |---|---|---|
 | Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`), en cartes et tableaux, sans graphiques |
-| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — **construit, pas encore testé** |
+| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — testé en navigateur (déclaration utilisateur, 2026-09-23) ; pièces jointes de la demande (bouton « Consulter », dans la demande en attente et dans l'historique) — **construit, pas encore testé** |
 | Services | `/admin/services`, `/:id` | Validation des services de garage |
 | Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
 | Avis | `/admin/avis`, `/:id` | Masquage avec motif |
@@ -93,7 +98,7 @@ Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran 
 | Notifications | `/market-space/notifications` | `shared/NotificationsView.vue` |
 | Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`). Testé en navigateur (déclaration utilisateur, 2026-09-23), hors bloc CIP (v0.27) |
 
-Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`SuspensionBanner` dans `DashboardShell`), sans blocage d'accès ; depuis v0.28, il peut y demander la réactivation (construit, pas encore testé). La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
+Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`SuspensionBanner` dans `DashboardShell`), sans blocage d'accès ; depuis v0.28, il peut y demander la réactivation (testé en navigateur, déclaration utilisateur du 2026-09-23), avec pièces jointes facultatives (construit, pas encore testé). La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
 
 ## 2. Backend construit et testé, sans écran frontend
 
@@ -151,6 +156,7 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 **Limites PHP d'envoi de fichiers**
 - Relevées en local dans `/etc/php.d/99-makecars-uploads.ini` (fichier système, hors dépôt) : `upload_max_filesize = 12M`, `post_max_size = 50M`. Vérifié le 2026-09-23 avec `php -r 'echo ini_get(...)'`.
 - Pourquoi : le document du registre de commerce peut peser jusqu'à 10 Mo. Les valeurs par défaut de PHP (2M / 8M) le refusaient avant même d'atteindre la validation Laravel. `post_max_size` couvre une requête qui envoie plusieurs fichiers à la fois.
+- Conséquence : les pièces jointes de la demande de réactivation sont limitées à 5 Mo chacune (5 au plus). À 10 Mo, cinq fichiers atteindraient exactement 50 Mo, et PHP refuserait la requête avant Laravel ; à 5 Mo, une demande complète reste sous 25 Mo.
 - **À reproduire sur le serveur de production** : même fichier `.ini` (ou équivalent selon l'hébergeur), plus la limite de corps de requête du serveur web s'il y en a une (ex. `client_max_body_size` pour Nginx).
 
 **Latence Supabase et timeout Axios**
@@ -242,7 +248,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - [ ] **Toutes les migrations en attente appliquées sur la base de production**, jamais une seule à la fois.
   - *Raison* : depuis la v0.26, les migrations n'ont été appliquées que sur la base de développement. Le code actuel en dépend (connexion, inscription, dossier, réactivation) : déployer sans elles casse la production.
   - *Procédure* : `switch-env.sh prod`, `switch-env.sh status` pour confirmer, sauvegarde de la base, `php artisan migrate:status` pour lister les migrations en attente (et les noter ici), `php artisan migrate`, nouvelle vérification avec `migrate:status`, puis retour sur `dev` et redémarrage de `php artisan serve --no-reload`.
-  - Liste actuelle des migrations en attente attendues : toutes celles du 2026-09-23 (v0.26 et v0.28). À vérifier par `migrate:status`, sans lancer `migrate` en production.
+  - Liste actuelle des migrations en attente attendues : toutes celles du 2026-09-23 (v0.26 et v0.28, dont `create_reactivation_request_attachments_table`). À vérifier par `migrate:status`, sans lancer `migrate` en production.
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
@@ -269,6 +275,13 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 - **Certificat d'Identification Personnelle (v0.27)** : backend `166c773` (le faux CIP des seeders y est inclus, car `submit()` l'exige), frontend `9668a4e` (`LegalDocumentField`).
 - Seeders : localisation cohérente à Cotonou (`6b3e3a0`).
 - **Demande de réactivation (v0.28)** : backend `b02c872` (+ `690759a`, retrait d'un fichier généré par erreur), frontend `91a9cb8`. Migration `create_reactivation_requests_table` appliquée sur la base de **développement** uniquement ; à appliquer en production lors du prochain déploiement.
+- **Pièces jointes de la demande de réactivation (v0.28, complément)** : backend `62a9c48`, frontend `80c84c6`.
+  - Pourquoi : pendant les tests, l'admin a refusé une demande avec le motif « Merci de joindre la preuve du remboursement du client », alors que la demande n'acceptait que du texte.
+  - 0 à 5 fichiers jpg/jpeg/png/pdf de 5 Mo au plus, disque privé des médias, table `reactivation_request_attachments` (jamais supprimées) ; téléchargement par le propriétaire et l'admin (404 sinon) ; si l'enregistrement échoue, les fichiers déjà écrits sont effacés.
+  - Pas de mutualisation avec `DisputeAttachment` : colonnes différentes (position vs nom d'origine, type, taille) et clé étrangère différente ; le seul point commun serait `download()`, une ligne.
+  - Frontend : `ReactivationRequestModal` (nouvelle fenêtre, `ReasonPromptModal` inchangé), nombre de pièces jointes dans le bandeau, `ReactivationAttachmentList` sur la fiche admin.
+  - Migration `create_reactivation_request_attachments_table` appliquée sur la base de **développement** uniquement.
+  - **Construit, pas encore testé** en navigateur.
 
 **Règles métier**
 - **Parcours d'inscription professionnelle en deux temps (v0.26, 2026-09-23)**, backend uniquement :
