@@ -58,6 +58,19 @@ async function handleLogout(): Promise<void> {
     </aside>
 
     <div class="flex flex-1 flex-col">
+      <!-- Compte suspendu (CLAUDE.md §5, ajout v0.6) : simple information,
+           l'accès au dashboard n'est pas bloqué. Placé ici plutôt que dans
+           chaque layout : `isSuspended` ne vaut vrai que pour un
+           professionnel, l'espace Admin n'est donc jamais concerné. -->
+      <div
+        v-if="auth.isSuspended"
+        class="border-b border-red-300 bg-red-50 px-6 py-3 text-sm text-red-900"
+      >
+        <span class="font-semibold"
+          >Votre compte est suspendu : il n'est plus visible par les automobilistes.</span
+        >
+        <span v-if="auth.suspensionReason"> Motif : {{ auth.suspensionReason }}</span>
+      </div>
       <main class="flex-1 p-6">
         <slot />
       </main>

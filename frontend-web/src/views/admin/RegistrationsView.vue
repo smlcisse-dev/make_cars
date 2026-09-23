@@ -10,7 +10,7 @@ import type { TableColumn } from '@/shared/components/AppTable.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationStatus } from '@/types/registration'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { reviewStatusTone } from '@/utils/reviewStatus'
+import { registrationStatusTone } from '@/utils/registrationStatus'
 
 const STATUS_FILTERS: { value: RegistrationStatus; label: string }[] = [
   { value: 'pending', label: 'En attente' },
@@ -130,7 +130,7 @@ onMounted(() => {
         </template>
         <template #cell-status="{ item }">
           <div class="flex items-center gap-2">
-            <StatusBadge :label="item.status_label" :tone="reviewStatusTone(item.status)" />
+            <StatusBadge :label="item.status_label" :tone="registrationStatusTone(item.status)" />
             <StatusBadge v-if="item.is_suspended" label="Suspendu" tone="danger" />
           </div>
         </template>

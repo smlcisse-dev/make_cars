@@ -1,13 +1,11 @@
 import type { BadgeTone } from '@/shared/components/StatusBadge.vue'
 import type { ReviewStatus } from '@/types/review'
 
-// Tonalité de badge et libellé pour un statut de validation admin —
-// inscriptions, services et produits partagent les mêmes trois valeurs (voir
-// ReviewStatus). Pur choix d'affichage frontend : le backend ne fournit un
-// libellé traduit que pour les inscriptions (`status_label` sur
-// ProfessionalRegistrationResource) ; ServiceResource/ProductResource ne
-// renvoient que la valeur brute, d'où ce libellé calculé côté frontend pour
-// ces deux-là.
+// Tonalité de badge et libellé pour un statut de validation admin des
+// services et produits (voir ReviewStatus ; les dossiers d'inscription ont
+// leur propre utilitaire, utils/registrationStatus.ts). ServiceResource/
+// ProductResource ne renvoient que la valeur brute, d'où ce libellé calculé
+// côté frontend.
 const TONE_BY_REVIEW_STATUS: Record<ReviewStatus, BadgeTone> = {
   pending: 'warning',
   approved: 'success',

@@ -1,9 +1,15 @@
-import type { ReviewStatus } from '@/types/review'
 import type { AccountType } from '@/types/user'
 
-// Reflète App\Enums\RegistrationStatus côté backend — mêmes valeurs que
-// ReviewStatus (partagé avec les services et produits, voir src/types/review.ts).
-export type RegistrationStatus = ReviewStatus
+// Reflète App\Enums\RegistrationStatus côté backend (CLAUDE.md §5, ajout
+// v0.26). Ce type était auparavant un simple alias de ReviewStatus (services et
+// produits), car les deux partageaient les mêmes trois valeurs. Le dossier
+// d'inscription a désormais un statut de plus, `profile_incomplete` (profil
+// ou informations légales encore à compléter, dossier jamais soumis), que les
+// services et produits n'ont pas : on découple donc les deux types. Sans ce
+// découplage, ajouter la valeur ici l'aurait aussi ajoutée à ReviewStatus, et
+// TypeScript aurait exigé de la gérer partout où un service ou un produit est
+// affiché, alors qu'elle ne peut jamais s'y présenter.
+export type RegistrationStatus = 'profile_incomplete' | 'pending' | 'approved' | 'rejected'
 
 // Reflète App\Enums\RegistrationDocumentType côté backend.
 export type RegistrationDocumentType = 'business_registration' | 'premises_photo'
@@ -24,12 +30,16 @@ export interface ProfessionalRegistration {
   id: number
   account_type: AccountType
   account_type_label: string
-  structure_name: string
-  address: string
-  business_registration_number: string
+  // Lus depuis le profil (v0.26) : `null` tant que le professionnel ne les a
+  // pas saisis, ou quand le profil n'est pas chargé par le backend.
+  structure_name: string | null
+  address: string | null
+  business_registration_number: string | null
   status: RegistrationStatus
   status_label: string
   rejection_reason: string | null
+  // Date de la dernière soumission pour validation (null si jamais soumis).
+  submitted_at: string | null
   reviewed_at: string | null
   is_suspended: boolean
   suspension_reason: string | null
@@ -37,3 +47,13 @@ export interface ProfessionalRegistration {
   documents: RegistrationDocument[]
   created_at: string
 }
+
+// Même ressource, telle qu'embarquée dans l'utilisateur connecté (/auth/me,
+// connexion) : le backend n'y charge ni le compte ni les documents, donc ces
+// clés sont absentes de la réponse. `Omit<T, K>` construit un nouveau type à
+// partir de T en retirant les propriétés K : TypeScript refusera ainsi qu'on
+// lise `documents` sur cet objet, au lieu de nous laisser croire qu'il existe.
+export type SessionRegistration = Omit<
+  ProfessionalRegistration,
+  'account_type' | 'account_type_label' | 'documents'
+>

@@ -25,3 +25,23 @@ export function extractApiErrorMessage(error: unknown, fallback: string): string
 
   return fallback
 }
+
+// Erreurs de validation Laravel (422) : `{ errors: { champ: ['message', …] } }`.
+// Renvoie le premier message de chaque champ, pour l'afficher sous le champ
+// concerné ; objet vide si l'erreur n'est pas un 422 de validation.
+export function extractValidationErrors(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error) || error.response?.status !== 422) {
+    return {}
+  }
+
+  const errors = (error.response.data as { errors?: Record<string, string[]> } | undefined)?.errors
+  if (!errors) {
+    return {}
+  }
+
+  // `Object.entries` transforme l'objet en liste de paires [clé, valeur] ;
+  // `Object.fromEntries` fait l'inverse, après transformation de chaque paire.
+  return Object.fromEntries(
+    Object.entries(errors).map(([field, messages]) => [field, messages[0] ?? '']),
+  )
+}

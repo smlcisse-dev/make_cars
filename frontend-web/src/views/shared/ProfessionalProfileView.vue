@@ -1,39 +1,75 @@
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import {
   deleteImage,
+  fetchBusinessRegistrationDocumentBlob,
   fetchProfile,
+  submitRegistration,
+  updateLegalInfo,
   updateOpeningHours,
   updateProfile,
+  uploadBusinessRegistrationDocument,
   uploadImages,
 } from '@/api/professionalProfile'
 import AppButton from '@/shared/components/AppButton.vue'
 import LocationSelect from '@/shared/components/LocationSelect.vue'
-import { homePathForRole, useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import { BENIN_PHONE_ERROR, normalizeBeninPhone } from '@/utils/beninPhone'
-import type { OpeningHourPayload } from '@/api/professionalProfile'
-import { MISSING_FIELD_LABELS, type ProfessionalProfile } from '@/types/profile'
+import type { LoadedProfile, OpeningHourPayload } from '@/api/professionalProfile'
+import {
+  MISSING_FIELD_LABELS,
+  MISSING_LEGAL_FIELD_LABELS,
+  type LegalInfo,
+  type LegalStatus,
+  type ProfessionalProfile,
+  type ProfileRegistrationMeta,
+} from '@/types/profile'
 import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { ProfileStatus } from '@/types/user'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { extractApiErrorMessage, extractValidationErrors } from '@/utils/apiError'
 
 // Écran de profil unique des deux espaces professionnels (Garagiste et Market
-// Space) : la prop `space` ne change que le préfixe d'URL de l'API. Tant que
-// le profil est incomplet, c'est la seule page accessible (CLAUDE.md §5,
-// ajout v0.20) ; une fois complet, il sert d'écran « Mon profil ».
+// Space) : la prop `space` ne change que le préfixe d'URL de l'API. C'est la
+// seule page accessible tant que le dossier d'inscription n'est pas approuvé
+// ou que le profil est incomplet (CLAUDE.md §5, ajouts v0.20 et v0.26) ; il
+// porte aussi le dossier lui-même (informations légales, soumission). Une
+// fois le compte validé, il sert d'écran « Mon profil ».
 //
-// Une section par endpoint backend (informations, horaires, photos), chacune
-// avec son propre bouton « Enregistrer » et son propre message.
+// Une section par endpoint backend (informations, horaires, photos,
+// informations légales, soumission), chacune avec son propre bouton et son
+// propre message.
 const props = defineProps<{ space: ProfessionalSpace }>()
 
 const auth = useAuthStore()
-const router = useRouter()
 
 const profile = ref<ProfessionalProfile | null>(null)
 const status = ref<ProfileStatus | null>(null)
+const legalStatus = ref<LegalStatus | null>(null)
+const registration = ref<ProfileRegistrationMeta | null>(null)
+const legal = ref<LegalInfo | null>(null)
 const loadError = ref<string | null>(null)
+
+// Pendant l'examen (`pending`), tout le profil est en lecture seule : le
+// backend refuse de toute façon chaque écriture (409
+// `registration_under_review`), l'interface évite juste d'y inviter.
+const isUnderReview = computed(() => registration.value?.status === 'pending')
+// Informations légales figées pendant l'examen, puis définitivement après
+// approbation (409 `legal_info_locked` côté backend).
+const isLegalLocked = computed(
+  () => registration.value?.status === 'pending' || registration.value?.status === 'approved',
+)
+// La soumission n'a de sens que depuis ces deux statuts (isSubmittable() côté
+// backend).
+const canSubmit = computed(
+  () =>
+    registration.value?.status === 'profile_incomplete' ||
+    registration.value?.status === 'rejected',
+)
+const isReadyToSubmit = computed(
+  () => status.value?.is_complete === true && legalStatus.value?.is_complete === true,
+)
 
 // `reactive` : objet dont chaque propriété est réactive, pratique pour un
 // formulaire (on écrit `info.name` directement, sans `.value`). Les champs
@@ -56,6 +92,19 @@ const info = reactive({
 const phoneError = ref<string | null>(null)
 
 const hours = ref<OpeningHourPayload[]>([])
+
+// Informations légales privées (CLAUDE.md §5, ajout v0.26). Même règles que
+// le backend (UpdateLegalInfoRequest), vérifiées avant l'envoi ; le backend
+// reste l'autorité.
+const legalForm = reactive({
+  business_registration_number: '',
+  ifu: '',
+  npi: '',
+})
+// Erreur à afficher sous chaque champ, indexée par nom de champ.
+const legalErrors = ref<Record<string, string>>({})
+const IFU_PATTERN = /^\d{13}$/
+const NPI_PATTERN = /^\d{10}$/
 const DAY_LABELS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 // État de chaque section : chargement du bouton, message de succès, erreur.
@@ -65,22 +114,50 @@ function sectionState() {
 const infoState = sectionState()
 const hoursState = sectionState()
 const photosState = sectionState()
+const legalState = sectionState()
+const documentState = sectionState()
+const submitState = sectionState()
 
 const missingLabels = computed(() =>
   (status.value?.missing_fields ?? []).map((field) => MISSING_FIELD_LABELS[field] ?? field),
 )
+const missingLegalLabels = computed(() =>
+  (legalStatus.value?.missing_fields ?? []).map(
+    (field) => MISSING_LEGAL_FIELD_LABELS[field] ?? field,
+  ),
+)
+// Tout ce qui manque encore avant de pouvoir soumettre (profil ET dossier).
+const allMissingLabels = computed(() => [...missingLabels.value, ...missingLegalLabels.value])
+
+function formatDateTime(iso: string | null): string {
+  return iso
+    ? new Date(iso).toLocaleString('fr-FR', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      })
+    : ''
+}
 
 // « HH:MM:SS » (renvoyé par la base) -> « HH:MM » (attendu par <input type="time">).
 function toTimeInput(value: string | null): string | null {
   return value ? value.slice(0, 5) : null
 }
 
-function applyProfile(loaded: ProfessionalProfile, loadedStatus: ProfileStatus): void {
+function applyProfile(data: LoadedProfile): void {
+  const loaded = data.profile
   profile.value = loaded
-  status.value = loadedStatus
-  info.name = loaded.name
+  status.value = data.status
+  legalStatus.value = data.legalStatus
+  registration.value = data.registration
+  legal.value = data.legal
+  legalForm.business_registration_number = data.legal?.business_registration_number ?? ''
+  legalForm.ifu = data.legal?.ifu ?? ''
+  legalForm.npi = data.legal?.npi ?? ''
+
+  // `?? ''` : un profil tout juste créé a encore `name`/`address` à null.
+  info.name = loaded.name ?? ''
   info.description = loaded.description ?? ''
-  info.address = loaded.address
+  info.address = loaded.address ?? ''
   info.phone = loaded.phone ?? ''
   info.latitude = loaded.latitude ?? ''
   info.longitude = loaded.longitude ?? ''
@@ -111,18 +188,16 @@ function applyProfile(loaded: ProfessionalProfile, loadedStatus: ProfileStatus):
   })
 }
 
-// Recharge profil + statut après chaque enregistrement, met le store à jour
-// (le menu et le garde de navigation en dépendent) et, à la première
-// complétion, renvoie le professionnel vers son espace.
+// Recharge profil + statuts après chaque enregistrement et met le store à
+// jour (le menu et le garde de navigation en dépendent). Pas de redirection
+// vers l'accueil quand le profil devient complet : depuis v0.26, un profil
+// complet n'est pas un compte validé — le dossier doit encore être soumis et
+// approuvé. Le menu complet réapparaît de lui-même à l'approbation
+// (`mustStayOnProfile` est un `computed`).
 async function reload(): Promise<void> {
-  const wasIncomplete = auth.mustCompleteProfile
-  const { profile: loaded, status: loadedStatus } = await fetchProfile(props.space)
-  applyProfile(loaded, loadedStatus)
-  auth.updateProfileStatus(loadedStatus)
-
-  if (wasIncomplete && loadedStatus.is_complete && auth.user) {
-    await router.replace(homePathForRole(auth.user.role))
-  }
+  const loaded = await fetchProfile(props.space)
+  applyProfile(loaded)
+  auth.updateProfileStatus(loaded.status)
 }
 
 onMounted(async () => {
@@ -233,6 +308,164 @@ function useMyPosition(): void {
 
 const inputClasses =
   'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900'
+
+function validateLegal(): Record<string, string> {
+  const errors: Record<string, string> = {}
+  const rccm = legalForm.business_registration_number.trim()
+  if (rccm === '') {
+    errors.business_registration_number = 'Le numéro RCCM est obligatoire.'
+  } else if (rccm.length > 100) {
+    errors.business_registration_number = 'Le numéro RCCM ne doit pas dépasser 100 caractères.'
+  }
+  if (!IFU_PATTERN.test(legalForm.ifu.trim())) {
+    errors.ifu = "L'IFU doit comporter exactement 13 chiffres."
+  }
+  if (!NPI_PATTERN.test(legalForm.npi.trim())) {
+    errors.npi = 'Le NPI doit comporter exactement 10 chiffres.'
+  }
+  return errors
+}
+
+// Pas `runSection` ici : en plus du message général, un 422 doit afficher ses
+// erreurs sous chaque champ.
+async function saveLegal(): Promise<void> {
+  legalErrors.value = validateLegal()
+  // `Object.keys` liste les clés d'un objet : au moins une erreur -> on
+  // n'envoie rien.
+  if (Object.keys(legalErrors.value).length > 0) return
+
+  legalState.saving = true
+  legalState.success = null
+  legalState.error = null
+  try {
+    await updateLegalInfo(props.space, {
+      business_registration_number: legalForm.business_registration_number.trim(),
+      ifu: legalForm.ifu.trim(),
+      npi: legalForm.npi.trim(),
+    })
+    await reload()
+    legalState.success = 'Informations légales enregistrées.'
+  } catch (error) {
+    legalErrors.value = extractValidationErrors(error)
+    legalState.error = extractApiErrorMessage(error, 'Enregistrement impossible.')
+  } finally {
+    legalState.saving = false
+  }
+}
+
+// Document du registre de commerce : pdf/jpg/png, 10 Mo max (mêmes règles
+// que UploadBusinessRegistrationDocumentRequest). On vérifie l'extension
+// plutôt que le type MIME, que certains navigateurs laissent vide.
+const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024
+const DOCUMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
+
+// « Template ref » : `ref="documentInput"` dans le template relie cette
+// variable à l'élément <input> réel une fois la page affichée. Ça permet
+// d'ouvrir le sélecteur de fichiers depuis le bouton « Remplacer ».
+const documentInput = ref<HTMLInputElement | null>(null)
+
+function pickDocument(): void {
+  documentInput.value?.click()
+}
+
+async function onDocumentSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  documentState.success = null
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+  if (!DOCUMENT_EXTENSIONS.includes(extension)) {
+    documentState.error = 'Format non accepté : PDF, JPG ou PNG uniquement.'
+    return
+  }
+  if (file.size > DOCUMENT_MAX_BYTES) {
+    documentState.error = 'Le document ne doit pas dépasser 10 Mo.'
+    return
+  }
+
+  await runSection(documentState, 'Document enregistré.', () =>
+    uploadBusinessRegistrationDocument(props.space, file),
+  )
+}
+
+// Fichier privé : blob authentifié -> URL locale temporaire -> nouvel onglet,
+// comme pour les PDF de devis.
+const isOpeningDocument = ref(false)
+async function openDocument(): Promise<void> {
+  isOpeningDocument.value = true
+  documentState.error = null
+  try {
+    const blob = await fetchBusinessRegistrationDocumentBlob(props.space)
+    const objectUrl = URL.createObjectURL(blob)
+    window.open(objectUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+  } catch (error) {
+    documentState.error = extractApiErrorMessage(error, 'Impossible de récupérer ce document.')
+  } finally {
+    isOpeningDocument.value = false
+  }
+}
+
+// Éléments manquants renvoyés par un 422 `registration_incomplete` (état du
+// serveur, qui peut différer de l'état affiché si la page est ancienne).
+const submitMissingLabels = ref<string[]>([])
+
+async function submitDossier(): Promise<void> {
+  if (
+    !window.confirm(
+      "Une fois soumis, votre profil ne pourra plus être modifié pendant l'examen. Soumettre votre dossier ?",
+    )
+  ) {
+    return
+  }
+
+  submitState.saving = true
+  submitState.success = null
+  submitState.error = null
+  submitMissingLabels.value = []
+  try {
+    await submitRegistration(props.space)
+    await reload()
+    // Met à jour le statut du dossier dans le store (menu, garde).
+    await auth.refreshUser()
+    submitState.success = 'Votre dossier a été soumis pour validation.'
+  } catch (error) {
+    submitState.error = extractApiErrorMessage(error, 'Soumission impossible.')
+    const data = axios.isAxiosError(error) ? error.response?.data : undefined
+    if (data?.code === 'registration_incomplete') {
+      submitMissingLabels.value = [
+        ...((data.missing_fields ?? []) as string[]).map(
+          (field) => MISSING_FIELD_LABELS[field] ?? field,
+        ),
+        ...((data.missing_legal_fields ?? []) as string[]).map(
+          (field) => MISSING_LEGAL_FIELD_LABELS[field] ?? field,
+        ),
+      ]
+    }
+  } finally {
+    submitState.saving = false
+  }
+}
+
+// Bouton « Actualiser » du bandeau « en cours d'examen » : relit l'utilisateur
+// (statut du dossier) puis le profil. Si l'admin a approuvé entre-temps, le
+// menu complet réapparaît tout seul (réactivité), sans redirection forcée.
+const isRefreshing = ref(false)
+const refreshError = ref<string | null>(null)
+async function refreshDossier(): Promise<void> {
+  isRefreshing.value = true
+  refreshError.value = null
+  try {
+    await auth.refreshUser()
+    await reload()
+  } catch (error) {
+    refreshError.value = extractApiErrorMessage(error, 'Actualisation impossible.')
+  } finally {
+    isRefreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -240,17 +473,63 @@ const inputClasses =
     <p v-if="loadError" class="text-sm text-red-600">{{ loadError }}</p>
 
     <template v-if="profile && status">
-      <!-- Bandeau de complétude -->
+      <!-- Bandeau d'état du dossier d'inscription (CLAUDE.md §5, ajout v0.26) -->
       <div
-        v-if="!status.is_complete"
+        v-if="registration?.status === 'profile_incomplete'"
         class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
       >
-        <p class="font-semibold">Complétez votre profil pour accéder à votre espace.</p>
-        <p class="mt-1">Il manque encore : {{ missingLabels.join(', ') }}.</p>
+        <p class="font-semibold">
+          Complétez votre profil et vos informations légales, puis soumettez votre dossier pour
+          validation.
+        </p>
+        <p v-if="allMissingLabels.length" class="mt-1">
+          Il manque encore : {{ allMissingLabels.join(', ') }}.
+        </p>
       </div>
-      <div v-else class="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
-        Votre profil est complet.
+      <div
+        v-else-if="registration?.status === 'pending'"
+        class="rounded-lg border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900"
+      >
+        <p class="font-semibold">
+          Votre dossier a été soumis le
+          {{ formatDateTime(registration.submitted_at) }} et est en cours d'examen. Réponse sous 24
+          h.
+        </p>
+        <p class="mt-1">Votre profil ne peut pas être modifié pendant l'examen.</p>
+        <div class="mt-3 flex items-center gap-3">
+          <AppButton variant="secondary" :loading="isRefreshing" @click="refreshDossier">
+            Actualiser
+          </AppButton>
+          <span v-if="refreshError" class="text-sm text-red-600">{{ refreshError }}</span>
+        </div>
       </div>
+      <div
+        v-else-if="registration?.status === 'rejected'"
+        class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900"
+      >
+        <p class="font-semibold">Votre dossier a été refusé.</p>
+        <p v-if="registration.rejection_reason" class="mt-2 rounded-md bg-white p-3 text-red-800">
+          <span class="font-semibold">Motif :</span>
+          {{ registration.rejection_reason }}
+        </p>
+        <p class="mt-2">Corrigez les éléments concernés et soumettez à nouveau.</p>
+      </div>
+      <!-- Dossier approuvé (ou absent) : bandeau de complétude du profil. -->
+      <template v-else>
+        <div
+          v-if="!status.is_complete"
+          class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <p class="font-semibold">Complétez votre profil pour accéder à votre espace.</p>
+          <p class="mt-1">Il manque encore : {{ missingLabels.join(', ') }}.</p>
+        </div>
+        <div
+          v-else
+          class="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800"
+        >
+          Votre profil est complet.
+        </div>
+      </template>
 
       <!-- Informations, localisation et position -->
       <form
@@ -259,83 +538,100 @@ const inputClasses =
       >
         <h2 class="text-lg font-semibold text-slate-900">Informations et localisation</h2>
 
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block text-sm font-medium text-slate-700">
-            Nom
-            <input v-model="info.name" type="text" required maxlength="255" :class="inputClasses" />
-          </label>
-          <label class="block text-sm font-medium text-slate-700">
-            Téléphone
-            <input
-              v-model="info.phone"
-              type="tel"
-              required
-              maxlength="30"
-              placeholder="+229 01 23 45 67 89"
-              :aria-invalid="phoneError !== null"
-              :class="[inputClasses, phoneError ? 'border-red-500' : '']"
-              @input="phoneError = null"
-            />
-            <span v-if="phoneError" class="mt-1 block text-xs font-normal text-red-600">{{
-              phoneError
-            }}</span>
-          </label>
-          <label class="block text-sm font-medium text-slate-700 sm:col-span-2">
-            Adresse
-            <input
-              v-model="info.address"
-              type="text"
-              required
-              maxlength="255"
-              :class="inputClasses"
-            />
-          </label>
-          <label class="block text-sm font-medium text-slate-700 sm:col-span-2">
-            Description (facultative)
-            <textarea v-model="info.description" rows="3" maxlength="2000" :class="inputClasses" />
-          </label>
-        </div>
+        <!-- <fieldset> regroupe des champs de formulaire ; son attribut natif
+             `disabled` désactive d'un coup tous les champs et boutons qu'il
+             contient, sans avoir à le répéter sur chacun. `:disabled="..."`
+             (liaison Vue) le rend dynamique : vrai pendant l'examen. -->
+        <fieldset :disabled="isUnderReview" class="space-y-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm font-medium text-slate-700">
+              Nom
+              <input
+                v-model="info.name"
+                type="text"
+                required
+                maxlength="255"
+                :class="inputClasses"
+              />
+            </label>
+            <label class="block text-sm font-medium text-slate-700">
+              Téléphone
+              <input
+                v-model="info.phone"
+                type="tel"
+                required
+                maxlength="30"
+                placeholder="+229 01 23 45 67 89"
+                :aria-invalid="phoneError !== null"
+                :class="[inputClasses, phoneError ? 'border-red-500' : '']"
+                @input="phoneError = null"
+              />
+              <span v-if="phoneError" class="mt-1 block text-xs font-normal text-red-600">{{
+                phoneError
+              }}</span>
+            </label>
+            <label class="block text-sm font-medium text-slate-700 sm:col-span-2">
+              Adresse
+              <input
+                v-model="info.address"
+                type="text"
+                required
+                maxlength="255"
+                :class="inputClasses"
+              />
+            </label>
+            <label class="block text-sm font-medium text-slate-700 sm:col-span-2">
+              Description (facultative)
+              <textarea
+                v-model="info.description"
+                rows="3"
+                maxlength="2000"
+                :class="inputClasses"
+              />
+            </label>
+          </div>
 
-        <!-- Le composant ne se monte qu'ici, une fois le profil chargé, pour
+          <!-- Le composant ne se monte qu'ici, une fois le profil chargé, pour
              recevoir les valeurs déjà enregistrées dès son premier rendu. -->
-        <LocationSelect
-          v-model:department-id="info.department_id"
-          v-model:commune-id="info.commune_id"
-          v-model:arrondissement-id="info.arrondissement_id"
-          v-model:neighborhood="info.neighborhood"
-        />
+          <LocationSelect
+            v-model:department-id="info.department_id"
+            v-model:commune-id="info.commune_id"
+            v-model:arrondissement-id="info.arrondissement_id"
+            v-model:neighborhood="info.neighborhood"
+          />
 
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block text-sm font-medium text-slate-700">
-            Latitude
-            <input
-              v-model="info.latitude"
-              type="number"
-              step="any"
-              min="-90"
-              max="90"
-              required
-              :class="inputClasses"
-            />
-          </label>
-          <label class="block text-sm font-medium text-slate-700">
-            Longitude
-            <input
-              v-model="info.longitude"
-              type="number"
-              step="any"
-              min="-180"
-              max="180"
-              required
-              :class="inputClasses"
-            />
-          </label>
-        </div>
-        <AppButton variant="secondary" :loading="isLocating" @click="useMyPosition">
-          Utiliser ma position
-        </AppButton>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm font-medium text-slate-700">
+              Latitude
+              <input
+                v-model="info.latitude"
+                type="number"
+                step="any"
+                min="-90"
+                max="90"
+                required
+                :class="inputClasses"
+              />
+            </label>
+            <label class="block text-sm font-medium text-slate-700">
+              Longitude
+              <input
+                v-model="info.longitude"
+                type="number"
+                step="any"
+                min="-180"
+                max="180"
+                required
+                :class="inputClasses"
+              />
+            </label>
+          </div>
+          <AppButton variant="secondary" :loading="isLocating" @click="useMyPosition">
+            Utiliser ma position
+          </AppButton>
+        </fieldset>
 
-        <div class="flex items-center gap-3">
+        <div v-if="!isUnderReview" class="flex items-center gap-3">
           <AppButton type="submit" :loading="infoState.saving">Enregistrer</AppButton>
           <span v-if="infoState.success" class="text-sm text-green-700">{{
             infoState.success
@@ -353,32 +649,34 @@ const inputClasses =
         <p class="text-sm text-slate-500">
           Les 7 jours sont obligatoires : cochez « Fermé » pour un jour non travaillé.
         </p>
-        <div
-          v-for="(hour, index) in hours"
-          :key="hour.day_of_week"
-          class="grid items-center gap-3 sm:grid-cols-[8rem_auto_1fr_1fr]"
-        >
-          <span class="text-sm font-medium text-slate-700">{{ DAY_LABELS[index] }}</span>
-          <label class="flex items-center gap-2 text-sm text-slate-600">
-            <input v-model="hour.is_closed" type="checkbox" />
-            Fermé
-          </label>
-          <input
-            v-model="hour.opens_at"
-            type="time"
-            :disabled="hour.is_closed"
-            :required="!hour.is_closed"
-            :class="inputClasses"
-          />
-          <input
-            v-model="hour.closes_at"
-            type="time"
-            :disabled="hour.is_closed"
-            :required="!hour.is_closed"
-            :class="inputClasses"
-          />
-        </div>
-        <div class="flex items-center gap-3">
+        <fieldset :disabled="isUnderReview" class="space-y-4">
+          <div
+            v-for="(hour, index) in hours"
+            :key="hour.day_of_week"
+            class="grid items-center gap-3 sm:grid-cols-[8rem_auto_1fr_1fr]"
+          >
+            <span class="text-sm font-medium text-slate-700">{{ DAY_LABELS[index] }}</span>
+            <label class="flex items-center gap-2 text-sm text-slate-600">
+              <input v-model="hour.is_closed" type="checkbox" />
+              Fermé
+            </label>
+            <input
+              v-model="hour.opens_at"
+              type="time"
+              :disabled="hour.is_closed"
+              :required="!hour.is_closed"
+              :class="inputClasses"
+            />
+            <input
+              v-model="hour.closes_at"
+              type="time"
+              :disabled="hour.is_closed"
+              :required="!hour.is_closed"
+              :class="inputClasses"
+            />
+          </div>
+        </fieldset>
+        <div v-if="!isUnderReview" class="flex items-center gap-3">
           <AppButton type="submit" :loading="hoursState.saving">Enregistrer les horaires</AppButton>
           <span v-if="hoursState.success" class="text-sm text-green-700">{{
             hoursState.success
@@ -402,6 +700,7 @@ const inputClasses =
               class="h-28 w-full rounded-md object-cover"
             />
             <AppButton
+              v-if="!isUnderReview"
               variant="danger"
               :disabled="photosState.saving"
               @click="removeImage(image.id)"
@@ -411,6 +710,7 @@ const inputClasses =
           </figure>
         </div>
         <input
+          v-if="!isUnderReview"
           type="file"
           accept="image/jpeg,image/png"
           multiple
@@ -418,9 +718,172 @@ const inputClasses =
           class="block text-sm text-slate-700"
           @change="onFilesSelected"
         />
-        <p v-if="photosState.success" class="text-sm text-green-700">{{ photosState.success }}</p>
-        <p v-if="photosState.error" class="text-sm text-red-600">{{ photosState.error }}</p>
+        <p v-if="photosState.success" class="text-sm text-green-700">
+          {{ photosState.success }}
+        </p>
+        <p v-if="photosState.error" class="text-sm text-red-600">
+          {{ photosState.error }}
+        </p>
       </section>
+
+      <!-- Informations légales (CLAUDE.md §5, ajout v0.26) -->
+      <form
+        v-if="legal"
+        class="space-y-4 rounded-lg border border-slate-200 bg-white p-6"
+        @submit.prevent="saveLegal"
+      >
+        <h2 class="text-lg font-semibold text-slate-900">Informations légales</h2>
+        <p class="text-sm text-slate-500">
+          Ces informations ne sont visibles que par l'équipe Make Cars.
+        </p>
+        <p v-if="registration?.status === 'approved'" class="text-sm text-slate-600">
+          Ces informations ne peuvent plus être modifiées depuis votre espace.
+        </p>
+
+        <fieldset :disabled="isLegalLocked" class="space-y-4">
+          <label class="block text-sm font-medium text-slate-700">
+            Numéro RCCM
+            <input
+              v-model="legalForm.business_registration_number"
+              type="text"
+              maxlength="100"
+              :aria-invalid="!!legalErrors.business_registration_number"
+              :class="[
+                inputClasses,
+                legalErrors.business_registration_number ? 'border-red-500' : '',
+              ]"
+            />
+            <span
+              v-if="legalErrors.business_registration_number"
+              class="mt-1 block text-xs font-normal text-red-600"
+              >{{ legalErrors.business_registration_number }}</span
+            >
+          </label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm font-medium text-slate-700">
+              IFU
+              <input
+                v-model="legalForm.ifu"
+                type="text"
+                inputmode="numeric"
+                maxlength="13"
+                :aria-invalid="!!legalErrors.ifu"
+                :class="[inputClasses, legalErrors.ifu ? 'border-red-500' : '']"
+              />
+              <span class="mt-1 block text-xs font-normal text-slate-500">
+                13 chiffres, figurant sur votre attestation d'immatriculation IFU
+              </span>
+              <span v-if="legalErrors.ifu" class="mt-1 block text-xs font-normal text-red-600">{{
+                legalErrors.ifu
+              }}</span>
+            </label>
+            <label class="block text-sm font-medium text-slate-700">
+              NPI
+              <input
+                v-model="legalForm.npi"
+                type="text"
+                inputmode="numeric"
+                maxlength="10"
+                :aria-invalid="!!legalErrors.npi"
+                :class="[inputClasses, legalErrors.npi ? 'border-red-500' : '']"
+              />
+              <span class="mt-1 block text-xs font-normal text-slate-500">
+                10 chiffres, en rouge sur votre Certificat d'Identification Personnelle (ANIP) — pas
+                le « N° » à 14 chiffres en haut à gauche
+              </span>
+              <span v-if="legalErrors.npi" class="mt-1 block text-xs font-normal text-red-600">{{
+                legalErrors.npi
+              }}</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div v-if="!isLegalLocked" class="flex items-center gap-3">
+          <AppButton type="submit" :loading="legalState.saving">
+            Enregistrer les informations légales
+          </AppButton>
+          <span v-if="legalState.success" class="text-sm text-green-700">{{
+            legalState.success
+          }}</span>
+          <span v-if="legalState.error" class="text-sm text-red-600">{{ legalState.error }}</span>
+        </div>
+
+        <!-- Document du registre de commerce : envoyé dès sa sélection, comme
+             les photos (endpoint séparé des champs ci-dessus). -->
+        <div class="space-y-2 border-t border-slate-200 pt-4">
+          <h3 class="text-sm font-semibold text-slate-900">Document du registre de commerce</h3>
+          <p class="text-xs text-slate-500">PDF, JPG ou PNG, 10 Mo maximum.</p>
+          <input
+            ref="documentInput"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            class="hidden"
+            @change="onDocumentSelected"
+          />
+          <div class="flex flex-wrap items-center gap-3">
+            <template v-if="legal.has_business_registration_document">
+              <span class="text-sm text-green-700">Document envoyé</span>
+              <AppButton variant="secondary" :loading="isOpeningDocument" @click="openDocument">
+                Voir le document
+              </AppButton>
+              <AppButton
+                v-if="!isLegalLocked"
+                variant="secondary"
+                :loading="documentState.saving"
+                @click="pickDocument"
+              >
+                Remplacer
+              </AppButton>
+            </template>
+            <template v-else>
+              <span class="text-sm text-slate-600">Aucun document envoyé.</span>
+              <AppButton
+                v-if="!isLegalLocked"
+                variant="secondary"
+                :loading="documentState.saving"
+                @click="pickDocument"
+              >
+                Choisir un fichier
+              </AppButton>
+            </template>
+          </div>
+          <p v-if="documentState.success" class="text-sm text-green-700">
+            {{ documentState.success }}
+          </p>
+          <p v-if="documentState.error" class="text-sm text-red-600">
+            {{ documentState.error }}
+          </p>
+        </div>
+      </form>
+
+      <!-- Soumission du dossier : seulement depuis `profile_incomplete` ou
+           `rejected` (isSubmittable() côté backend). -->
+      <section v-if="canSubmit" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="text-lg font-semibold text-slate-900">Soumettre mon dossier</h2>
+        <p class="text-sm text-slate-500">
+          L'équipe Make Cars examine votre profil et vos informations légales, puis valide votre
+          compte ou vous indique ce qu'il faut corriger.
+        </p>
+        <p v-if="!isReadyToSubmit" class="text-sm text-amber-800">
+          Avant de soumettre, complétez : {{ allMissingLabels.join(', ') }}.
+        </p>
+        <div class="flex items-center gap-3">
+          <AppButton
+            :disabled="!isReadyToSubmit"
+            :loading="submitState.saving"
+            @click="submitDossier"
+          >
+            Soumettre pour validation
+          </AppButton>
+          <span v-if="submitState.error" class="text-sm text-red-600">{{ submitState.error }}</span>
+        </div>
+        <p v-if="submitMissingLabels.length" class="text-sm text-red-600">
+          Éléments manquants : {{ submitMissingLabels.join(', ') }}.
+        </p>
+      </section>
+      <p v-if="submitState.success" class="text-sm text-green-700">
+        {{ submitState.success }}
+      </p>
     </template>
   </div>
 </template>

@@ -9,6 +9,7 @@ import {
   setStoredToken,
   setStoredUser,
 } from '@/lib/token'
+import type { RegistrationStatus } from '@/types/registration'
 import type { AccountType, ProfileStatus, User } from '@/types/user'
 
 // Chemin d'accueil de chaque espace, une fois connecté (CLAUDE.md §3) —
@@ -55,17 +56,56 @@ export const useAuthStore = defineStore('auth', () => {
     setStoredUser(newUser)
   }
 
-  // Vrai pour un professionnel approuvé dont le profil est incomplet : tout
-  // son espace est alors verrouillé sauf la page de profil (le backend
-  // applique la même règle, cette redirection n'est qu'un confort).
-  const mustCompleteProfile = computed(
-    () => user.value?.profile_status != null && !user.value.profile_status.is_complete,
+  const isProfessional = computed(
+    () => user.value?.role === 'garagiste' || user.value?.role === 'market_space',
+  )
+
+  // Statut du dossier d'inscription (CLAUDE.md §5, ajout v0.26) ; `null` pour
+  // admin et automobiliste, qui n'ont pas de dossier. `?.` (chaînage
+  // optionnel) s'arrête et renvoie `undefined` dès qu'un maillon manque, au
+  // lieu de lever une erreur ; `?? null` remplace alors ce `undefined`.
+  const registrationStatus = computed<RegistrationStatus | null>(() =>
+    isProfessional.value ? (user.value?.professional_registration?.status ?? null) : null,
+  )
+
+  // Suspension (CLAUDE.md §5, ajout v0.6) : état superposé à un dossier
+  // `approved`, qui ne bloque pas l'accès au dashboard — seul un bandeau
+  // l'affiche (DashboardShell).
+  const isSuspended = computed(() => user.value?.professional_registration?.is_suspended === true)
+  const suspensionReason = computed(
+    () => user.value?.professional_registration?.suspension_reason ?? null,
+  )
+
+  // Vrai tant qu'un professionnel doit rester sur « Mon profil » : dossier non
+  // approuvé OU profil incomplet. Remplace l'ancien calcul de complétude seule
+  // (v0.20), qui ne regardait que la complétude du profil : depuis v0.26, un
+  // profil complet n'est plus un compte validé — le dossier doit encore être
+  // soumis puis approuvé par l'administrateur, et le backend ferme toutes les
+  // routes métier d'ici là (403 `registration_not_approved`). Les deux
+  // conditions restent nécessaires : un compte approuvé avant v0.26 peut
+  // encore avoir un profil incomplet. Comme pour l'ancien calcul, le garde de
+  // navigation et les menus ne sont qu'un confort ; le backend reste la
+  // protection.
+  const mustStayOnProfile = computed(
+    () =>
+      isProfessional.value &&
+      (registrationStatus.value !== 'approved' ||
+        user.value?.profile_status?.is_complete === false),
   )
 
   function updateProfileStatus(status: ProfileStatus): void {
     if (!user.value) return
     user.value = { ...user.value, profile_status: status }
     setStoredUser(user.value)
+  }
+
+  // Relit l'utilisateur connecté depuis le backend (/auth/me) : statut du
+  // dossier, suspension et complétude du profil peuvent avoir changé depuis
+  // la connexion (décision de l'administrateur). Le token, lui, ne change pas.
+  async function refreshUser(): Promise<void> {
+    const freshUser = await authApi.fetchCurrentUser()
+    user.value = freshUser
+    setStoredUser(freshUser)
   }
 
   function clearSession(): void {
@@ -94,8 +134,12 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     isAuthenticated,
-    mustCompleteProfile,
+    registrationStatus,
+    isSuspended,
+    suspensionReason,
+    mustStayOnProfile,
     login,
+    refreshUser,
     logout,
     setSession,
     clearSession,

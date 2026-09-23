@@ -6,10 +6,11 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 
-// Profil incomplet : seul « Mon profil » est proposé (CLAUDE.md §5, ajout
-// v0.20) — `computed` recalcule le menu dès que le profil devient complet.
+// Dossier non approuvé ou profil incomplet : seul « Mon profil » est proposé
+// (CLAUDE.md §5, ajouts v0.20 et v0.26) — `computed` recalcule le menu dès que
+// le store change (ex. dossier approuvé, vu après « Actualiser »).
 const navItems = computed(() =>
-  auth.mustCompleteProfile
+  auth.mustStayOnProfile
     ? [{ label: 'Mon profil', to: '/market-space/profile' }]
     : [
         { label: 'Tableau de bord', to: '/market-space' },

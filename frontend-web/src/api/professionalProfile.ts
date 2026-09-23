@@ -1,19 +1,43 @@
 import http from '@/api/http'
-import type { OpeningHour, ProfessionalProfile } from '@/types/profile'
+import type {
+  LegalInfo,
+  LegalStatus,
+  OpeningHour,
+  ProfessionalProfile,
+  ProfileRegistrationMeta,
+} from '@/types/profile'
 import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { ProfileStatus } from '@/types/user'
 
 // Le backend renvoie la complétude du profil dans `meta.profile_status` (voir
-// ProfileController) : chaque appel qui modifie le profil est suivi d'un
-// rechargement pour récupérer profil + statut à jour.
+// ProfileController) et, depuis v0.26, l'état du dossier d'inscription :
+// complétude des informations légales, statut du dossier et informations
+// légales elles-mêmes (BuildsProfessionalProfileMeta). Ces trois clés sont
+// absentes si le compte n'a pas de dossier (cas anormal), d'où le `?` qui les
+// rend facultatives dans le type. Chaque appel qui modifie le profil est
+// suivi d'un rechargement pour récupérer profil + statuts à jour.
 interface ProfileResponse {
   data: ProfessionalProfile
-  meta: { profile_status: ProfileStatus }
+  meta: {
+    profile_status: ProfileStatus
+    legal_status?: LegalStatus
+    registration?: ProfileRegistrationMeta
+    legal?: LegalInfo
+  }
 }
 
 export interface LoadedProfile {
   profile: ProfessionalProfile
   status: ProfileStatus
+  legalStatus: LegalStatus | null
+  registration: ProfileRegistrationMeta | null
+  legal: LegalInfo | null
+}
+
+export interface LegalInfoPayload {
+  business_registration_number: string
+  ifu: string
+  npi: string
 }
 
 export interface ProfileInfoPayload {
@@ -37,7 +61,14 @@ export interface OpeningHourPayload {
 }
 
 function unwrap(response: { data: ProfileResponse }): LoadedProfile {
-  return { profile: response.data.data, status: response.data.meta.profile_status }
+  const { data, meta } = response.data
+  return {
+    profile: data,
+    status: meta.profile_status,
+    legalStatus: meta.legal_status ?? null,
+    registration: meta.registration ?? null,
+    legal: meta.legal ?? null,
+  }
 }
 
 export async function fetchProfile(space: ProfessionalSpace): Promise<LoadedProfile> {
@@ -69,6 +100,43 @@ export async function uploadImages(space: ProfessionalSpace, files: File[]): Pro
 
 export async function deleteImage(space: ProfessionalSpace, imageId: number): Promise<void> {
   await http.delete(`/${space}/profile/images/${imageId}`)
+}
+
+// Informations légales privées (RCCM, IFU, NPI) du dossier d'inscription
+// (CLAUDE.md §5, ajout v0.26).
+export async function updateLegalInfo(
+  space: ProfessionalSpace,
+  payload: LegalInfoPayload,
+): Promise<void> {
+  await http.put(`/${space}/profile/legal`, payload)
+}
+
+// Un seul document du registre de commerce : le nouveau remplace l'ancien.
+export async function uploadBusinessRegistrationDocument(
+  space: ProfessionalSpace,
+  file: File,
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('document', file)
+  await http.post(`/${space}/profile/legal/document`, formData)
+}
+
+// Fichier privé : même mécanisme blob authentifié que les PDF de devis
+// (fetchQuoteVersionPdfBlob) — une simple balise <a href> n'enverrait pas le
+// token Sanctum.
+export async function fetchBusinessRegistrationDocumentBlob(
+  space: ProfessionalSpace,
+): Promise<Blob> {
+  const response = await http.get<Blob>(`/${space}/profile/legal/document`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
+
+// Passe le dossier en `pending` (422 `registration_incomplete` si le profil ou
+// les informations légales sont incomplets).
+export async function submitRegistration(space: ProfessionalSpace): Promise<void> {
+  await http.post(`/${space}/profile/submit`)
 }
 
 export type { OpeningHour }

@@ -56,13 +56,23 @@ http.interceptors.response.use(
       }
     }
 
-    // 403 `profile_incomplete` : le backend refuse l'accès tant que le profil
-    // du professionnel n'est pas complet (CLAUDE.md §5, ajout v0.20). Filet de
-    // sécurité si l'état local est périmé (ex. session ouverte avant cette
-    // règle) : on mémorise l'état d'incomplétude puis on recharge sur la
-    // page de profil, où le garde de navigation prend le relais.
+    // 403 `profile_incomplete` (profil incomplet, CLAUDE.md §5 ajout v0.20) et
+    // 403 `registration_not_approved` (dossier pas encore approuvé, ajout
+    // v0.26) : le backend ferme l'espace métier. Filet de sécurité si l'état
+    // local est périmé (ex. session ouverte avant une décision de l'admin) :
+    // on met à jour l'utilisateur enregistré avec ce que dit la réponse, puis
+    // on recharge sur la page de profil, où le garde de navigation prend le
+    // relais (`mustStayOnProfile`).
+    //
+    // 409 `registration_under_review` (profil verrouillé pendant l'examen) et
+    // 409 `legal_info_locked` (informations légales d'un dossier approuvé) :
+    // volontairement aucun traitement ici — pas de redirection, l'écran
+    // affiche simplement le message du backend.
     const data = error.response?.data
-    if (error.response?.status === 403 && data?.code === 'profile_incomplete') {
+    if (
+      error.response?.status === 403 &&
+      (data?.code === 'profile_incomplete' || data?.code === 'registration_not_approved')
+    ) {
       const user = getStoredUser()
       const profilePath =
         user?.role === 'garagiste'
@@ -71,10 +81,22 @@ http.interceptors.response.use(
             ? '/market-space/profile'
             : null
       if (user && profilePath) {
-        setStoredUser({
-          ...user,
-          profile_status: { is_complete: false, missing_fields: data.missing_fields ?? [] },
-        })
+        if (data.code === 'profile_incomplete') {
+          setStoredUser({
+            ...user,
+            profile_status: { is_complete: false, missing_fields: data.missing_fields ?? [] },
+          })
+        } else if (user.professional_registration && data.registration_status) {
+          // `...` (décomposition) copie l'objet existant pour n'en remplacer
+          // que le statut, sans modifier l'original.
+          setStoredUser({
+            ...user,
+            professional_registration: {
+              ...user.professional_registration,
+              status: data.registration_status,
+            },
+          })
+        }
         if (window.location.pathname !== profilePath) {
           window.location.href = profilePath
         }

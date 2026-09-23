@@ -307,11 +307,11 @@ router.beforeEach((to) => {
     return { name: 'forbidden' }
   }
 
-  // Profil professionnel incomplet : aucune autre page que celle du profil
-  // (CLAUDE.md §5, ajout v0.20). La déconnexion n'est pas une route, elle
-  // reste toujours possible depuis la barre latérale.
+  // Dossier non approuvé ou profil incomplet : aucune autre page que celle
+  // du profil (CLAUDE.md §5, ajouts v0.20 et v0.26). La déconnexion n'est pas
+  // une route, elle reste toujours possible depuis la barre latérale.
   const profilePath = profilePathForRole(auth.user.role)
-  if (auth.mustCompleteProfile && profilePath && to.path !== profilePath) {
+  if (auth.mustStayOnProfile && profilePath && to.path !== profilePath) {
     return { path: profilePath }
   }
 

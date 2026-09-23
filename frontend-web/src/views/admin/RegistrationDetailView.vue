@@ -15,7 +15,7 @@ import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
 import type { ProfessionalRegistration, RegistrationDocument } from '@/types/registration'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { reviewStatusTone } from '@/utils/reviewStatus'
+import { registrationStatusTone } from '@/utils/registrationStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -180,7 +180,7 @@ function formatDate(iso: string): string {
             <p class="mt-1 text-sm text-slate-500">{{ registration.account_type_label }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <StatusBadge :label="registration.status_label" :tone="reviewStatusTone(registration.status)" />
+            <StatusBadge :label="registration.status_label" :tone="registrationStatusTone(registration.status)" />
             <StatusBadge v-if="registration.is_suspended" label="Suspendu" tone="danger" />
           </div>
         </div>
