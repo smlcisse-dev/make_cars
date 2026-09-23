@@ -43,6 +43,18 @@ class RegistrationSeedersTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d{10}$/', $pending->professionalRegistration->npi);
 
         $this->assertNotNull(User::where('email', 'auto.pieces.rejected@makecars.test')->sole()->professionalRegistration->rejection_reason);
+
+        // Structures de Cotonou localisées à Cotonou (Littoral), CIP fourni.
+        foreach (['garage.etoile.pending@makecars.test', 'pieces.express.pending@makecars.test', 'auto.pieces.rejected@makecars.test', 'garage.excellence.approved@makecars.test'] as $email) {
+            $user = User::where('email', $email)->sole();
+            $profile = $user->professionalProfile()->load('department', 'commune', 'arrondissement');
+            $this->assertSame('littoral', $profile->department->slug, $email);
+            $this->assertSame('cotonou', $profile->commune->slug, $email);
+            $this->assertSame($profile->commune_id, $profile->arrondissement->commune_id, $email);
+            $this->assertEqualsWithDelta(6.36, (float) $profile->latitude, 0.05, $email);
+            $this->assertEqualsWithDelta(2.41, (float) $profile->longitude, 0.06, $email);
+            $this->assertNotNull($user->professionalRegistration->identityCertificateDocument()->first(), $email);
+        }
         $this->assertNull(User::where('email', 'garage.nouveau.incomplete@makecars.test')->sole()->garage->name);
     }
 

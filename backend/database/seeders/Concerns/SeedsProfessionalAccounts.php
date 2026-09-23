@@ -6,6 +6,7 @@ use App\Enums\AccountType;
 use App\Enums\RegistrationDocumentType;
 use App\Enums\RegistrationStatus;
 use App\Models\Arrondissement;
+use App\Models\Commune;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Models\OrderLine;
@@ -49,7 +50,7 @@ trait SeedsProfessionalAccounts
      * approuvé ou s'il a un historique d'activité (avertissement en
      * console) ; sinon supprimé puis recréé, le tout dans une transaction.
      *
-     * @param  array{structure_name: string, address: string, neighborhood: string, image_directory: string}|null  $profile  null = profil laissé vide
+     * @param  array{structure_name: string, address: string, neighborhood: string, arrondissement_slug: string, latitude: float, longitude: float, image_directory: string}|null  $profile  null = profil laissé vide
      */
     private function seedProfessionalAccount(
         AccountType $accountType,
@@ -202,21 +203,31 @@ trait SeedsProfessionalAccounts
 
     /**
      * Profil public complet (CLAUDE.md §5, ajout v0.20) : photo à chemin fixe,
-     * écrasée à chaque passage plutôt qu'accumulée.
+     * écrasée à chaque passage plutôt qu'accumulée. Tous les comptes de test
+     * sont à Cotonou : localisation Littoral > Cotonou > arrondissement du
+     * quartier, cherchée par slug (jamais par position dans la liste), et
+     * coordonnées du quartier.
      *
-     * @param  array{structure_name: string, address: string, neighborhood: string, image_directory: string}  $data
+     * @param  array{structure_name: string, address: string, neighborhood: string, arrondissement_slug: string, latitude: float, longitude: float, image_directory: string}  $data
      */
     private function completePublicProfile(Garage|MarketSpaceAccount $profile, array $data): void
     {
-        $arrondissement = Arrondissement::query()->with('commune')->orderBy('id')->firstOrFail();
+        $cotonou = Commune::query()
+            ->where('slug', 'cotonou')
+            ->whereRelation('department', 'slug', 'littoral')
+            ->firstOrFail();
+        $arrondissement = Arrondissement::query()
+            ->whereBelongsTo($cotonou)
+            ->where('slug', $data['arrondissement_slug'])
+            ->firstOrFail();
 
         $profile->update([
             'name' => $data['structure_name'],
             'address' => $data['address'],
-            'latitude' => 6.3654,
-            'longitude' => 2.4183,
-            'department_id' => $arrondissement->commune->department_id,
-            'commune_id' => $arrondissement->commune_id,
+            'latitude' => $data['latitude'],
+            'longitude' => $data['longitude'],
+            'department_id' => $cotonou->department_id,
+            'commune_id' => $cotonou->id,
             'arrondissement_id' => $arrondissement->id,
             'neighborhood' => $data['neighborhood'],
         ]);

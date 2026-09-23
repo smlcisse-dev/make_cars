@@ -56,28 +56,28 @@ class ProfessionalRegistrationTestSeeder extends Seeder
         $this->seedProfessionalAccount(
             AccountType::Garagiste, 'garage.etoile.pending@makecars.test', 'Moussa', 'Adéchi',
             '+22901900102'.random_int(10, 99), RegistrationStatus::Pending,
-            $this->profileData('Garage Étoile du Bénin', 'Quartier Akpakpa, Cotonou, Bénin', 'Akpakpa', 'garages/registration-test-seeder/etoile'),
+            $this->profileData('Garage Étoile du Bénin', 'Quartier Akpakpa, Cotonou, Bénin', 'Akpakpa', '2e-arrondissement', 6.3712, 2.4527, 'garages/registration-test-seeder/etoile'),
             $admin,
         );
 
         $this->seedProfessionalAccount(
             AccountType::MarketSpace, 'pieces.express.pending@makecars.test', 'Aïcha', 'Sanni',
             '+22901900203'.random_int(10, 99), RegistrationStatus::Pending,
-            $this->profileData('Pièces Express Cotonou', 'Quartier Gbégamey, Cotonou, Bénin', 'Gbégamey', 'market-space/registration-test-seeder/express'),
+            $this->profileData('Pièces Express Cotonou', 'Quartier Gbégamey, Cotonou, Bénin', 'Gbégamey', '10e-arrondissement', 6.3668, 2.4012, 'market-space/registration-test-seeder/express'),
             $admin,
         );
 
         $this->seedProfessionalAccount(
             AccountType::Garagiste, 'garage.excellence.approved@makecars.test', 'Rodrigue', 'Zinsou',
             '+22901900104'.random_int(10, 99), RegistrationStatus::Approved,
-            $this->profileData('Garage Excellence Akpakpa', 'Quartier Akpakpa, Cotonou, Bénin', 'Akpakpa', 'garages/registration-test-seeder/excellence'),
+            $this->profileData('Garage Excellence Akpakpa', 'Quartier Akpakpa, Cotonou, Bénin', 'Akpakpa', '2e-arrondissement', 6.3735, 2.4561, 'garages/registration-test-seeder/excellence'),
             $admin,
         );
 
         $this->seedProfessionalAccount(
             AccountType::MarketSpace, 'auto.pieces.rejected@makecars.test', 'Florent', 'Dossou',
             '+22901900205'.random_int(10, 99), RegistrationStatus::Rejected,
-            $this->profileData('Auto Pièces Fidjrossè', 'Quartier Fidjrossè, Cotonou, Bénin', 'Fidjrossè', 'market-space/registration-test-seeder/fidjrosse'),
+            $this->profileData('Auto Pièces Fidjrossè', 'Quartier Fidjrossè, Cotonou, Bénin', 'Fidjrossè', '12e-arrondissement', 6.3571, 2.3648, 'market-space/registration-test-seeder/fidjrosse'),
             $admin,
             "Le document du registre de commerce fourni est illisible et les photos ne correspondent pas à l'adresse déclarée. Merci de corriger votre dossier puis de le soumettre à nouveau.",
         );
@@ -88,10 +88,18 @@ class ProfessionalRegistrationTestSeeder extends Seeder
     }
 
     /**
-     * @return array{structure_name: string, address: string, neighborhood: string, image_directory: string}
+     * @return array{structure_name: string, address: string, neighborhood: string, arrondissement_slug: string, latitude: float, longitude: float, image_directory: string}
      */
-    private function profileData(string $structureName, string $address, string $neighborhood, string $imageDirectory): array
+    private function profileData(string $structureName, string $address, string $neighborhood, string $arrondissementSlug, float $latitude, float $longitude, string $imageDirectory): array
     {
-        return ['structure_name' => $structureName, 'address' => $address, 'neighborhood' => $neighborhood, 'image_directory' => $imageDirectory];
+        return [
+            'structure_name' => $structureName,
+            'address' => $address,
+            'neighborhood' => $neighborhood,
+            'arrondissement_slug' => $arrondissementSlug,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'image_directory' => $imageDirectory,
+        ];
     }
 }
