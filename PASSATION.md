@@ -3,17 +3,17 @@
 Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23 par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **69 commits** au total, dont 27 depuis la passation précédente.
-- **Dernier commit** : `528ef98` chore(http): relève temporairement le timeout Axios à 30 s.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **523 tests, 523 réussis, 1589 assertions** après le backend v0.26 (475 tests et 1232 assertions juste avant).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **92 commits** au total après le lot v0.27/v0.28 (69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `91a9cb8` feat(frontend): demande de réactivation d'un compte suspendu (v0.28), suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **558 tests, 558 réussis, 1796 assertions** après v0.27/v0.28 (523 tests après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **183 routes** au total (173 avant le parcours d'inscription v0.26 : +4 par espace pro, +2 en auth).
+- **Routes** (`php artisan route:list`) : **190 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28).
 
 | Espace | Routes | Détail |
 |---|---|---|
-| `api/garage/*` | 53 | profil 9 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
-| `api/market-space/*` | 30 | profil 9 (mêmes routes de dossier v0.26), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
-| `api/admin/*` | 39 | inscriptions 7, litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
+| `api/garage/*` | 56 | profil 12 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit` ; CIP v0.27 : `profile/legal/identity-document` ×2 ; v0.28 : `profile/reactivation-request`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
+| `api/market-space/*` | 33 | profil 12 (mêmes routes de dossier v0.26, v0.27 et v0.28), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
+| `api/admin/*` | 40 | inscriptions 8 (dont `reactivation-request/refuse`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 9 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim` |
 | Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2, réclamation de compte express 2, `health` 1 |
@@ -25,6 +25,8 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 
 - **Testé manuellement en navigateur, écran par écran** : le **dashboard Garagiste au complet**, c'est-à-dire Services, Produits, Rendez-vous, Devis/Factures, Chat, Commandes, Avis, Réclamations et Notifications (plus Mon profil).
   - *Source : déclaration de l'utilisateur. Rien dans le dépôt ne permet de le constater.*
+- **« Mon profil » v0.26 (espaces Garagiste et Market Space)** : testé manuellement en navigateur — remplissage et soumission, verrouillage pendant l'examen, approbation puis « Actualiser », bandeau de suspension, dossier refusé corrigeable.
+  - *Source : déclaration de l'utilisateur, 2026-09-23.* Les corrections qui en sont issues (lot du 2026-09-23, §8) et les ajouts v0.27/v0.28 ne sont **pas encore testés** en navigateur.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
@@ -44,7 +46,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 **Commun**
 - `/login` : connexion email/mot de passe.
 - `/403` et page 404.
-- Composants partagés (`src/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal`, `StatusBadge`, `LocationSelect`.
+- Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28).
 - Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
 
 **Espace Admin (`/admin`)** : construit, relu, jamais testé en navigateur
@@ -52,7 +54,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 | Menu | Routes | Périmètre |
 |---|---|---|
 | Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`), en cartes et tableaux, sans graphiques |
-| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC. Approbation, rejet, suspension et réactivation (motif obligatoire) |
+| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — **construit, pas encore testé** |
 | Services | `/admin/services`, `/:id` | Validation des services de garage |
 | Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
 | Avis | `/admin/avis`, `/:id` | Masquage avec motif |
@@ -74,7 +76,7 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 | Avis | `/garage/reviews` | `shared/ReviewsView.vue` : lecture seule |
 | Réclamations | `/garage/disputes`, `/:id` | `shared/DisputesView` (filtre par statut), `shared/DisputeDetailView` (réponse) |
 | Notifications | `/garage/notifications` | `shared/NotificationsView.vue` |
-| Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`). Depuis le 2026-09-23, porte aussi le dossier d'inscription v0.26 : bandeau d'état (`profile_incomplete` / `pending` avec « Actualiser » / `rejected` avec motif / `approved`), profil en lecture seule pendant l'examen, section « Informations légales » (RCCM, IFU, NPI, document du registre de commerce), section « Soumettre mon dossier ». **Construit, pas encore testé en navigateur** |
+| Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`). Depuis le 2026-09-23, porte aussi le dossier d'inscription v0.26 : bandeau d'état (`profile_incomplete` / `pending` avec « Actualiser » / `rejected` avec motif / `approved`), profil en lecture seule pendant l'examen, section « Informations légales » (RCCM, IFU, NPI, document du registre de commerce, et depuis v0.27 le Certificat d'Identification Personnelle), section « Soumettre mon dossier ». **Testé en navigateur (déclaration utilisateur, 2026-09-23)**, hors bloc CIP (v0.27, pas encore testé) |
 
 **Espace Market Space (`/market-space`)** : construit, relu, jamais testé en navigateur
 
@@ -89,9 +91,9 @@ Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran 
 | Avis | `/market-space/reviews` | `shared/ReviewsView.vue` |
 | Réclamations | `/market-space/disputes`, `/:id` | `shared/DisputesView`, `shared/DisputeDetailView` |
 | Notifications | `/market-space/notifications` | `shared/NotificationsView.vue` |
-| Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`) |
+| Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`). Testé en navigateur (déclaration utilisateur, 2026-09-23), hors bloc CIP (v0.27) |
 
-Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`DashboardShell`), sans blocage d'accès. La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
+Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustStayOnProfile`, store `auth`), les deux layouts ne proposent que « Mon profil ». Un compte suspendu voit un bandeau rouge avec le motif en haut de l'espace (`SuspensionBanner` dans `DashboardShell`), sans blocage d'accès ; depuis v0.28, il peut y demander la réactivation (construit, pas encore testé). La session est rafraîchie (`/auth/me`) au démarrage, sans bloquer l'affichage.
 
 ## 2. Backend construit et testé, sans écran frontend
 
@@ -175,6 +177,9 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - **Changement v0.26** : les seeders suivent le nouveau parcours (trait `SeedsProfessionalAccounts` : compte email vérifié, profil, informations légales avec IFU/NPI fictifs au bon format, document RCCM, soumission puis décision via `ProfessionalRegistrationService`). Aucun email réel n'est envoyé (`Mail::fake`). Nouveau compte `garage.nouveau.incomplete`.
 - **Base de dev après la migration v0.26 (2026-09-23)** : les anciens dossiers `pending` (`garage.etoile`, `pieces.express`) sont passés `profile_incomplete` sans IFU/NPI ; les seeders n'ont **pas** été relancés sur Supabase — les relancer pour retrouver exactement les états du tableau.
 - **Ordre d'exécution** : `ProfessionalRegistrationTestSeeder` puis `CatalogTestSeeder`. Les deux sont idempotents.
+- **Relancés sur la base de dev le 2026-09-23** (lot v0.27/v0.28) : `garage.nouveau.incomplete`, `garage.etoile.pending`, `pieces.express.pending` et `auto.pieces.rejected` réinitialisés ; les deux comptes approuvés conservés.
+- **Localisation et CIP (2026-09-23)** : les structures créées ou réinitialisées sont localisées à Cotonou (Littoral > Cotonou > arrondissement du quartier, recherche par slug) avec des coordonnées du quartier : Akpakpa → 2e arrondissement, Gbégamey → 10e, Fidjrossè → 12e, Ganhi → 4e (valeurs de test approximatives). Elles reçoivent aussi un faux CIP (exigé par la soumission depuis v0.27).
+  - **Exception** : les deux comptes approuvés existants (`garage.excellence.approved`, `marche.pieces.approved`), jamais modifiés par les seeders, gardent leur ancienne localisation Alibori > Banikoara > Founougo et n'ont **pas de CIP** (sans blocage : pas d'exigence rétroactive). À corriger à la main si besoin, ou en supprimant ces comptes sans historique avant de relancer les seeders.
 - **Historique toujours préservé (correctif du 2026-09-23)** : les seeders ne suppriment plus jamais de donnée ayant une trace réelle.
   - Comptes **approuvés** (`garage.excellence.approved`, `marche.pieces.approved`) : créés s'ils manquent, **jamais supprimés ni réinitialisés** s'ils existent, même dans un état différent du tableau.
   - Comptes d'**état d'inscription** (`garage.nouveau.incomplete`, `garage.etoile.pending`, `pieces.express.pending`, `auto.pieces.rejected`) : supprimés puis recréés (dans une transaction) **seulement** s'ils n'ont aucun historique : produits vendus en commande ou cités dans un devis, commandes, devis, RDV, conversations, avis, réclamations. Sinon ils sont conservés tels quels, avec un avertissement en console qui indique le compte et l'historique trouvé.
@@ -190,7 +195,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 2. **Agrégateur de paiement** : Kkiapay, FedaPay ou autre. Le paiement manuel V1 sert en attendant.
 3. **Chat temps réel** : Reverb, Pusher ou Supabase Realtime.
 4. **Contestation d'un avis** par un pro avant modération.
-5. **Cadre légal** du partage des données agrégées avec l'administration.
+5. **Cadre légal** du partage des données agrégées avec l'administration. **Complément (2026-09-23)** : la plateforme stocke désormais des pièces d'identité (CIP, v0.27 : photo, date de naissance, filiation). Avant la mise en production, définir au regard de la loi n° 2017-20 portant Code du numérique (protection des données personnelles, Bénin) : la durée de conservation de ces documents, l'information et le consentement du professionnel, et le sort des documents d'un dossier refusé ou d'un compte fermé.
 6. **Auth téléphone/SMS** pour l'automobiliste.
 7. **Périmètre de la mini-boutique** : catégories, limite, seuil de bascule vers un compte Market Space.
 8. **Pages de confirmation** des liens email (devis, compte express).
@@ -223,6 +228,17 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
    - middleware `profile.complete` présent.
 
 ## 8. Derniers changements (depuis le 2026-09-20)
+
+**Lot du 2026-09-23 (après les tests de « Mon profil »)**
+- Corrections frontend (`c0506e4`) :
+  - champs verrouillés visibles (variantes Tailwind `disabled:`) sur « Mon profil » ;
+  - badge « Profil à compléter » dans les cartes Structures du tableau de bord admin (`profile_incomplete`, typé dans `types/statistics.ts`) ;
+  - plus aucune mention de CLAUDE.md, de § ou de version dans les textes affichés (6 écrans admin) ;
+  - une seule rubrique active dans le menu, pages de détail comprises (`DashboardShell`) ;
+  - « Mon profil » reporte l'état du dossier dans la session (`auth.updateRegistrationFromProfile`).
+- **Certificat d'Identification Personnelle (v0.27)** : backend `166c773` (le faux CIP des seeders y est inclus, car `submit()` l'exige), frontend `9668a4e` (`LegalDocumentField`).
+- Seeders : localisation cohérente à Cotonou (`6b3e3a0`).
+- **Demande de réactivation (v0.28)** : backend `b02c872` (+ `690759a`, retrait d'un fichier généré par erreur), frontend `91a9cb8`. Migration `create_reactivation_requests_table` appliquée sur la base de **développement** uniquement ; à appliquer en production lors du prochain déploiement.
 
 **Règles métier**
 - **Parcours d'inscription professionnelle en deux temps (v0.26, 2026-09-23)**, backend uniquement :
