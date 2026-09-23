@@ -26,7 +26,7 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Testé manuellement en navigateur, écran par écran** : le **dashboard Garagiste au complet**, c'est-à-dire Services, Produits, Rendez-vous, Devis/Factures, Chat, Commandes, Avis, Réclamations et Notifications (plus Mon profil).
   - *Source : déclaration de l'utilisateur. Rien dans le dépôt ne permet de le constater.*
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
-  - le **dashboard Market Space**, miroir du Garagiste ;
+  - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
 
 ---
@@ -66,29 +66,29 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 |---|---|---|
 | Tableau de bord | `/garage` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, sans chiffres ni raccourcis |
 | Services | `/garage/services` | `ServicesView.vue` : CRUD, disponibilité, image obligatoire à la création (v0.23) |
-| Produits | `/garage/products` | `ProductsView.vue` : CRUD, correction de stock, seuil bas, image obligatoire (v0.23) |
+| Produits | `/garage/products` | `shared/ProductsView.vue` : CRUD, correction de stock, seuil bas, image obligatoire (v0.23) |
 | Rendez-vous | `/garage/appointments`, `/:id` | `AppointmentsView`, `AppointmentDetailView` : confirmer, refuser (motif obligatoire, v0.24), reprogrammer |
 | Devis | `/garage/quotes`, `/new`, `/:id` | `QuotesView`, `QuoteCreateView` (avec ou sans RDV, client express), `QuoteDetailView` (versions, envoi, démarrage, paiement manuel, abandon, PDF) ; lignes diagnostic / service / pièce / **prestation libre** |
-| Commandes | `/garage/orders`, `/:id` | `OrdersView`, `OrderDetailView` : paiement manuel, PDF |
-| Messages | `/garage/conversations` | `ConversationsView.vue` : lien vers le devis depuis un message système |
-| Avis | `/garage/reviews` | `ReviewsView.vue` : lecture seule |
-| Réclamations | `/garage/disputes`, `/:id` | `DisputesView` (filtre par statut), `DisputeDetailView` (réponse) |
-| Notifications | `/garage/notifications` | `NotificationsView.vue` |
+| Commandes | `/garage/orders`, `/:id` | `shared/OrdersView`, `shared/OrderDetailView` : paiement manuel, PDF |
+| Messages | `/garage/conversations` | `shared/ConversationsView.vue` : lien vers le devis depuis un message système |
+| Avis | `/garage/reviews` | `shared/ReviewsView.vue` : lecture seule |
+| Réclamations | `/garage/disputes`, `/:id` | `shared/DisputesView` (filtre par statut), `shared/DisputeDetailView` (réponse) |
+| Notifications | `/garage/notifications` | `shared/NotificationsView.vue` |
 | Mon profil | `/garage/profile` | `shared/ProfessionalProfileView.vue` (`space="garage"`) |
 
 **Espace Market Space (`/market-space`)** : construit, relu, jamais testé en navigateur
 
-Ordre du menu dans `MarketSpaceLayout.vue` :
+Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran est le même fichier que côté Garagiste (`views/shared/`, prop `space="market-space"`) :
 
 | Menu | Routes | Vue(s) |
 |---|---|---|
 | Tableau de bord | `/market-space` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, comme côté Garagiste |
-| Produits | `/market-space/products` | `ProductsView.vue` |
-| Commandes | `/market-space/orders`, `/:id` | `OrdersView`, `OrderDetailView` |
-| Messages | `/market-space/conversations` | `ConversationsView.vue` (chat Market Space, v0.22) |
-| Avis | `/market-space/reviews` | `ReviewsView.vue` |
-| Réclamations | `/market-space/disputes`, `/:id` | `DisputesView`, `DisputeDetailView` |
-| Notifications | `/market-space/notifications` | `NotificationsView.vue` |
+| Produits | `/market-space/products` | `shared/ProductsView.vue` |
+| Commandes | `/market-space/orders`, `/:id` | `shared/OrdersView`, `shared/OrderDetailView` |
+| Messages | `/market-space/conversations` | `shared/ConversationsView.vue` (chat Market Space, v0.22 ; sans lien « Voir le devis ») |
+| Avis | `/market-space/reviews` | `shared/ReviewsView.vue` |
+| Réclamations | `/market-space/disputes`, `/:id` | `shared/DisputesView`, `shared/DisputeDetailView` |
+| Notifications | `/market-space/notifications` | `shared/NotificationsView.vue` |
 | Mon profil | `/market-space/profile` | `shared/ProfessionalProfileView.vue` (`space="market-space"`) |
 
 Tant que le profil est incomplet, les deux layouts ne proposent que « Mon profil ».
@@ -230,6 +230,12 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 - Market Space :
   - Produits et Commandes `f48dfab` ;
   - Avis, Réclamations, Notifications `874281c`.
+
+**Mutualisation des écrans Garagiste / Market Space (2026-09-23, `07d536e`)**
+- Produits, Commandes (+ détail), Messages, Avis, Réclamations (+ détail) et Notifications déplacés dans `views/shared/`, prop obligatoire `space` ; les copies `views/market-space/*`, `api/marketSpace*.ts` et `types/marketSpace*.ts` sont supprimées.
+- API des espaces pro : `space` en premier paramètre obligatoire (`api/professionalProducts.ts`, `api/professionalReviews.ts`, `orders`, `disputes`, `notifications`, `conversations`). `fetchAllGarageProducts()` reste propre au Garagiste (devis).
+- Chemins et noms de route inchangés ; backend inchangé. Convention documentée dans CLAUDE.md §4.
+- Market Space toujours **non testé en navigateur** (voir « Niveau de vérification »).
 
 **Correctifs et ajustements techniques**
 - `0b70784` : rechargement des relations Eloquent après approve / reject / suspend / moderate / resolve (écrans admin).
