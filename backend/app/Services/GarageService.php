@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\DayOfWeek;
 use App\Models\Garage;
 use App\Models\GarageImage;
-use App\Models\ProfessionalRegistration;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -13,20 +12,6 @@ use Illuminate\Validation\ValidationException;
 
 class GarageService
 {
-    /**
-     * Pré-remplit le profil Garage à partir du dossier KYC validé (nom,
-     * adresse) ; le garagiste complète ensuite géoloc/horaires/photos depuis
-     * son dashboard.
-     */
-    public function createFromRegistration(ProfessionalRegistration $registration): Garage
-    {
-        return $registration->user->garage()->create([
-            'name' => $registration->structure_name,
-            'address' => $registration->address,
-            'phone' => $registration->user->phone,
-        ]);
-    }
-
     /**
      * Profil Garage vide, créé dès la vérification de l'email (CLAUDE.md §5,
      * ajout v0.26) : seul le téléphone saisi à l'inscription est repris ; le

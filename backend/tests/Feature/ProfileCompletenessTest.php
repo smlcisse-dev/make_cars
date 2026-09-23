@@ -4,9 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
-use App\Models\ProfessionalRegistration;
 use App\Models\User;
-use App\Services\ProfessionalRegistrationService;
+use App\Services\GarageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -50,7 +49,7 @@ class ProfileCompletenessTest extends TestCase
 
     public function test_an_incomplete_garage_is_blocked_everywhere_except_the_profile_routes(): void
     {
-        $garage = Garage::factory()->create();
+        $garage = Garage::factory()->withApprovedRegistration()->create();
         Sanctum::actingAs($garage->user);
 
         $this->getJson('/api/garage/products')
@@ -73,7 +72,7 @@ class ProfileCompletenessTest extends TestCase
 
     public function test_an_incomplete_market_space_account_is_blocked_too(): void
     {
-        $account = MarketSpaceAccount::factory()->create();
+        $account = MarketSpaceAccount::factory()->withApprovedRegistration()->create();
         Sanctum::actingAs($account->user);
 
         $this->getJson('/api/market-space/products')->assertForbidden()->assertJsonPath('code', 'profile_incomplete');
@@ -116,13 +115,13 @@ class ProfileCompletenessTest extends TestCase
             ->assertJsonValidationErrors(['phone', 'latitude', 'longitude']);
     }
 
-    public function test_the_phone_is_prefilled_from_the_registration_on_approval(): void
+    public function test_the_empty_profile_is_prefilled_with_the_phone_given_at_registration(): void
     {
-        $registration = ProfessionalRegistration::factory()->create();
-        $registration->user->update(['phone' => '+2290196000000']);
+        $user = User::factory()->garagiste()->create(['phone' => '+2290196000000']);
 
-        app(ProfessionalRegistrationService::class)->approve($registration, User::factory()->admin()->create());
+        $garage = app(GarageService::class)->createEmpty($user);
 
-        $this->assertSame('+2290196000000', $registration->user->fresh()->garage->phone);
+        $this->assertSame('+2290196000000', $garage->phone);
+        $this->assertNull($garage->name);
     }
 }

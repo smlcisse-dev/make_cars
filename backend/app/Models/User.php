@@ -80,7 +80,8 @@ class User extends Authenticatable
 
     /**
      * Profil public du professionnel (Garage ou Market Space selon le rôle),
-     * null pour les autres rôles ou tant que le dossier n'est pas approuvé.
+     * null pour les autres rôles. Créé dès la vérification de l'email, avant
+     * même la soumission du dossier (CLAUDE.md §5, ajout v0.26).
      */
     public function professionalProfile(): Garage|MarketSpaceAccount|null
     {

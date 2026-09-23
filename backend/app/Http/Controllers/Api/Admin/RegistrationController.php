@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Enums\RegistrationStatus;
 use App\Http\Controllers\Api\Controller;
 use App\Http\Requests\Admin\RejectRegistrationRequest;
 use App\Http\Requests\Admin\SuspendRegistrationRequest;
@@ -18,6 +19,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RegistrationController extends Controller
 {
+    /**
+     * Le profil est chargé pour exposer `structure_name`/`address`, lus
+     * depuis lui (CLAUDE.md §5, ajout v0.26).
+     */
+    private const LIST_RELATIONS = ['documents', 'user.garage', 'user.marketSpaceAccount'];
+
+    /**
+     * Fiche d'examen : profil complet, documents et historique des décisions.
+     */
+    private const DETAIL_RELATIONS = [
+        'documents',
+        'decisions.decidedBy',
+        'user.garage.openingHours', 'user.garage.images', 'user.garage.department', 'user.garage.commune', 'user.garage.arrondissement',
+        'user.marketSpaceAccount.openingHours', 'user.marketSpaceAccount.images', 'user.marketSpaceAccount.department',
+        'user.marketSpaceAccount.commune', 'user.marketSpaceAccount.arrondissement',
+    ];
+
     public function __construct(private readonly ProfessionalRegistrationService $registrationService) {}
 
     /**
@@ -29,9 +47,16 @@ class RegistrationController extends Controller
     {
         Gate::authorize('viewAny', ProfessionalRegistration::class);
 
+        // Par défaut, les dossiers encore en cours de remplissage par le
+        // professionnel (`profile_incomplete`) sont exclus : rien à examiner
+        // (CLAUDE.md §5, ajout v0.26). Le filtre `status` permet de les voir.
         $registrations = ProfessionalRegistration::query()
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->with(['documents', 'user'])
+            ->when(
+                $request->filled('status'),
+                fn ($query) => $query->where('status', $request->string('status')),
+                fn ($query) => $query->where('status', '!=', RegistrationStatus::ProfileIncomplete),
+            )
+            ->with(self::LIST_RELATIONS)
             ->latest()
             ->paginate();
 
@@ -42,7 +67,7 @@ class RegistrationController extends Controller
     {
         Gate::authorize('view', $registration);
 
-        return $this->success(new ProfessionalRegistrationResource($registration->load(['documents', 'user'])));
+        return $this->success(new ProfessionalRegistrationResource($registration->load(self::DETAIL_RELATIONS)));
     }
 
     public function approve(Request $request, ProfessionalRegistration $registration): JsonResponse
@@ -50,7 +75,7 @@ class RegistrationController extends Controller
         Gate::authorize('review', $registration);
 
         $registration = $this->registrationService->approve($registration, $request->user())
-            ->load(['documents', 'user']);
+            ->load(self::LIST_RELATIONS);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Inscription validée.');
     }
@@ -58,7 +83,7 @@ class RegistrationController extends Controller
     public function reject(RejectRegistrationRequest $request, ProfessionalRegistration $registration): JsonResponse
     {
         $registration = $this->registrationService->reject($registration, $request->user(), $request->string('reason')->toString())
-            ->load(['documents', 'user']);
+            ->load(self::LIST_RELATIONS);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Inscription rejetée.');
     }
@@ -70,7 +95,7 @@ class RegistrationController extends Controller
     public function suspend(SuspendRegistrationRequest $request, ProfessionalRegistration $registration): JsonResponse
     {
         $registration = $this->registrationService->suspend($registration, $request->user(), $request->string('reason')->toString())
-            ->load(['documents', 'user']);
+            ->load(self::LIST_RELATIONS);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Compte suspendu.');
     }
@@ -79,7 +104,7 @@ class RegistrationController extends Controller
     {
         Gate::authorize('reactivate', $registration);
 
-        $registration = $this->registrationService->reactivate($registration)->load(['documents', 'user']);
+        $registration = $this->registrationService->reactivate($registration)->load(self::LIST_RELATIONS);
 
         return $this->success(new ProfessionalRegistrationResource($registration), 'Compte réactivé.');
     }

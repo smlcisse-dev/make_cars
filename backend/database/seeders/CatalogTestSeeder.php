@@ -3,16 +3,16 @@
 namespace Database\Seeders;
 
 use App\Enums\AccountType;
-use App\Models\Arrondissement;
+use App\Enums\RegistrationStatus;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
 use App\Models\User;
 use App\Services\ProductService;
-use App\Services\ProfessionalRegistrationService;
 use App\Services\RepairServiceService;
 use Database\Seeders\Concerns\GeneratesFakeKycDocuments;
+use Database\Seeders\Concerns\SeedsProfessionalAccounts;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Jeu de données de test pour la validation admin des services et produits
@@ -24,9 +24,9 @@ use Illuminate\Support\Facades\Hash;
  *   php artisan db:seed --class=ProfessionalRegistrationTestSeeder
  *   php artisan db:seed --class=CatalogTestSeeder
  *
- * Passe exclusivement par RepairServiceService/ProductService/
- * ProfessionalRegistrationService (jamais d'insertion directe Eloquent/DB),
- * même principe que ProfessionalRegistrationTestSeeder.
+ * Passe par RepairServiceService/ProductService et, pour le compte Market
+ * Space, par SeedsProfessionalAccounts (même parcours que
+ * ProfessionalRegistrationTestSeeder). Aucun email réel (Mail::fake).
  *
  * Idempotent : un nouveau passage supprime d'abord le service/les produits
  * de test déjà présents (identifiés par leur nom) avant de les recréer, et
@@ -35,7 +35,7 @@ use Illuminate\Support\Facades\Hash;
  */
 class CatalogTestSeeder extends Seeder
 {
-    use GeneratesFakeKycDocuments;
+    use GeneratesFakeKycDocuments, SeedsProfessionalAccounts;
 
     private const GARAGE_NAME = 'Garage Excellence Akpakpa';
 
@@ -56,10 +56,11 @@ class CatalogTestSeeder extends Seeder
     private const MARKET_SPACE_PRODUCT_NAME = 'Kit plaquettes de frein avant (test validation admin)';
 
     public function run(
-        ProfessionalRegistrationService $registrationService,
         RepairServiceService $serviceService,
         ProductService $productService,
     ): void {
+        Mail::fake();
+
         $admin = User::where('role', AccountType::Admin)->first()
             ?? User::factory()->admin()->create([
                 'name' => 'Admin Make Cars',
@@ -95,7 +96,7 @@ class CatalogTestSeeder extends Seeder
             'stock_quantity' => 20,
         ], $this->fakeCatalogImage('huile-moteur-5w30.jpg'));
 
-        $marketSpaceAccount = $this->ensureApprovedMarketSpaceAccount($registrationService, $admin);
+        $marketSpaceAccount = $this->ensureApprovedMarketSpaceAccount($admin);
 
         $marketSpaceAccount->products()->where('name', self::MARKET_SPACE_PRODUCT_NAME)->delete();
         $productService->create($marketSpaceAccount, [
@@ -112,80 +113,28 @@ class CatalogTestSeeder extends Seeder
     }
 
     /**
-     * Aucun compte Market Space de test n'est approuvé (les seeders existants
-     * n'en laissent qu'un pending et un rejected) : on inscrit puis approuve
-     * un compte dédié, en repartant de zéro s'il existe déjà (même logique
-     * que ProfessionalRegistrationTestSeeder::resetExistingTestAccounts).
+     * Compte Market Space approuvé de test, recréé à chaque passage via le
+     * parcours v0.26 (profil, informations légales, soumission, approbation
+     * — voir SeedsProfessionalAccounts).
      */
-    private function ensureApprovedMarketSpaceAccount(
-        ProfessionalRegistrationService $registrationService,
-        User $admin,
-    ): MarketSpaceAccount {
-        $existingUser = User::where('email', self::MARKET_SPACE_EMAIL)->first();
-
-        if ($existingUser) {
-            $existingUser->marketSpaceAccount?->products()->delete();
-            $existingUser->delete();
-        }
-
-        $user = $registrationService->register(
+    private function ensureApprovedMarketSpaceAccount(User $admin): MarketSpaceAccount
+    {
+        $user = $this->seedProfessionalAccount(
+            AccountType::MarketSpace,
+            self::MARKET_SPACE_EMAIL,
+            'Géraud',
+            'Ahouansou',
+            '+22901900405'.random_int(10, 99),
+            RegistrationStatus::Approved,
             [
-                'name' => self::MARKET_SPACE_STRUCTURE_NAME,
-                'email' => self::MARKET_SPACE_EMAIL,
-                'phone' => '+229 01 90 04 05 '.random_int(10, 99),
-                'password' => Hash::make('password'),
-                'account_type' => AccountType::MarketSpace->value,
                 'structure_name' => self::MARKET_SPACE_STRUCTURE_NAME,
                 'address' => 'Quartier Ganhi, Cotonou, Bénin',
-                'business_registration_number' => 'IFU-'.random_int(10000000, 99999999),
+                'neighborhood' => 'Ganhi',
+                'image_directory' => self::MARKET_SPACE_IMAGE_DIRECTORY,
             ],
-            $this->fakeBusinessRegistrationDocument(),
-            [$this->fakePremisesPhoto()],
+            $admin,
         );
 
-        $registrationService->approve($user->professionalRegistration, $admin);
-
-        $account = $user->marketSpaceAccount()->firstOrFail();
-        $this->completeProfile($account);
-
-        return $account;
-    }
-
-    /**
-     * Complète le profil du compte Market Space de test (CLAUDE.md §5, ajout
-     * v0.20) pour qu'il puisse accéder à tout son espace sans passer par
-     * l'écran de profil : téléphone, position, localisation administrative,
-     * 7 jours d'horaires et une photo.
-     */
-    private function completeProfile(MarketSpaceAccount $account): void
-    {
-        $arrondissement = Arrondissement::query()->with('commune')->orderBy('id')->firstOrFail();
-
-        $account->update([
-            'phone' => '+2290190040599',
-            'latitude' => 6.3654,
-            'longitude' => 2.4183,
-            'department_id' => $arrondissement->commune->department_id,
-            'commune_id' => $arrondissement->commune_id,
-            'arrondissement_id' => $arrondissement->id,
-            'neighborhood' => 'Ganhi',
-        ]);
-
-        $account->openingHours()->delete();
-        $account->openingHours()->createMany(
-            array_map(fn (int $day) => [
-                'day_of_week' => $day,
-                'is_closed' => $day === 7,
-                'opens_at' => $day === 7 ? null : '08:00',
-                'closes_at' => $day === 7 ? null : '18:00',
-            ], range(1, 7)),
-        );
-
-        $account->images()->delete();
-        $account->images()->create([
-            'disk' => 'public',
-            'path' => $this->fakeCatalogImage('boutique.jpg')->storeAs(self::MARKET_SPACE_IMAGE_DIRECTORY, 'boutique.jpg', 'public'),
-            'position' => 1,
-        ]);
+        return $user->marketSpaceAccount()->firstOrFail();
     }
 }

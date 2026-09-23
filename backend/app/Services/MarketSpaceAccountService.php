@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\DayOfWeek;
 use App\Models\MarketSpaceAccount;
 use App\Models\MarketSpaceImage;
-use App\Models\ProfessionalRegistration;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,20 +16,6 @@ use Illuminate\Validation\ValidationException;
  */
 class MarketSpaceAccountService
 {
-    /**
-     * Pré-remplit le profil Market Space à partir du dossier KYC validé
-     * (nom, adresse), pendant public du compte pour le catalogue de pièces ;
-     * le compte complète ensuite géoloc/horaires/photos depuis son dashboard.
-     */
-    public function createFromRegistration(ProfessionalRegistration $registration): MarketSpaceAccount
-    {
-        return $registration->user->marketSpaceAccount()->create([
-            'name' => $registration->structure_name,
-            'address' => $registration->address,
-            'phone' => $registration->user->phone,
-        ]);
-    }
-
     /**
      * Profil Market Space vide, créé dès la vérification de l'email (CLAUDE.md §5,
      * ajout v0.26) : seul le téléphone saisi à l'inscription est repris ; le

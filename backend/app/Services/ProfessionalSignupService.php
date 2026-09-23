@@ -9,6 +9,7 @@ use App\Mail\AccountCreatedMail;
 use App\Mail\VerificationCodeMail;
 use App\Models\PendingProfessionalRegistration;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -121,7 +122,7 @@ class ProfessionalSignupService
             return $user;
         });
 
-        Mail::to($user->email)->send(new AccountCreatedMail($user, $this->profileUrl($user->role)));
+        Mail::to($user->email)->send(new AccountCreatedMail($user, FrontendUrl::professionalProfile($user->role)));
 
         return $user;
     }
@@ -217,12 +218,5 @@ class ProfessionalSignupService
             'attempts_left' => config('registration.max_attempts'),
             'last_code_sent_at' => now(),
         ];
-    }
-
-    private function profileUrl(AccountType $role): string
-    {
-        $space = $role === AccountType::MarketSpace ? 'market-space' : 'garage';
-
-        return rtrim(config('app.frontend_url'), '/').'/'.$space.'/profile';
     }
 }

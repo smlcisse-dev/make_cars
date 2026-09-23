@@ -10,18 +10,30 @@ use App\Http\Controllers\Api\MarketSpace\OrderController;
 use App\Http\Controllers\Api\MarketSpace\ProductController;
 use App\Http\Controllers\Api\MarketSpace\ProfileController;
 use App\Http\Controllers\Api\MarketSpace\ReviewController;
+use App\Http\Controllers\Api\Professional\RegistrationDossierController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'role:market_space'])->group(function () {
+    // Accessibles quel que soit le statut du dossier (CLAUDE.md §5, ajout
+    // v0.26) : lecture du profil, téléchargement de son propre document,
+    // soumission pour validation.
     Route::get('profile', [ProfileController::class, 'show']);
-    Route::put('profile', [ProfileController::class, 'update']);
-    Route::put('profile/opening-hours', [OpeningHoursController::class, 'update']);
-    Route::post('profile/images', [MarketSpaceImageController::class, 'store']);
-    Route::delete('profile/images/{image}', [MarketSpaceImageController::class, 'destroy']);
+    Route::get('profile/legal/document', [RegistrationDossierController::class, 'downloadDocument']);
+    Route::post('profile/submit', [RegistrationDossierController::class, 'submit']);
 
-    // Tout le reste de l'espace pro exige un profil complet (CLAUDE.md §5,
-    // ajout v0.20).
-    Route::middleware('profile.complete')->group(function () {
+    // Écritures du profil : verrouillées pendant l'examen du dossier.
+    Route::middleware('registration.editable')->group(function () {
+        Route::put('profile', [ProfileController::class, 'update']);
+        Route::put('profile/opening-hours', [OpeningHoursController::class, 'update']);
+        Route::post('profile/images', [MarketSpaceImageController::class, 'store']);
+        Route::delete('profile/images/{image}', [MarketSpaceImageController::class, 'destroy']);
+        Route::put('profile/legal', [RegistrationDossierController::class, 'updateLegal']);
+        Route::post('profile/legal/document', [RegistrationDossierController::class, 'uploadDocument']);
+    });
+
+    // Tout le reste de l'espace pro exige un dossier approuvé (CLAUDE.md §5,
+    // ajout v0.26) puis un profil complet (ajout v0.20).
+    Route::middleware(['registration.approved', 'profile.complete'])->group(function () {
         Route::get('products', [ProductController::class, 'index']);
         Route::post('products', [ProductController::class, 'store']);
         Route::put('products/{product}', [ProductController::class, 'update']);

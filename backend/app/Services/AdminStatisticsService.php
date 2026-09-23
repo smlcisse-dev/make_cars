@@ -10,8 +10,6 @@ use App\Enums\QuoteStatus;
 use App\Enums\RegistrationStatus;
 use App\Models\Appointment;
 use App\Models\Dispute;
-use App\Models\Garage;
-use App\Models\MarketSpaceAccount;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Models\QuoteLine;
@@ -45,18 +43,17 @@ class AdminStatisticsService
 
     /**
      * Nombre total de structures par type (Garagiste/Market Space) et par
-     * statut dérivé (approuvé/en attente/suspendu/rejeté) — lu depuis
-     * `professional_registrations` (jamais depuis Garage/MarketSpaceAccount,
-     * qui n'existent qu'une fois le dossier approuvé, CLAUDE.md §5, ajout
-     * v0.6).
+     * statut dérivé (approuvé/en attente/profil à compléter/suspendu/rejeté)
+     * — lu depuis `professional_registrations`, seule source du statut
+     * (CLAUDE.md §5, ajouts v0.6 et v0.26).
      *
      * @return array<string, array<string, int>>
      */
     private function structureCounts(): array
     {
         $counts = [
-            AccountType::Garagiste->value => ['approved' => 0, 'pending' => 0, 'suspended' => 0, 'rejected' => 0, 'total' => 0],
-            AccountType::MarketSpace->value => ['approved' => 0, 'pending' => 0, 'suspended' => 0, 'rejected' => 0, 'total' => 0],
+            AccountType::Garagiste->value => ['approved' => 0, 'pending' => 0, 'profile_incomplete' => 0, 'suspended' => 0, 'rejected' => 0, 'total' => 0],
+            AccountType::MarketSpace->value => ['approved' => 0, 'pending' => 0, 'profile_incomplete' => 0, 'suspended' => 0, 'rejected' => 0, 'total' => 0],
         ];
 
         $registrations = DB::table('professional_registrations')
@@ -72,6 +69,7 @@ class AdminStatisticsService
             $status = match (true) {
                 $registration->status === RegistrationStatus::Rejected->value => 'rejected',
                 $registration->status === RegistrationStatus::Pending->value => 'pending',
+                $registration->status === RegistrationStatus::ProfileIncomplete->value => 'profile_incomplete',
                 $registration->suspended_at !== null => 'suspended',
                 default => 'approved',
             };
@@ -85,8 +83,10 @@ class AdminStatisticsService
 
     /**
      * Répartition géographique par département, séparément pour les garages
-     * et pour les Market Space (structures approuvées, seules à porter ce
-     * champ — CLAUDE.md §5, ajouts v0.17 et v0.19). Une entrée à
+     * et pour les Market Space (CLAUDE.md §5, ajouts v0.17 et v0.19). Depuis
+     * v0.26, un profil existe dès la vérification de l'email : les profils des
+     * dossiers pas encore approuvés sont donc comptés aussi (souvent dans
+     * « Non renseigné » tant que leur localisation n'est pas saisie). Une entrée à
      * `department_id` null ("Non renseigné") regroupe les profils qui n'ont
      * pas encore renseigné leur localisation ; elle est toujours en dernier.
      *

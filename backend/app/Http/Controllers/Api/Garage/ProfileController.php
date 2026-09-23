@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Garage;
 
 use App\Http\Controllers\Api\Controller;
+use App\Http\Controllers\Concerns\BuildsProfessionalProfileMeta;
 use App\Http\Controllers\Concerns\ResolvesAuthenticatedGarage;
 use App\Http\Requests\Garage\UpdateGarageProfileRequest;
 use App\Http\Resources\GarageResource;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
-    use ResolvesAuthenticatedGarage;
+    use BuildsProfessionalProfileMeta, ResolvesAuthenticatedGarage;
 
     public function __construct(private readonly GarageService $garageService) {}
 
@@ -20,7 +21,7 @@ class ProfileController extends Controller
     {
         $garage = $this->authenticatedGarage($request)->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']);
 
-        return $this->success(new GarageResource($garage), meta: ['profile_status' => $garage->profileStatus()]);
+        return $this->success(new GarageResource($garage), meta: $this->professionalProfileMeta($garage, $request->user()->professionalRegistration));
     }
 
     public function update(UpdateGarageProfileRequest $request): JsonResponse
@@ -30,6 +31,6 @@ class ProfileController extends Controller
             $request->validated(),
         );
 
-        return $this->success(new GarageResource($garage->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil garage mis à jour.', meta: ['profile_status' => $garage->profileStatus()]);
+        return $this->success(new GarageResource($garage->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil garage mis à jour.', meta: $this->professionalProfileMeta($garage, $request->user()->professionalRegistration));
     }
 }

@@ -47,6 +47,7 @@ class StatisticsTest extends TestCase
         ProfessionalRegistration::factory()->suspended()->create();
         ProfessionalRegistration::factory()->create();
         ProfessionalRegistration::factory()->rejected()->create();
+        ProfessionalRegistration::factory()->profileIncomplete()->create();
         ProfessionalRegistration::factory()->marketSpace()->approved()->create();
         Sanctum::actingAs($this->admin());
 
@@ -57,7 +58,9 @@ class StatisticsTest extends TestCase
         $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.suspended', 1);
         $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.pending', 1);
         $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.rejected', 1);
-        $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.total', 4);
+        $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.profile_incomplete', 1);
+        $response->assertJsonPath('data.structures.'.AccountType::Garagiste->value.'.total', 5);
+        $response->assertJsonPath('data.structures.'.AccountType::MarketSpace->value.'.profile_incomplete', 0);
         $response->assertJsonPath('data.structures.'.AccountType::MarketSpace->value.'.approved', 1);
     }
 

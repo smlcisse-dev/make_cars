@@ -104,7 +104,7 @@ class ConversationTest extends TestCase
 
     public function test_an_incomplete_profile_is_blocked_from_the_market_space_chat(): void
     {
-        Sanctum::actingAs(MarketSpaceAccount::factory()->create()->user);
+        Sanctum::actingAs(MarketSpaceAccount::factory()->withApprovedRegistration()->create()->user);
 
         $this->getJson('/api/market-space/conversations')->assertForbidden()->assertJsonPath('code', 'profile_incomplete');
     }

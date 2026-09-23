@@ -9,8 +9,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Bloque tout l'espace professionnel (Garagiste/Market Space) tant que le
  * profil n'est pas complet — seules les routes de profil restent accessibles
- * (CLAUDE.md §5, ajout v0.20). Un professionnel sans profil (compte pas
- * encore approuvé) n'est pas concerné ici : les contrôleurs répondent déjà 404.
+ * (CLAUDE.md §5, ajout v0.20). Toujours placé après `registration.approved`
+ * (CLAUDE.md §5, ajout v0.26) : il ne concerne donc qu'un compte approuvé.
  */
 class EnsureProfileIsComplete
 {

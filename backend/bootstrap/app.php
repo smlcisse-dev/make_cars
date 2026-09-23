@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureProfileIsComplete;
+use App\Http\Middleware\EnsureRegistrationIsApproved;
+use App\Http\Middleware\EnsureRegistrationIsEditable;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'profile.complete' => EnsureProfileIsComplete::class,
+            'registration.approved' => EnsureRegistrationIsApproved::class,
+            'registration.editable' => EnsureRegistrationIsEditable::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

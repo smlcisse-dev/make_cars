@@ -3,8 +3,10 @@
 namespace App\Enums;
 
 /**
- * Justificatifs exigés pour toute inscription professionnelle (CLAUDE.md §5,
- * règle 4) : registre de commerce / IFU-RCCM, et au moins une photo du local.
+ * Justificatifs d'une inscription professionnelle (CLAUDE.md §5, règle 4).
+ * Depuis v0.26, seul le document du registre de commerce est envoyé (étape
+ * profil) : l'admin voit les photos du profil comme photos du local.
+ * PremisesPhoto reste pour les dossiers antérieurs qui en ont.
  */
 enum RegistrationDocumentType: string
 {

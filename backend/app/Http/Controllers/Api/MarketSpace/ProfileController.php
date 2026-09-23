@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\MarketSpace;
 
 use App\Http\Controllers\Api\Controller;
+use App\Http\Controllers\Concerns\BuildsProfessionalProfileMeta;
 use App\Http\Controllers\Concerns\ResolvesAuthenticatedMarketSpaceAccount;
 use App\Http\Requests\MarketSpace\UpdateMarketSpaceProfileRequest;
 use App\Http\Resources\MarketSpaceAccountResource;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
-    use ResolvesAuthenticatedMarketSpaceAccount;
+    use BuildsProfessionalProfileMeta, ResolvesAuthenticatedMarketSpaceAccount;
 
     public function __construct(private readonly MarketSpaceAccountService $marketSpaceAccountService) {}
 
@@ -20,7 +21,7 @@ class ProfileController extends Controller
     {
         $account = $this->authenticatedMarketSpaceAccount($request)->load(['openingHours', 'images', 'department', 'commune', 'arrondissement']);
 
-        return $this->success(new MarketSpaceAccountResource($account), meta: ['profile_status' => $account->profileStatus()]);
+        return $this->success(new MarketSpaceAccountResource($account), meta: $this->professionalProfileMeta($account, $request->user()->professionalRegistration));
     }
 
     public function update(UpdateMarketSpaceProfileRequest $request): JsonResponse
@@ -30,6 +31,6 @@ class ProfileController extends Controller
             $request->validated(),
         );
 
-        return $this->success(new MarketSpaceAccountResource($account->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil Market Space mis à jour.', meta: ['profile_status' => $account->profileStatus()]);
+        return $this->success(new MarketSpaceAccountResource($account->load(['openingHours', 'images', 'department', 'commune', 'arrondissement'])), 'Profil Market Space mis à jour.', meta: $this->professionalProfileMeta($account, $request->user()->professionalRegistration));
     }
 }

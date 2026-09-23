@@ -26,12 +26,13 @@ class ProfessionalRegistrationPolicy
     }
 
     /**
-     * Approve or reject a registration — admin only, and only while pending.
+     * Approve or reject a registration — admin only. The "only while pending"
+     * rule is a business-state conflict (409 `invalid_status`), enforced by
+     * ProfessionalRegistrationService rather than as an authorization denial.
      */
     public function review(User $user, ProfessionalRegistration $professionalRegistration): bool
     {
-        return $user->role === AccountType::Admin
-            && $professionalRegistration->status === RegistrationStatus::Pending;
+        return $user->role === AccountType::Admin;
     }
 
     /**
