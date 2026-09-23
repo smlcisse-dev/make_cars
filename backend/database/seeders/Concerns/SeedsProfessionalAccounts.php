@@ -7,10 +7,13 @@ use App\Enums\RegistrationStatus;
 use App\Models\Arrondissement;
 use App\Models\Garage;
 use App\Models\MarketSpaceAccount;
+use App\Models\OrderLine;
+use App\Models\QuoteLine;
 use App\Models\User;
 use App\Services\GarageService;
 use App\Services\MarketSpaceAccountService;
 use App\Services\ProfessionalRegistrationService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
@@ -22,12 +25,28 @@ use Illuminate\Support\Facades\Storage;
  * vérification par code est court-circuitée (pas d'email à lire dans un
  * seeder) : le compte est créé directement, email déjà vérifié.
  *
+ * Un compte existant n'est jamais supprimé s'il porte une trace réelle
+ * (CLAUDE.md §6, traçabilité) : un compte approuvé est toujours conservé
+ * tel quel, un compte représentant un état d'inscription n'est réinitialisé
+ * que s'il n'a aucun historique d'activité (voir professionalActivity()).
+ *
  * Suppose que la classe utilisatrice utilise aussi GeneratesFakeKycDocuments.
  */
 trait SeedsProfessionalAccounts
 {
     /**
+     * Issue de chaque compte traité, par email, pour le résumé en console.
+     *
+     * @var array<string, string>
+     */
+    private array $seededAccountOutcomes = [];
+
+    /**
      * Crée un compte professionnel au statut demandé. Mot de passe : « password ».
+     *
+     * Compte déjà existant : conservé tel quel s'il est demandé au statut
+     * approuvé ou s'il a un historique d'activité (avertissement en
+     * console) ; sinon supprimé puis recréé, le tout dans une transaction.
      *
      * @param  array{structure_name: string, address: string, neighborhood: string, image_directory: string}|null  $profile  null = profil laissé vide
      */
@@ -42,8 +61,97 @@ trait SeedsProfessionalAccounts
         User $admin,
         ?string $rejectionReason = null,
     ): User {
-        $this->deleteProfessionalAccount($email);
+        $existing = User::where('email', $email)->first();
 
+        if ($existing && $status === RegistrationStatus::Approved) {
+            $this->seededAccountOutcomes[$email] = 'conservé (compte approuvé, jamais réinitialisé)';
+
+            return $existing;
+        }
+
+        if ($existing && ($activity = $this->professionalActivity($existing)) !== []) {
+            $this->seededAccountOutcomes[$email] = 'conservé (historique d\'activité)';
+            $this->command?->warn(
+                "{$email} n'a pas été réinitialisé : il a un historique d'activité (".implode(', ', $activity).'). '.
+                'Il est laissé tel quel, dans son état actuel.',
+            );
+
+            return $existing;
+        }
+
+        $oldDocuments = $existing?->professionalRegistration?->documents
+            ->map(fn ($document) => [$document->disk, $document->path])->all() ?? [];
+
+        $user = DB::transaction(function () use ($existing, $accountType, $email, $firstName, $lastName, $phone, $status, $profile, $admin, $rejectionReason) {
+            if ($existing) {
+                $existing->professionalProfile()?->products()->delete();
+                $existing->delete();
+            }
+
+            return $this->createProfessionalAccount($accountType, $email, $firstName, $lastName, $phone, $status, $profile, $admin, $rejectionReason);
+        });
+
+        // Fichiers physiques des anciens justificatifs, que la suppression en
+        // base n'efface pas : seulement une fois la transaction validée.
+        foreach ($oldDocuments as [$disk, $path]) {
+            Storage::disk($disk)->delete($path);
+        }
+
+        $this->seededAccountOutcomes[$email] = $existing ? 'réinitialisé' : 'créé';
+
+        return $user;
+    }
+
+    /**
+     * Historique d'activité réelle d'un compte professionnel : tout ce qui
+     * interdit de le supprimer (la suppression du profil effacerait en
+     * cascade RDV, devis et conversations, et laisserait orphelins
+     * commandes, avis et réclamations). Vide = aucun historique.
+     *
+     * @return list<string>
+     */
+    private function professionalActivity(User $user): array
+    {
+        $profile = $user->professionalProfile();
+
+        if (! $profile) {
+            return [];
+        }
+
+        $productIds = $profile->products()->pluck('id');
+
+        $counts = [
+            'produits vendus en commande' => OrderLine::whereIn('product_id', $productIds)->count(),
+            'produits cités dans un devis' => QuoteLine::whereIn('product_id', $productIds)->count(),
+            'commandes' => $profile->orders()->count(),
+            'conversations' => $profile->conversations()->count(),
+            'avis' => $profile->reviews()->count(),
+            'réclamations' => $profile->disputes()->count(),
+        ];
+
+        if ($profile instanceof Garage) {
+            $counts['devis'] = $profile->quotes()->count();
+            $counts['rendez-vous'] = $profile->appointments()->count();
+        }
+
+        return array_values(array_map(
+            fn (string $label, int $count) => "{$count} {$label}",
+            array_keys(array_filter($counts)),
+            array_filter($counts),
+        ));
+    }
+
+    private function createProfessionalAccount(
+        AccountType $accountType,
+        string $email,
+        string $firstName,
+        string $lastName,
+        string $phone,
+        RegistrationStatus $status,
+        ?array $profile,
+        User $admin,
+        ?string $rejectionReason,
+    ): User {
         $user = new User([
             'role' => $accountType,
             'first_name' => $firstName,
@@ -127,26 +235,5 @@ trait SeedsProfessionalAccounts
             'path' => $this->fakeCatalogImage('photo.jpg')->storeAs($data['image_directory'], 'photo.jpg', 'public'),
             'position' => 1,
         ]);
-    }
-
-    /**
-     * Supprime un compte de test existant (et, par les FK cascadeOnDelete,
-     * son dossier, ses documents et son profil) ainsi que les fichiers
-     * physiques des justificatifs, que la suppression en base n'efface pas.
-     */
-    private function deleteProfessionalAccount(string $email): void
-    {
-        $user = User::where('email', $email)->first();
-
-        if (! $user) {
-            return;
-        }
-
-        foreach ($user->professionalRegistration?->documents ?? [] as $document) {
-            Storage::disk($document->disk)->delete($document->path);
-        }
-
-        $user->professionalProfile()?->products()->delete();
-        $user->delete();
     }
 }

@@ -170,6 +170,12 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - **Changement v0.26** : les seeders suivent le nouveau parcours (trait `SeedsProfessionalAccounts` : compte email vérifié, profil, informations légales avec IFU/NPI fictifs au bon format, document RCCM, soumission puis décision via `ProfessionalRegistrationService`). Aucun email réel n'est envoyé (`Mail::fake`). Nouveau compte `garage.nouveau.incomplete`.
 - **Base de dev après la migration v0.26 (2026-09-23)** : les anciens dossiers `pending` (`garage.etoile`, `pieces.express`) sont passés `profile_incomplete` sans IFU/NPI ; les seeders n'ont **pas** été relancés sur Supabase — les relancer pour retrouver exactement les états du tableau.
 - **Ordre d'exécution** : `ProfessionalRegistrationTestSeeder` puis `CatalogTestSeeder`. Les deux sont idempotents.
+- **Historique toujours préservé (correctif du 2026-09-23)** : les seeders ne suppriment plus jamais de donnée ayant une trace réelle.
+  - Comptes **approuvés** (`garage.excellence.approved`, `marche.pieces.approved`) : créés s'ils manquent, **jamais supprimés ni réinitialisés** s'ils existent, même dans un état différent du tableau.
+  - Comptes d'**état d'inscription** (`garage.nouveau.incomplete`, `garage.etoile.pending`, `pieces.express.pending`, `auto.pieces.rejected`) : supprimés puis recréés (dans une transaction) **seulement** s'ils n'ont aucun historique : produits vendus en commande ou cités dans un devis, commandes, devis, RDV, conversations, avis, réclamations. Sinon ils sont conservés tels quels, avec un avertissement en console qui indique le compte et l'historique trouvé.
+  - `CatalogTestSeeder` : un service ou produit de test référencé par une ligne de devis ou de commande (ou, pour un service, par un RDV) est conservé tel quel, avec un avertissement, et pas recréé en double. Il peut donc ne plus être `pending`.
+  - Chaque passage affiche l'issue de chaque compte : créé, réinitialisé ou conservé.
+  - Pourquoi : supprimer un compte supprime en cascade ses RDV, devis et conversations, et `order_lines.product_id` interdit de supprimer un produit déjà vendu.
 - Après un `switch-env`, relancer `php artisan serve --no-reload`.
 - Le mot de passe Supabase se renseigne à la main dans `.env.development`, jamais par l'assistant.
 

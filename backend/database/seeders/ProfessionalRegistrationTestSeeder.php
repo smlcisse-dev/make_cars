@@ -26,7 +26,11 @@ use Illuminate\Support\Facades\Mail;
  * Le Market Space approuvé (marche.pieces.approved) est créé par
  * CatalogTestSeeder. Tous les mots de passe : « password ».
  *
- * Idempotent : chaque compte est supprimé puis recréé à l'identique.
+ * Idempotent sans jamais effacer d'historique (CLAUDE.md §6) : le compte
+ * approuvé est créé s'il manque, jamais réinitialisé ; les comptes d'état
+ * d'inscription sont supprimés puis recréés à l'identique uniquement s'ils
+ * n'ont aucune activité (sinon conservés, avec un avertissement) — voir
+ * SeedsProfessionalAccounts.
  * Aucun email réel n'est envoyé (Mail::fake) : les décisions admin passent
  * par le service réel, qui en envoie normalement.
  */
@@ -78,7 +82,9 @@ class ProfessionalRegistrationTestSeeder extends Seeder
             "Le document du registre de commerce fourni est illisible et les photos ne correspondent pas à l'adresse déclarée. Merci de corriger votre dossier puis de le soumettre à nouveau.",
         );
 
-        $this->command?->info('ProfessionalRegistrationTestSeeder : 5 comptes créés (1 garagiste profile_incomplete, 1 garagiste pending, 1 market_space pending, 1 garagiste approved, 1 market_space rejected).');
+        foreach ($this->seededAccountOutcomes as $email => $outcome) {
+            $this->command?->info("ProfessionalRegistrationTestSeeder : {$email} — {$outcome}.");
+        }
     }
 
     /**
