@@ -15,12 +15,29 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'phone', 'role', 'password', 'google_id', 'is_express'])]
+#[Fillable(['name', 'first_name', 'last_name', 'email', 'phone', 'role', 'password', 'google_id', 'is_express'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * `name` reste le nom d'affichage lu partout (PDF, chat, ressources,
+     * emails) : plutôt que de faire évoluer chacun de ces usages, il est
+     * recomposé en « Prénom Nom » dès que les deux champs séparés sont
+     * renseignés (CLAUDE.md §5, ajout v0.26). Un compte sans prénom/nom
+     * (automobiliste, compte express, Google, comptes antérieurs) garde son
+     * `name` tel quel.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if (filled($user->first_name) && filled($user->last_name)) {
+                $user->name = trim($user->first_name).' '.trim($user->last_name);
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
