@@ -239,6 +239,10 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - [ ] **Timeout Axios ramené à 15 s** une fois la latence Supabase revenue à la normale
   - *Raison* : la valeur actuelle de 30 s est un palliatif temporaire, marqué comme tel dans `frontend-web/src/api/http.ts`.
   - *Voir* : §4 « Latence Supabase et timeout Axios ».
+- [ ] **Migration v0.28 appliquée sur la base de production** (`2026_09_23_193401_create_reactivation_requests_table`)
+  - *Raison* : appliquée le 2026-09-23 sur la base de développement uniquement. Sans cette table, la demande de réactivation, son refus et la connexion d'un professionnel (qui charge la dernière demande) échouent en production.
+  - *Procédure* : `backend/bin/switch-env.sh prod`, `switch-env.sh status` pour confirmer, sauvegarde de la base, `php artisan migrate`, puis retour sur `dev` et redémarrage de `php artisan serve --no-reload`.
+  - *Voir* : §8 « Lot du 2026-09-23 » ; CLAUDE.md §5 « Demande de réactivation d'un compte suspendu (ajout v0.28) ».
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
