@@ -146,6 +146,11 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 - **Ne survit pas à un redémarrage** : ce mode n'est inscrit dans aucun script du dépôt. Après un reboot ou la fermeture du terminal, un simple `php artisan serve` repart avec un seul worker ; il faut relancer explicitement avec `--no-reload`.
 - **Vérifié le 2026-09-23** : aucun processus `artisan serve` ni Vite ne tourne en ce moment. La commande et le port viennent de l'historique des sessions précédentes (le 2026-09-22, processus `php artisan serve --no-reload`, workers `php -S 127.0.0.1:…`). Le port 8001 a aussi été observé ce jour-là, quand 8000 était déjà occupé.
 
+**Limites PHP d'envoi de fichiers**
+- Relevées en local dans `/etc/php.d/99-makecars-uploads.ini` (fichier système, hors dépôt) : `upload_max_filesize = 12M`, `post_max_size = 50M`. Vérifié le 2026-09-23 avec `php -r 'echo ini_get(...)'`.
+- Pourquoi : le document du registre de commerce peut peser jusqu'à 10 Mo. Les valeurs par défaut de PHP (2M / 8M) le refusaient avant même d'atteindre la validation Laravel. `post_max_size` couvre une requête qui envoie plusieurs fichiers à la fois.
+- **À reproduire sur le serveur de production** : même fichier `.ini` (ou équivalent selon l'hébergeur), plus la limite de corps de requête du serveur web s'il y en a une (ex. `client_max_body_size` pour Nginx).
+
 **Latence Supabase et timeout Axios**
 - **Ticket support Supabase SU-481692** : latence anormale du pooler `eu-central-1`.
   - *Référence fournie par l'utilisateur. Elle n'apparaît nulle part dans le dépôt, et son statut actuel n'a pas pu être vérifié.* À mettre à jour à la réception de la réponse de Supabase.
@@ -194,13 +199,13 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 11. **Design system / identité visuelle** non choisis.
 12. **Téléphone d'un automobiliste non béninois** (nouveau, commit `7068c44`) : `BeninPhoneNumber` refuse tout numéro hors `+229`. Il faut choisir en V2 entre assouplir ou assumer.
 13. **Parcours d'inscription pro v0.26, suites** : écrans frontend du parcours, landing page (projet séparé), notification de l'admin à chaque soumission, prénom/nom pour automobiliste/express/Google, `FRONTEND_URL` à renseigner dans `.env.production`.
+14. **Suppression d'un compte professionnel** (nouveau, 2026-09-23) : supprimer un utilisateur pro supprime en cascade son profil, puis ses RDV, devis et conversations. Commandes, avis et réclamations, polymorphes, resteraient orphelins. Aucun endpoint ne supprime de compte aujourd'hui, mais le cahier des charges prévoit la suppression de comptes par l'admin. Avant de la construire, il faut garantir qu'aucun devis, facture ou commande ne disparaisse (CLAUDE.md §6, traçabilité) : désactivation ou suppression logique plutôt que suppression réelle.
 
 **Autres pistes ouvertes**
 - `scopePubliclyVisible()` ne filtre toujours pas sur la complétude du profil (vérifié dans `Garage.php`). Une fiche incomplète reste visible côté mobile.
 - Vérification téléphone pour la finalisation d'un compte express.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
-  - limites d'envoi de fichiers de PHP (`upload_max_filesize`, `post_max_size`) à vérifier au regard des 10 Mo du registre de commerce ;
   - écrans d'inscription (formulaire court, saisie du code) toujours absents : le parcours v0.26 n'est utilisable côté web qu'à partir de « Mon profil ».
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
