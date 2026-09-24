@@ -91,7 +91,7 @@ class PushNotificationTriggersTest extends TestCase
         $service->send($version);
         $this->assertDatabaseHas('push_notifications', ['user_id' => $client->id, 'type' => PushNotificationType::QuoteSent->value]);
 
-        $service->accept($version, $client);
+        $service->accept($quote, $version, $client);
         $this->assertDatabaseHas('push_notifications', ['user_id' => $garage->user_id, 'type' => PushNotificationType::QuoteAccepted->value]);
 
         $service->start($quote);
@@ -110,7 +110,7 @@ class PushNotificationTriggersTest extends TestCase
         ]);
         $version = $quote->currentVersion()->first();
         $service->send($version);
-        $service->reject($version, $client);
+        $service->reject($quote, $version, $client);
 
         $this->assertDatabaseHas('push_notifications', ['user_id' => $garage->user_id, 'type' => PushNotificationType::QuoteRejected->value]);
     }

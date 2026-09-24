@@ -67,9 +67,7 @@ class QuoteController extends Controller
     public function accept(Request $request, Quote $quote, QuoteVersion $version): JsonResponse
     {
         $this->authorizeQuote($request, $quote);
-        $this->quoteService->assertVersionIsDecidable($quote, $version);
-
-        $version = $this->quoteService->accept($version, $request->user());
+        $version = $this->quoteService->accept($quote, $version, $request->user());
 
         return $this->success(new QuoteVersionResource($version->load('lines')), 'Devis accepté.');
     }
@@ -77,9 +75,7 @@ class QuoteController extends Controller
     public function reject(Request $request, Quote $quote, QuoteVersion $version): JsonResponse
     {
         $this->authorizeQuote($request, $quote);
-        $this->quoteService->assertVersionIsDecidable($quote, $version);
-
-        $version = $this->quoteService->reject($version, $request->user());
+        $version = $this->quoteService->reject($quote, $version, $request->user());
 
         return $this->success(new QuoteVersionResource($version->load('lines')), 'Devis refusé.');
     }

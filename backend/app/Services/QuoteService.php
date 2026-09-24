@@ -202,17 +202,27 @@ class QuoteService
      * Décision explicite du client, tracée et authentifiée — jamais déduite
      * du chat (CLAUDE.md §5, ajout v0.8). Le stock des lignes de pièces n'est
      * décrémenté qu'ici, à l'acceptation (CLAUDE.md §5, ajout v0.4).
+     *
+     * La vérification (version encore décidable) et la décision se font
+     * dans la même transaction, sous verrou : deux appels simultanés (double
+     * clic, lien email + application) ne peuvent pas décider deux fois, ni
+     * décrémenter le stock deux fois. Le second reçoit 409
+     * `quote_version_not_decidable`.
+     *
+     * @throws ApiException
      */
-    public function accept(QuoteVersion $version, User $client): QuoteVersion
+    public function accept(Quote $quote, QuoteVersion $version, User $client): QuoteVersion
     {
-        return DB::transaction(function () use ($version, $client) {
+        return DB::transaction(function () use ($quote, $version, $client) {
+            [$quote, $version] = $this->lockForDecision($quote, $version);
+
             $version->update([
                 'decision' => QuoteVersionDecision::Accepted,
                 'decided_at' => now(),
                 'decided_by' => $client->id,
             ]);
 
-            $version->quote->update(['status' => QuoteStatus::Accepted]);
+            $quote->update(['status' => QuoteStatus::Accepted]);
 
             foreach ($version->lines()->where('type', QuoteLineType::Product)->get() as $line) {
                 if ($line->product) {
@@ -226,19 +236,51 @@ class QuoteService
         });
     }
 
-    public function reject(QuoteVersion $version, User $client): QuoteVersion
+    /**
+     * Même protection que accept() contre les appels simultanés.
+     *
+     * @throws ApiException
+     */
+    public function reject(Quote $quote, QuoteVersion $version, User $client): QuoteVersion
     {
-        $version->update([
-            'decision' => QuoteVersionDecision::Rejected,
-            'decided_at' => now(),
-            'decided_by' => $client->id,
-        ]);
+        return DB::transaction(function () use ($quote, $version, $client) {
+            [$quote, $version] = $this->lockForDecision($quote, $version);
 
-        $version->quote->update(['status' => QuoteStatus::Rejected]);
+            $version->update([
+                'decision' => QuoteVersionDecision::Rejected,
+                'decided_at' => now(),
+                'decided_by' => $client->id,
+            ]);
 
-        $this->notificationService->notifyQuoteRejected($version);
+            $quote->update(['status' => QuoteStatus::Rejected]);
 
-        return $version->fresh();
+            $this->notificationService->notifyQuoteRejected($version);
+
+            return $version->fresh();
+        });
+    }
+
+    /**
+     * Relit le devis puis la version sous verrou (`SELECT ... FOR UPDATE`,
+     * toujours dans cet ordre pour éviter tout interblocage) et vérifie
+     * qu'elle peut encore être décidée. À appeler dans une transaction : un
+     * second appel concurrent attend la fin du premier, puis relit l'état
+     * déjà décidé et échoue en 409.
+     *
+     * @return array{0: Quote, 1: QuoteVersion}
+     *
+     * @throws ApiException
+     */
+    private function lockForDecision(Quote $quote, QuoteVersion $version): array
+    {
+        abort_unless($version->quote_id === $quote->id, 404);
+
+        $quote = Quote::query()->lockForUpdate()->findOrFail($quote->id);
+        $version = QuoteVersion::query()->lockForUpdate()->findOrFail($version->id);
+
+        $this->assertVersionIsDecidable($quote, $version);
+
+        return [$quote, $version];
     }
 
     public function start(Quote $quote): Quote
@@ -257,6 +299,14 @@ class QuoteService
     public function markPaid(Quote $quote): Quote
     {
         return DB::transaction(function () use ($quote) {
+            // Verrou sur le devis : deux paiements simultanés ne créent pas
+            // deux factures (le second relit le statut déjà `invoiced`).
+            $quote = Quote::query()->lockForUpdate()->findOrFail($quote->id);
+
+            if ($quote->status !== QuoteStatus::InProgress) {
+                throw new ApiException('La prestation n\'est pas en cours.', 409, 'quote_not_in_progress');
+            }
+
             $acceptedVersion = $quote->acceptedVersion()->with('lines')->firstOrFail();
             $nextNumber = $quote->versions()->max('version') + 1;
 

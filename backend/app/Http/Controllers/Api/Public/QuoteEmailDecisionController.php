@@ -41,13 +41,12 @@ class QuoteEmailDecisionController extends Controller
 
     public function decide(QuoteEmailDecisionRequest $request, Quote $quote, QuoteVersion $version): JsonResponse
     {
-        $this->quoteService->assertVersionIsDecidable($quote, $version);
-
+        // Vérification de l'état faite par accept()/reject(), sous verrou.
         if ($request->input('decision') === 'accept') {
-            $version = $this->quoteService->accept($version, $quote->user);
+            $version = $this->quoteService->accept($quote, $version, $quote->user);
             $message = 'Devis accepté.';
         } else {
-            $version = $this->quoteService->reject($version, $quote->user);
+            $version = $this->quoteService->reject($quote, $version, $quote->user);
             $message = 'Devis refusé.';
         }
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\ProductStatus;
+use App\Exceptions\ApiException;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -75,13 +76,23 @@ class OrderService
             ->firstOrFail();
     }
 
+    /**
+     * Sous verrou, comme markPaid() : une annulation concurrente d'un
+     * paiement ne peut jamais repasser une commande payée en annulée.
+     *
+     * @throws ApiException
+     */
     public function cancel(Order $order): Order
     {
-        $order->update(['status' => OrderStatus::Cancelled]);
+        return DB::transaction(function () use ($order) {
+            $order = $this->lockPendingOrder($order);
 
-        $this->notificationService->notifyOrderStatusChanged($order);
+            $order->update(['status' => OrderStatus::Cancelled]);
 
-        return $order;
+            $this->notificationService->notifyOrderStatusChanged($order);
+
+            return $order;
+        });
     }
 
     /**
@@ -93,6 +104,10 @@ class OrderService
     public function markPaid(Order $order): Order
     {
         return DB::transaction(function () use ($order) {
+            // Verrou sur la commande : deux paiements simultanés (double
+            // clic) ne décrémentent le stock qu'une fois.
+            $order = $this->lockPendingOrder($order);
+
             foreach ($order->lines as $line) {
                 $this->productService->decrementStock($line->product, $line->quantity);
             }
@@ -106,5 +121,23 @@ class OrderService
 
             return $order->fresh(['lines', 'sellable']);
         });
+    }
+
+    /**
+     * Relit la commande sous verrou (`SELECT ... FOR UPDATE`) et vérifie
+     * qu'elle est toujours en attente de paiement. À appeler dans une
+     * transaction.
+     *
+     * @throws ApiException
+     */
+    private function lockPendingOrder(Order $order): Order
+    {
+        $order = Order::query()->lockForUpdate()->findOrFail($order->id);
+
+        if ($order->status !== OrderStatus::Pending) {
+            throw new ApiException('Cette commande n\'est plus en attente de paiement.', 409, 'order_not_pending');
+        }
+
+        return $order;
     }
 }
