@@ -53,6 +53,38 @@ const pastReactivationRequests = computed(() =>
   (registration.value?.reactivation_requests ?? []).filter((request) => request.status !== 'pending'),
 )
 
+// Certificat d'Identification Personnelle (v0.27) : repéré parmi les
+// justificatifs pour le bouton « Consulter le CIP » placé à côté du NPI.
+const identityCertificate = computed(
+  () => registration.value?.documents.find((document) => document.type === 'identity_certificate') ?? null,
+)
+
+// Lien OpenStreetMap vers la position déclarée : simple lien externe, aucune
+// carte intégrée (point ouvert CLAUDE.md §7). `null` sans coordonnées.
+const mapUrl = computed(() => {
+  const profile = registration.value?.profile
+  if (!profile?.latitude || !profile.longitude) {
+    return null
+  }
+  const { latitude: lat, longitude: lon } = profile
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`
+})
+
+// Nom de famille de la personne inscrite. Les comptes antérieurs à v0.26
+// n'ont ni prénom ni nom séparés : on affiche alors le nom complet (`name`).
+const representativeLastName = computed(() => {
+  const person = registration.value?.representative
+  if (!person) {
+    return null
+  }
+  return person.last_name ?? (person.first_name ? null : person.name)
+})
+
+// Photos triées par position (la première est la photo principale).
+const profileImages = computed(() =>
+  [...(registration.value?.profile?.images ?? [])].sort((a, b) => a.position - b.position),
+)
+
 const documentErrorById = ref<Record<number, string>>({})
 const isOpeningDocumentId = ref<number | null>(null)
 
@@ -200,6 +232,17 @@ async function openDocument(document: RegistrationDocument): Promise<void> {
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
 }
+
+// Valeur affichée d'un champ de la fiche : « Non fourni » quand il est vide
+// (comptes validés avant v0.26/v0.27, ou profil pas encore rempli).
+function displayValue(value: string | number | null | undefined): string {
+  return value === null || value === undefined || value === '' ? 'Non fourni' : String(value)
+}
+
+// "08:00:00" → "08:00".
+function formatTime(time: string | null): string {
+  return time ? time.slice(0, 5) : '—'
+}
 </script>
 
 <template>
@@ -212,13 +255,14 @@ function formatDate(iso: string): string {
     <p v-else-if="loadErrorMessage" class="text-sm text-rose-600">{{ loadErrorMessage }}</p>
 
     <template v-else-if="registration">
-      <div class="rounded-lg border border-slate-200 bg-white p-6">
-        <div class="flex items-start justify-between">
+      <!-- 1. En-tête -->
+      <div class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-slate-900">{{ registration.structure_name }}</h2>
+            <h2 class="text-lg font-semibold text-slate-900">{{ registration.structure_name ?? 'Structure sans nom' }}</h2>
             <p class="mt-1 text-sm text-slate-500">{{ registration.account_type_label }}</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <StatusBadge :label="registration.status_label" :tone="registrationStatusTone(registration.status)" />
             <StatusBadge v-if="registration.is_suspended" label="Suspendu" tone="danger" />
           </div>
@@ -226,15 +270,13 @@ function formatDate(iso: string): string {
 
         <dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Adresse</dt>
-            <dd class="mt-1 text-sm text-slate-700">{{ registration.address }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">N° IFU-RCCM</dt>
-            <dd class="mt-1 text-sm text-slate-700">{{ registration.business_registration_number }}</dd>
-          </div>
-          <div>
             <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Date de soumission</dt>
+            <dd class="mt-1 text-sm text-slate-700">
+              {{ registration.submitted_at ? formatDate(registration.submitted_at) : 'Jamais soumis' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Compte créé le</dt>
             <dd class="mt-1 text-sm text-slate-700">{{ formatDate(registration.created_at) }}</dd>
           </div>
           <div v-if="registration.status === 'rejected' && registration.rejection_reason">
@@ -252,13 +294,171 @@ function formatDate(iso: string): string {
         </dl>
       </div>
 
-      <div class="rounded-lg border border-slate-200 bg-white p-6">
+      <!-- 2. Représentant : la personne inscrite, distincte de la structure -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Représentant</h3>
+        <dl class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Prénom</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.representative?.first_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nom</dt>
+            <dd class="mt-1 text-sm text-slate-700">
+              {{ displayValue(representativeLastName) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Email</dt>
+            <dd class="mt-1 break-all text-sm text-slate-700">{{ displayValue(registration.representative?.email) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Téléphone</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.representative?.phone) }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- 3. Structure (profil public) -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Structure (profil public)</h3>
+        <dl class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Nom</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Téléphone</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.phone) }}</dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Adresse</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.address) }}</dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Description</dt>
+            <dd class="mt-1 whitespace-pre-line text-sm text-slate-700">
+              {{ registration.profile?.description || 'Aucune description' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Département</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.department_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Commune</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.commune_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Arrondissement</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.arrondissement_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Quartier</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.neighborhood) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Latitude</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.latitude) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Longitude</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.profile?.longitude) }}</dd>
+          </div>
+        </dl>
+        <div v-if="mapUrl" class="mt-4">
+          <!-- Lien externe simple : rel="noopener" empêche l'onglet ouvert
+               d'agir sur celui-ci (bonne pratique avec target="_blank"). -->
+          <a
+            :href="mapUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Voir sur la carte ↗
+          </a>
+          <p class="mt-1 text-xs text-slate-500">Vérifiez que le repère tombe bien sur le quartier déclaré.</p>
+        </div>
+      </section>
+
+      <!-- 4. Horaires -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Horaires</h3>
+        <p v-if="!registration.profile?.opening_hours?.length" class="mt-3 text-sm text-slate-500">Non fournis.</p>
+        <ul v-else class="mt-3 divide-y divide-slate-100">
+          <li
+            v-for="hour in registration.profile.opening_hours"
+            :key="hour.day_of_week"
+            class="flex justify-between py-2 text-sm"
+          >
+            <span class="text-slate-700">{{ hour.day_label }}</span>
+            <span v-if="hour.is_closed" class="text-slate-500">Fermé</span>
+            <span v-else class="text-slate-700">{{ formatTime(hour.opens_at) }} – {{ formatTime(hour.closes_at) }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 5. Photos du profil (= photos du local, v0.26) -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Photos du profil</h3>
+        <p class="mt-1 text-xs text-slate-500">Elles servent de photos du local. Cliquez pour agrandir.</p>
+        <p v-if="!profileImages.length" class="mt-3 text-sm text-slate-500">Aucune photo.</p>
+        <div v-else class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <a
+            v-for="image in profileImages"
+            :key="image.id"
+            :href="image.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="block overflow-hidden rounded-md border border-slate-200"
+          >
+            <img :src="image.url" alt="Photo du local" class="aspect-square w-full object-cover hover:opacity-90" />
+          </a>
+        </div>
+      </section>
+
+      <!-- 6. Informations légales (privées, fiche admin uniquement) -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Informations légales</h3>
+        <dl class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Numéro RCCM</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.business_registration_number) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">IFU (13 chiffres)</dt>
+            <dd class="mt-1 text-sm text-slate-700">{{ displayValue(registration.ifu) }}</dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">NPI (10 chiffres)</dt>
+            <dd class="mt-1 flex flex-wrap items-center gap-3 text-sm text-slate-700">
+              <span>{{ displayValue(registration.npi) }}</span>
+              <AppButton
+                v-if="identityCertificate"
+                variant="secondary"
+                :loading="isOpeningDocumentId === identityCertificate.id"
+                @click="openDocument(identityCertificate)"
+              >
+                Consulter le CIP
+              </AppButton>
+              <span v-else class="text-xs text-slate-500">CIP non fourni</span>
+              <span v-if="identityCertificate && documentErrorById[identityCertificate.id]" class="text-sm text-rose-600">
+                {{ documentErrorById[identityCertificate.id] }}
+              </span>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- 7. Justificatifs -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         <h3 class="text-sm font-semibold text-slate-900">Justificatifs</h3>
+        <p v-if="!registration.documents.length" class="mt-3 text-sm text-slate-500">Aucun justificatif.</p>
         <ul class="mt-3 space-y-2">
           <li
             v-for="document in registration.documents"
             :key="document.id"
-            class="flex items-center justify-between rounded-md border border-slate-200 px-4 py-3"
+            class="flex flex-col gap-2 rounded-md border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <span class="text-sm text-slate-700">{{ document.type_label }}</span>
             <div class="flex items-center gap-3">
@@ -275,9 +475,33 @@ function formatDate(iso: string): string {
             </div>
           </li>
         </ul>
-      </div>
+      </section>
 
-      <div v-if="registration.status === 'pending'" class="rounded-lg border border-slate-200 bg-white p-6">
+      <!-- 8. Historique des décisions -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <h3 class="text-sm font-semibold text-slate-900">Historique des décisions</h3>
+        <p v-if="!registration.decisions?.length" class="mt-3 text-sm text-slate-500">Aucune décision pour l'instant.</p>
+        <ul v-else class="mt-3 space-y-2">
+          <li
+            v-for="decision in registration.decisions"
+            :key="decision.id"
+            class="rounded-md border border-slate-200 px-4 py-3 text-sm"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs text-slate-500">
+                {{ formatDate(decision.decided_at) }}<span v-if="decision.decided_by"> · {{ decision.decided_by.name }}</span>
+              </span>
+              <StatusBadge :label="decision.decision_label" :tone="registrationStatusTone(decision.decision)" />
+            </div>
+            <p v-if="decision.reason" class="mt-1 text-slate-700">
+              <span class="font-medium">Motif :</span> {{ decision.reason }}
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 10. Décision (dossier en attente ; exclusif du bloc Compte) -->
+      <div v-if="registration.status === 'pending'" class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         <h3 class="text-sm font-semibold text-slate-900">Décision</h3>
         <p v-if="actionErrorMessage" class="mt-2 text-sm text-rose-600">{{ actionErrorMessage }}</p>
         <div class="mt-3 flex gap-3">
@@ -286,7 +510,8 @@ function formatDate(iso: string): string {
         </div>
       </div>
 
-      <div v-else-if="registration.status === 'approved'" class="rounded-lg border border-slate-200 bg-white p-6">
+      <!-- 9. Compte / réactivation (v0.28) -->
+      <div v-else-if="registration.status === 'approved'" class="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         <h3 class="text-sm font-semibold text-slate-900">Compte</h3>
         <p v-if="actionErrorMessage" class="mt-2 text-sm text-rose-600">{{ actionErrorMessage }}</p>
         <p v-if="reactivationFlash" class="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">

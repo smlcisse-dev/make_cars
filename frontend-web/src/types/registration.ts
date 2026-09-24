@@ -1,3 +1,4 @@
+import type { ProfessionalProfile } from '@/types/profile'
 import type { AccountType } from '@/types/user'
 
 // Reflète App\Enums\RegistrationStatus côté backend (CLAUDE.md §5, ajout
@@ -58,6 +59,36 @@ export interface ReactivationRequest {
   created_at: string
 }
 
+// Personne inscrite (compte utilisateur), distincte de la structure. Fiche
+// admin uniquement. `first_name`/`last_name` sont vides pour les comptes créés
+// avant v0.26, d'où le repli sur `name`.
+export interface RegistrationRepresentative {
+  first_name: string | null
+  last_name: string | null
+  name: string
+  email: string | null
+  phone: string | null
+}
+
+// Profil tel que la fiche admin le reçoit : le backend y ajoute les noms des
+// niveaux de localisation. `extends` reprend toutes les propriétés de
+// ProfessionalProfile et en ajoute trois.
+export interface RegistrationProfile extends ProfessionalProfile {
+  department_name: string | null
+  commune_name: string | null
+  arrondissement_name: string | null
+}
+
+// Décision de l'admin sur le dossier (historique, CLAUDE.md §5, v0.26).
+export interface RegistrationDecision {
+  id: number
+  decision: 'approved' | 'rejected'
+  decision_label: string
+  reason: string | null
+  decided_by?: { id: number; name: string } | null
+  decided_at: string
+}
+
 // Reflète ProfessionalRegistrationResource (backend/app/Http/Resources).
 export interface ProfessionalRegistration {
   id: number
@@ -84,6 +115,13 @@ export interface ProfessionalRegistration {
   // Historique complet, du plus récent au plus ancien : fiche admin seulement.
   reactivation_requests?: ReactivationRequest[]
   documents: RegistrationDocument[]
+  // Fiche admin uniquement (absents ailleurs, d'où le `?`) : informations
+  // légales privées, personne inscrite, profil complet et décisions.
+  ifu?: string | null
+  npi?: string | null
+  representative?: RegistrationRepresentative
+  profile?: RegistrationProfile
+  decisions?: RegistrationDecision[]
   created_at: string
 }
 
@@ -94,5 +132,13 @@ export interface ProfessionalRegistration {
 // lise `documents` sur cet objet, au lieu de nous laisser croire qu'il existe.
 export type SessionRegistration = Omit<
   ProfessionalRegistration,
-  'account_type' | 'account_type_label' | 'documents' | 'reactivation_requests'
+  | 'account_type'
+  | 'account_type_label'
+  | 'documents'
+  | 'reactivation_requests'
+  | 'ifu'
+  | 'npi'
+  | 'representative'
+  | 'profile'
+  | 'decisions'
 >

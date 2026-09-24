@@ -22,6 +22,9 @@ const STATUS_FILTERS: { value: RegistrationFilter; label: string }[] = [
   { value: 'pending', label: 'En attente' },
   { value: 'approved', label: 'Approuvé' },
   { value: 'rejected', label: 'Rejeté' },
+  // Dossiers jamais soumis (profil ou informations légales incomplets) : hors
+  // de la liste par défaut, consultables ici (CLAUDE.md §5, v0.26).
+  { value: 'profile_incomplete', label: 'Profil à compléter' },
   { value: 'reactivation_requested', label: 'Réactivation demandée' },
 ]
 
@@ -32,7 +35,8 @@ const STATUS_FILTERS: { value: RegistrationFilter; label: string }[] = [
 const columns: TableColumn[] = [
   { key: 'structure_name', label: 'Structure' },
   { key: 'account_type_label', label: 'Type de compte' },
-  { key: 'created_at', label: 'Date de soumission' },
+  { key: 'submitted_at', label: 'Date de soumission' },
+  { key: 'created_at', label: 'Compte créé le' },
   { key: 'status', label: 'Statut' },
 ]
 
@@ -119,7 +123,7 @@ onMounted(() => {
       {{ flashMessage }}
     </p>
 
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       <AppButton
         v-for="filter in STATUS_FILTERS"
         :key="filter.value"
@@ -137,7 +141,11 @@ onMounted(() => {
       <AppTable :items="registrations" :columns="columns" @row-click="goToDetail">
         <template #empty>
           <template v-if="statusFilter === 'reactivation_requested'">Aucune demande de réactivation en attente.</template>
+          <template v-else-if="statusFilter === 'profile_incomplete'">Aucun profil à compléter.</template>
           <template v-else>Aucun dossier {{ STATUS_FILTERS.find((f) => f.value === statusFilter)?.label.toLowerCase() }}.</template>
+        </template>
+        <template #cell-submitted_at="{ item }">
+          {{ item.submitted_at ? formatDate(item.submitted_at) : '—' }}
         </template>
         <template #cell-created_at="{ item }">
           {{ formatDate(item.created_at) }}
