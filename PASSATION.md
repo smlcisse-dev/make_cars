@@ -1,18 +1,18 @@
 # Make Cars : document de passation (état au 2026-09-24)
 
-Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, puis liens email v0.30), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
+Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, liens email v0.30, puis correctifs et tableaux de bord professionnels), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **112 commits** au total après le lot v0.30 (liens email) du 2026-09-24, ce commit de documentation compris (109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `82b733f` feat(frontend): pages de confirmation des liens email (v0.30), suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **596 tests, 596 réussis, 1995 assertions** après le lot v0.30 (586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **117 commits** au total après le lot « correctifs et tableaux de bord » du 2026-09-24, ce commit de documentation compris (112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `73dfee2` feat(frontend): tableaux de bord des espaces professionnels, suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **608 tests, 608 réussis, 2050 assertions** après le lot « correctifs et tableaux de bord » (596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **195 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
+- **Routes** (`php artisan route:list`) : **197 routes** au total (+1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
 | Espace | Routes | Détail |
 |---|---|---|
-| `api/garage/*` | 57 | profil 13 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit` ; CIP v0.27 : `profile/legal/identity-document` ×2 ; v0.28 : `profile/reactivation-request`, `profile/reactivation-requests/{reactivationRequest}/attachments/{attachment}`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
-| `api/market-space/*` | 34 | profil 13 (mêmes routes de dossier v0.26, v0.27 et v0.28), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
+| `api/garage/*` | 58 | tableau de bord 1, profil 13 (dont dossier v0.26 : `profile/legal`, `profile/legal/document` ×2, `profile/submit` ; CIP v0.27 : `profile/legal/identity-document` ×2 ; v0.28 : `profile/reactivation-request`, `profile/reactivation-requests/{reactivationRequest}/attachments/{attachment}`), services 5, produits 5, RDV 7, devis 10, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, client express 1, jeton FCM 1 |
+| `api/market-space/*` | 35 | tableau de bord 1, profil 13 (mêmes routes de dossier v0.26, v0.27 et v0.28), produits 5, commandes 4, chat 4, réclamations 4, notifications 2, avis 1, jeton FCM 1 |
 | `api/admin/*` | 41 | inscriptions 9 (dont `reactivation-request/refuse` et `reactivation-requests/{reactivationRequest}/attachments/{attachment}`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 11 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim`, mot de passe oublié en 2 routes (`password/forgot`, `password/reset`, v0.29) |
@@ -38,8 +38,9 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Mot de passe oublié (v0.29)** : construit, couvert par les tests backend (`tests/Feature/Auth/PasswordResetTest.php`), considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 - **Fiche admin d'examen d'un dossier (2026-09-24)** : construite, **pas encore testée en navigateur**.
 - **Pages des liens email (v0.30, 2026-09-24)** : `/devis/decision` et `/compte/activer`, construites, couvertes côté backend par les tests (`QuoteEmailDecisionTest`, `ExpressClaimTest`), **pas encore testées en navigateur** (ni sur téléphone).
+- **Correctifs et tableaux de bord professionnels (2026-09-24)** : double décision d'un devis (tests backend), nouveau lien d'activation depuis `/compte/activer`, tableaux de bord Garagiste et Market Space (tests backend de chaque compteur). Construits, **pas encore testés en navigateur**.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
-  - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
+  - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans partagent le code du Garagiste (tableau de bord compris depuis le 2026-09-24) (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
 
 ---
@@ -80,7 +81,7 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 
 | Menu | Routes | Vue(s) |
 |---|---|---|
-| Tableau de bord | `/garage` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, sans chiffres ni raccourcis |
+| Tableau de bord | `/garage` | `shared/DashboardView.vue` (`space="garage"`, 2026-09-24) : « À traiter » (cartes non nulles, liens vers les pages ; stock bas avec 5 produits) et « Activité » (facturé du mois, note, devis en attente du client, éléments en attente de validation), un seul appel `GET /garage/dashboard`. **Pas encore testé en navigateur** |
 | Services | `/garage/services` | `ServicesView.vue` : CRUD, disponibilité, image obligatoire à la création (v0.23) |
 | Produits | `/garage/products` | `shared/ProductsView.vue` : CRUD, correction de stock, seuil bas, image obligatoire (v0.23) |
 | Rendez-vous | `/garage/appointments`, `/:id` | `AppointmentsView`, `AppointmentDetailView` : confirmer, refuser (motif obligatoire, v0.24), reprogrammer |
@@ -94,11 +95,11 @@ Ordre du menu dans `GarageLayout.vue`, identique au routeur :
 
 **Espace Market Space (`/market-space`)** : construit, relu, jamais testé en navigateur
 
-Ordre du menu dans `MarketSpaceLayout.vue`. Hors tableau de bord, chaque écran est le même fichier que côté Garagiste (`views/shared/`, prop `space="market-space"`) :
+Ordre du menu dans `MarketSpaceLayout.vue`. Chaque écran est le même fichier que côté Garagiste (`views/shared/`, prop `space="market-space"`) :
 
 | Menu | Routes | Vue(s) |
 |---|---|---|
-| Tableau de bord | `/market-space` | `DashboardView.vue`. Simple message de bienvenue qui renvoie au menu, comme côté Garagiste |
+| Tableau de bord | `/market-space` | `shared/DashboardView.vue` (`space="market-space"`, 2026-09-24), sans les blocs RDV, devis et services. **Pas encore testé en navigateur** |
 | Produits | `/market-space/products` | `shared/ProductsView.vue` |
 | Commandes | `/market-space/orders`, `/:id` | `shared/OrdersView`, `shared/OrderDetailView` |
 | Messages | `/market-space/conversations` | `shared/ConversationsView.vue` (chat Market Space, v0.22 ; sans lien « Voir le devis ») |
@@ -138,7 +139,6 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
 - **Écran d'inscription automobiliste** côté web : volontairement absent (l'automobiliste passe par l'application mobile). Le parcours pro v0.26 est complet côté web : formulaire court et saisie du code (`/inscription`, 2026-09-23), puis informations légales, document, soumission et suivi du dossier sur « Mon profil ».
-- **Tableaux de bord d'accueil** Garagiste et Market Space : un message de bienvenue seulement, sans chiffres clés ni raccourcis.
 - **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
 - **Chat temps réel** : ni WebSocket ni Reverb. Il faut recharger pour voir les nouveaux messages.
@@ -227,6 +227,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 **Autres pistes ouvertes**
 - `scopePubliclyVisible()` ne filtre toujours pas sur la complétude du profil (vérifié dans `Garage.php`). Une fiche incomplète reste visible côté mobile.
 - Vérification téléphone pour la finalisation d'un compte express.
+- **`POST /auth/express-claim` révèle l'existence d'un compte** (relevé le 2026-09-24, non corrigé) : réponse 422 « Aucun compte express en attente de réclamation ne correspond à cet email » pour un email inconnu ou déjà activé, 200 sinon ; et la route n'a pas de limite de débit (`throttle`), contrairement à `password/forgot`. La page `/compte/activer` affiche le même message dans les deux cas, mais l'API reste interrogeable directement. Correctif possible : même réponse générique que le mot de passe oublié (v0.29) et `throttle:10,1`.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
@@ -276,6 +277,18 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 
 ## 8. Derniers changements (depuis le 2026-09-20)
 
+**Lot du 2026-09-24 : correctifs (double décision, lien d'activation expiré) et tableaux de bord professionnels**
+- **Double décision d'un devis** (`7d4c11b`) : deux `POST` simultanés (double clic, ou lien email + application) pouvaient passer tous les deux la vérification et décrémenter le stock deux fois. `QuoteService::accept()/reject()` vérifient désormais l'état **dans** la transaction, après verrou (`lockForUpdate`) sur le devis puis la version ; le second appel reçoit 409 `quote_version_not_decidable`. Les contrôleurs n'appellent plus `assertVersionIsDecidable` eux-mêmes. Autres chemins protégés de la même façon :
+  - `OrderService::markPaid()` (décrément du stock) : verrou sur la commande, 409 `order_not_pending` ;
+  - `OrderService::cancel()` : même verrou (sinon une annulation en attente du verrou pouvait repasser une commande payée en annulée) ;
+  - `QuoteService::markPaid()` (création de la facture, sans effet sur le stock) : verrou sur le devis, 409 `quote_not_in_progress`.
+  - Les contrôles d'état existants des contrôleurs (403) sont conservés pour le cas ordinaire ; le 409 ne sort qu'en cas de course.
+  - Tests `ConcurrentStockDecisionTest` : second appel sur des objets relus avant la première décision. SQLite ignore `lockForUpdate` : le test prouve la relecture de l'état, le verrou lui-même n'agit que sous PostgreSQL.
+- **Lien d'activation expiré** (`e1c593f`) : `/compte/activer` propose un champ email et « Recevoir un nouveau lien » (`POST /auth/express-claim`), avec un message identique que l'adresse corresponde ou non à un compte. Aucun changement backend ; l'endpoint révèle toutefois l'existence d'un compte (§6, « Autres pistes ouvertes »).
+- **Tableaux de bord** : backend `22065a9` (`GET /garage|market-space/dashboard`, `ProfessionalDashboardService`, calcul du montant facturé extrait dans `InvoicedAmountService` et partagé avec les statistiques admin, 7 tests), frontend `73dfee2` (`views/shared/DashboardView.vue`, les deux anciens `DashboardView.vue` supprimés).
+  - Liens des cartes : RDV → liste des RDV (déjà ouverte sur « En attente ») ; devis à démarrer / à facturer / en attente du client → liste des devis (sans filtre : la page n'en a pas) ; commandes → Commandes ; services / produits refusés → Services / Produits ; stock bas → Produits ; réclamations ouvertes → Réclamations (sans filtre : « ouvertes » regroupe deux statuts de la page) ; note → Avis.
+- **Pas encore testé en navigateur.**
+
 **Lot du 2026-09-24 : liens email et correctif de sécurité (v0.30)**
 - **Faille corrigée** : la décision d'un devis par un client express se faisait sur un simple `GET`. Une messagerie ou un antivirus qui ouvre le lien pour l'analyser pouvait accepter le devis (et décrémenter le stock) ou le refuser sans action du client. Règle désormais : un `GET` sur un lien reçu par email n'a jamais d'effet ; seul un `POST` explicite décide.
 - Backend `5f2dbeb` :
@@ -287,7 +300,7 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
   - tests : un `GET` ne change ni le statut, ni le stock, ni les notifications ; `POST` accept/reject ; `decision` invalide ; lien expiré, modifié, ou appelé par un autre hôte ; version déjà décidée ou périmée (409). OpenAPI mis à jour.
 - Frontend `82b733f` : pages `/devis/decision` et `/compte/activer` (`views/public/`), client `api/emailLinks.ts` (instance Axios sans jeton ni redirection, paramètre `link` vérifié : même origine que l'API et route attendue).
 - **Pas encore testé en navigateur.**
-- Lien d'activation expiré : aucun écran web ne permet d'en demander un nouveau (`POST /auth/express-claim` n'est appelé par aucune interface, l'application mobile n'existant pas). La page dit seulement que le lien n'est plus valide.
+- Lien d'activation expiré : depuis `e1c593f` (lot suivant), la page propose d'en recevoir un nouveau.
 - Lire les liens reçus en développement (`MAIL_MAILER=log`), depuis `backend/` :
   - décision de devis : `grep -o 'http[^"]*/devis/decision?[^"]*' storage/logs/laravel.log | tail -2 | sed 's/&amp;/\&/g'` (lien « accepter » puis « refuser ») ;
   - activation d'un compte express : `grep -o 'http[^"]*/compte/activer?[^"]*' storage/logs/laravel.log | tail -1`.

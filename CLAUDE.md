@@ -159,6 +159,7 @@ Deuxième maillon de la chaîne RDV → devis → validation → prestation → 
 - **Statuts** : `draft` (brouillon, lignes modifiables) → `sent` (envoyé, PDF généré, notifié via le chat) → `accepted` (validé par le client, décrémente le stock des lignes de pièces) ou `rejected` (refusé) → si refusé, le garagiste peut créer une nouvelle version (`negotiating` une fois cette version envoyée) → `accepted` ou `rejected` à nouveau. Depuis `accepted` : `in_progress` (prestation démarrée) → `invoiced` (payé, facture générée). Depuis `rejected` : `abandoned` (négociation infructueuse, clôture sans prestation ni facture) au lieu de renégocier.
 - **Validation = action digitale explicite, jamais le chat** : le client dispose d'un endpoint « Accepter » et d'un endpoint « Refuser », rattachés précisément à la version du devis concernée (pas juste « le dernier devis reçu ») — toute décision est tracée (`decided_by`, `decided_at`). Le chat ne sert qu'à transmettre le PDF et notifier, jamais à interpréter une validation.
 - **Codes d'erreur de la décision** (mise à jour v0.30) : **403 = accès refusé** (devis d'un autre client, lien signé invalide ou expiré) ; **409 `quote_version_not_decidable` = état qui ne permet plus l'action** (version déjà décidée, périmée ou pas encore envoyée, devis plus en attente de décision) ; 404 si la version n'appartient pas au devis. Même règle depuis l'app et depuis le lien email (`QuoteService::assertVersionIsDecidable`).
+- **Décision protégée contre les appels simultanés** (correctif 2026-09-24) : `QuoteService::accept()/reject()` vérifient l'état et décident dans la même transaction, sous verrou (`lockForUpdate`) sur le devis puis la version — deux appels simultanés (double clic, lien email + application) ne décident et ne décrémentent le stock qu'une fois ; le second reçoit 409. Même principe pour le paiement et l'annulation d'une commande (409 `order_not_pending`) et le paiement d'un devis (409 `quote_not_in_progress`). À appliquer à tout futur chemin qui agit à partir d'un état (surtout s'il touche au stock).
 - **Paiement manuel V1** : en l'absence d'agrégateur de paiement en ligne (§7), le garagiste marque lui-même la prestation comme payée (couvre aussi le paiement en espèces sur place). Ça transforme automatiquement le devis accepté en facture : même contenu (lignes copiées), nouveau PDF avec la mention « Facture », renvoyé via le chat. Ce mécanisme sera étendu par un vrai module de paiement en ligne plus tard, sans changer cette logique de transition.
 - **Clôture du RDV, deux issues distinctes** (utile pour les statistiques agrégées, §1) : prestation facturée (`Appointment.status = completed`, `Quote.status = invoiced`) vs négociation infructueuse (`Appointment.status = completed`, `Quote.status = abandoned`). La distinction n'est jamais dupliquée sur `Appointment` : elle se lit via `Appointment::wasCompletedWithService()`, dérivée du statut du devis lié.
 
@@ -453,6 +454,16 @@ Ferme le point ouvert « page de confirmation conviviale » (§7) et corrige une
   - `/compte/activer` (`views/public/AccountActivationView.vue`) : « Bonjour {prénom}… », mot de passe (8 caractères minimum) et confirmation ; succès : renvoi vers l'application mobile, sans lien vers `/login` (site réservé aux professionnels).
   - `api/emailLinks.ts` : instance Axios dédiée (ni jeton de session, ni redirection en cas d'erreur) ; le paramètre `link` est vérifié (même origine que l'API, route attendue) puis résolu sur l'origine de l'API, sans doubler le préfixe `/api`.
 
+### Tableaux de bord professionnels (ajout 2026-09-24)
+
+Page d'accueil des espaces Garagiste et Market Space : ce qui demande une action, puis l'activité.
+
+- **Endpoint unique par espace** : `GET /garage/dashboard` et `GET /market-space/dashboard`, derrière `registration.approved` et `profile.complete` comme les autres routes métier. **Une seule réponse avec tous les chiffres** : avec la latence de Supabase (§4), une requête par carte ralentirait l'écran d'autant. Service commun `ProfessionalDashboardService` (vendeur polymorphe), contrôleur commun `Professional\DashboardController`.
+- **`to_handle`** (compteurs) : garage seulement — RDV `pending`, devis `accepted` (à démarrer), devis `in_progress` (à facturer), services `rejected` ; les deux — commandes `pending` (à encaisser), produits en stock bas (seuil configuré et stock inférieur ou égal : nombre + 5 premiers, `id`/`name`/`stock_quantity`/`low_stock_threshold`), produits `rejected`, réclamations `submitted` ou `under_review`.
+- **`activity`** : montant facturé du mois en cours (heure du Bénin ; devis `invoiced` + commandes `paid`, sur `paid_at` — même calcul que les statistiques admin, `InvoicedAmountService`), note moyenne et nombre d'avis visibles ; garage seulement — devis `sent`/`negotiating` (en attente du client) et services `pending` ; les deux — produits `pending`.
+- Les clés propres au garage sont **absentes** (pas à zéro) de la réponse d'un Market Space.
+- **Frontend** : `views/shared/DashboardView.vue` (prop `space`) ; cartes « À traiter » non nulles seulement, chacune liée à sa page ; « Rien à traiter pour le moment. » sinon ; bouton « Actualiser ».
+
 ### Matrice des droits d'accès (résumé)
 
 | Fonctionnalité | Admin | Compte Garagiste | Compte Market Space | Automobiliste (mobile) |
@@ -483,6 +494,7 @@ Ferme le point ouvert « page de confirmation conviviale » (§7) et corrige une
 | Définir le seuil d'alerte de stock bas sur ses produits | Non | Oui | Oui | Non concerné |
 | Notifications push (statut commande) | — | — | — | Oui |
 | Consulter les statistiques agrégées (structures, géographie, activité, avis, réclamations) | Oui | Non | Non | Non |
+| Tableau de bord de son espace (chiffres clés) | Non | Oui | Oui | Non |
 | Réclamer un compte express (définir un mot de passe) | Non concerné | Non concerné | Non concerné | Oui (lien email) |
 | Soumettre son dossier pour validation | Non | Oui | Oui | Non |
 | Demander la réactivation de son compte suspendu | Non | Oui | Oui | Non |
