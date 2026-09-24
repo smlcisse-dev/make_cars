@@ -36,6 +36,8 @@ export interface QuoteVersion {
   is_sent: boolean
   sent_at: string | null
   decision: QuoteVersionDecision | null
+  // Auteur de la décision (identifiant du compte) : toujours le client.
+  decided_by: number | null
   decided_at: string | null
   total: string
   lines: QuoteLine[]

@@ -156,6 +156,72 @@ const router = createRouter({
           name: 'admin.litiges.show',
           component: () => import('@/views/admin/LitigeDetailView.vue'),
         },
+        // Supervision en lecture seule (CLAUDE.md §5, règle 8). Garages et
+        // boutiques partagent les mêmes écrans, `kind` choisit la route API.
+        {
+          path: 'garages',
+          name: 'admin.garages',
+          component: () => import('@/views/admin/supervision/StructuresView.vue'),
+          props: { kind: 'garage' },
+        },
+        {
+          path: 'garages/:id',
+          name: 'admin.garages.show',
+          component: () => import('@/views/admin/supervision/StructureDetailView.vue'),
+          props: { kind: 'garage' },
+        },
+        {
+          path: 'boutiques',
+          name: 'admin.boutiques',
+          component: () => import('@/views/admin/supervision/StructuresView.vue'),
+          props: { kind: 'market_space' },
+        },
+        {
+          path: 'boutiques/:id',
+          name: 'admin.boutiques.show',
+          component: () => import('@/views/admin/supervision/StructureDetailView.vue'),
+          props: { kind: 'market_space' },
+        },
+        {
+          path: 'appointments',
+          name: 'admin.appointments',
+          component: () => import('@/views/admin/supervision/AppointmentsView.vue'),
+        },
+        {
+          path: 'appointments/:id',
+          name: 'admin.appointments.show',
+          component: () => import('@/views/admin/supervision/AppointmentDetailView.vue'),
+        },
+        {
+          path: 'quotes',
+          name: 'admin.quotes',
+          component: () => import('@/views/admin/supervision/QuotesView.vue'),
+        },
+        {
+          path: 'quotes/:id',
+          name: 'admin.quotes.show',
+          component: () => import('@/views/admin/supervision/QuoteDetailView.vue'),
+        },
+        {
+          path: 'orders',
+          name: 'admin.orders',
+          component: () => import('@/views/admin/supervision/OrdersView.vue'),
+        },
+        {
+          path: 'orders/:id',
+          name: 'admin.orders.show',
+          component: () => import('@/views/admin/supervision/OrderDetailView.vue'),
+        },
+        {
+          path: 'conversations',
+          name: 'admin.conversations',
+          component: () => import('@/views/admin/supervision/ConversationsView.vue'),
+        },
+        {
+          path: 'conversations/:id',
+          name: 'admin.conversations.show',
+          component: () => import('@/views/admin/supervision/ConversationDetailView.vue'),
+        },
       ],
     },
     {

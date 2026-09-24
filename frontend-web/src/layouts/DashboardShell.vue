@@ -10,9 +10,12 @@ import { useAuthStore } from '@/stores/auth'
 // routing/permissions internes") : seuls le titre et les liens de navigation
 // changent d'un espace à l'autre, passés en props par AdminLayout /
 // GarageLayout / MarketSpaceLayout.
+// `group` (facultatif) : titre de groupe affiché au-dessus de la première
+// entrée d'une suite d'entrées du même groupe (ex. « Supervision »).
 interface NavItem {
   label: string
   to: string
+  group?: string
 }
 
 const props = defineProps<{
@@ -48,6 +51,13 @@ const activeTo = computed<string | null>(() => {
   return matches.sort((a, b) => b.length - a.length)[0] ?? null
 })
 
+// Titre à afficher avant l'entrée d'indice `index` : seulement quand elle
+// ouvre un nouveau groupe.
+function groupHeadingAt(index: number): string | null {
+  const group = props.navItems[index]?.group
+  return group && group !== props.navItems[index - 1]?.group ? group : null
+}
+
 async function handleLogout(): Promise<void> {
   await auth.logout()
   window.location.href = '/login'
@@ -62,19 +72,27 @@ async function handleLogout(): Promise<void> {
         <h1 class="text-lg font-semibold text-slate-900">{{ title }}</h1>
       </div>
       <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          :class="[
-            'block rounded-md px-3 py-2 text-sm font-medium',
-            item.to === activeTo
-              ? 'bg-slate-900 text-white hover:bg-slate-900'
-              : 'text-slate-700 hover:bg-slate-100',
-          ]"
-        >
-          {{ item.label }}
-        </RouterLink>
+        <!-- `<template v-for>` répète plusieurs éléments (titre éventuel +
+             lien) sans ajouter de balise englobante. -->
+        <template v-for="(item, index) in navItems" :key="item.to">
+          <p
+            v-if="groupHeadingAt(index)"
+            class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-slate-400"
+          >
+            {{ groupHeadingAt(index) }}
+          </p>
+          <RouterLink
+            :to="item.to"
+            :class="[
+              'block rounded-md px-3 py-2 text-sm font-medium',
+              item.to === activeTo
+                ? 'bg-slate-900 text-white hover:bg-slate-900'
+                : 'text-slate-700 hover:bg-slate-100',
+            ]"
+          >
+            {{ item.label }}
+          </RouterLink>
+        </template>
       </nav>
       <div class="border-t border-slate-200 px-4 py-4">
         <p class="text-sm font-medium text-slate-900">{{ auth.user?.name }}</p>

@@ -25,7 +25,9 @@ const emit = defineEmits<{ 'row-click': [item: T] }>()
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+  <!-- `overflow-x-auto` : sur téléphone, le tableau défile horizontalement
+       dans son cadre au lieu d'élargir la page. -->
+  <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
     <table class="min-w-full divide-y divide-slate-200">
       <thead class="bg-slate-50">
         <tr>

@@ -15,6 +15,7 @@ import {
   type LitigeDetail,
 } from '@/api/litiges'
 import AppButton from '@/shared/components/AppButton.vue'
+import ConversationMessageList from '@/shared/components/ConversationMessageList.vue'
 import BaseModal from '@/shared/components/BaseModal.vue'
 import ReasonPromptModal from '@/shared/components/ReasonPromptModal.vue'
 import StatusBadge from '@/shared/components/StatusBadge.vue'
@@ -342,16 +343,7 @@ async function handleClose(): Promise<void> {
         </div>
         <p v-if="conversationErrorMessage" class="mt-2 text-sm text-rose-600">{{ conversationErrorMessage }}</p>
 
-        <ul v-if="conversation" class="mt-3 space-y-3">
-          <li v-if="conversation.messages.length === 0" class="text-sm text-slate-500">Aucun message échangé.</li>
-          <li v-for="message in conversation.messages" :key="message.id" class="rounded-md bg-slate-50 px-3 py-2">
-            <div class="flex items-center justify-between text-xs text-slate-400">
-              <span>{{ message.is_system ? 'Message système' : message.sender?.name ?? 'Automobiliste' }}</span>
-              <span>{{ formatDate(message.created_at) }}</span>
-            </div>
-            <p class="mt-1 text-sm text-slate-700">{{ message.body ?? (message.has_image ? '[Photo jointe]' : '') }}</p>
-          </li>
-        </ul>
+        <ConversationMessageList v-if="conversation" class="mt-3" :messages="conversation.messages" />
       </div>
 
       <div v-if="detail.reviews.length > 0" class="rounded-lg border border-slate-200 bg-white p-6">
