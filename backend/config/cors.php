@@ -19,7 +19,12 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_filter(explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173'))),
+    // Adresse(s) du frontend web, séparées par des virgules (CORS_ALLOWED_ORIGINS).
+    // En production : l'adresse réelle du site, en https (ex. "https://app.makecars.bj").
+    'allowed_origins' => array_values(array_filter(array_map(
+        trim(...),
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173')),
+    ))),
 
     'allowed_origins_patterns' => [],
 
