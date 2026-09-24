@@ -1,11 +1,11 @@
 # Make Cars : document de passation (état au 2026-09-24)
 
-Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
+Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, puis fiche admin d'examen), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **106 commits** au total après le lot v0.29 du 2026-09-24, ce commit de documentation compris (98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `b06fc59` feat(frontend): mot de passe oublié (v0.29), suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **586 tests, 586 réussis, 1932 assertions** après le lot v0.29 (571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **109 commits** au total après la fiche admin d'examen du 2026-09-24, ce commit de documentation compris (106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `3df53f1` feat(frontend): fiche admin d'examen complète d'un dossier d'inscription, suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **586 tests, 586 réussis, 1937 assertions** après la fiche admin d'examen (1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
 - **Routes** (`php artisan route:list`) : **195 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29).
 
@@ -35,7 +35,8 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Parcours d'inscription garagiste (v0.26)** : testé manuellement en navigateur — choix du type de compte, formulaire, code faux (essais restants affichés), blocage après 5 essais et ses deux boutons, « Modifier l'email » (champs conservés), renvoi du code avec décompte, confirmation, lien de l'email « compte créé », connexion, « Mon profil », soumission du dossier, email déjà utilisé refusé.
   - *Source : déclaration de l'utilisateur, 2026-09-24.* Les corrections qui en sont issues (§8, lot du 2026-09-24) ne sont, elles, pas encore revues en navigateur.
 - **Parcours d'inscription boutique (Market Space)** : vérifié par un **test automatique backend** de bout en bout (`tests/Feature/MarketSpace/MarketSpaceSignupJourneyTest.php` : inscription, code, compte et profil vides, lien de l'email vers `/market-space/profile`, connexion, profil, informations légales, registre de commerce, CIP, soumission, approbation admin, routes métier ouvertes) et par **relecture du code frontend** (titre « Créer mon compte boutique », `account_type=market_space` envoyé, « Modifier l'email » qui revient à `/inscription/boutique`, redirection après connexion vers `/market-space/profile`, libellé « Nom de la boutique »). **Pas testé en navigateur** ; affichage sur téléphone non testé.
-- **Mot de passe oublié (v0.29)** : construit, couvert par les tests backend (`tests/Feature/Auth/PasswordResetTest.php`), **pas encore testé en navigateur**.
+- **Mot de passe oublié (v0.29)** : construit, couvert par les tests backend (`tests/Feature/Auth/PasswordResetTest.php`), considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
+- **Fiche admin d'examen d'un dossier (2026-09-24)** : construite, **pas encore testée en navigateur**.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
@@ -54,7 +55,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 
 **Commun**
 - `/login` : connexion email/mot de passe, avec lien vers l'inscription professionnelle et lien « Mot de passe oublié ? » (v0.29).
-- `/mot-de-passe-oublie` (v0.29) : email, puis code + nouveau mot de passe sur la même page ; retour sur `/login?reset=1` avec message de confirmation. Construit, pas encore testé en navigateur.
+- `/mot-de-passe-oublie` (v0.29) : email, puis code + nouveau mot de passe sur la même page ; retour sur `/login?reset=1` avec message de confirmation. Considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 - `/inscription` et ses étapes (v0.26) : choix du type de compte, formulaire court, saisie du code, confirmation (parcours garagiste testé en navigateur le 2026-09-24, parcours boutique vérifié par test automatique backend et relecture).
 - `/403` et page 404.
 - Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28), `ConfirmDialog` (fenêtre de confirmation unique, montée dans `App.vue`, pilotée par `confirmAction()` de `utils/confirmDialog.ts` — remplace tous les `window.confirm`, 2026-09-24), `CodeInput` (champ du code à 6 chiffres, commun à l'inscription et au mot de passe oublié).
@@ -65,7 +66,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 | Menu | Routes | Périmètre |
 |---|---|---|
 | Tableau de bord | `/admin` | Statistiques agrégées (`GET /admin/statistics`), en cartes et tableaux, sans graphiques |
-| Inscriptions | `/admin/registrations`, `/:id` | Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — testé en navigateur (déclaration utilisateur, 2026-09-23) ; pièces jointes de la demande (bouton « Consulter », dans la demande en attente et dans l'historique) — considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23) |
+| Inscriptions | `/admin/registrations`, `/:id` | Liste : filtres par statut dont « Profil à compléter » (2026-09-24), colonnes date de soumission (`submitted_at`) et date de création du compte. Fiche d'examen (2026-09-24, pas encore testée en navigateur) : en-tête (soumission, création), représentant, structure avec « Voir sur la carte » (lien OpenStreetMap), horaires, photos, informations légales (RCCM, IFU, NPI + « Consulter le CIP »), justificatifs, historique des décisions. Fiche KYC (documents dont la CIP, v0.27). Approbation, rejet, suspension et réactivation (motif obligatoire). v0.28 : filtre et badge « Réactivation demandée », bloc de la demande en attente, « Refuser la demande » (motif obligatoire), historique des demandes — testé en navigateur (déclaration utilisateur, 2026-09-23) ; pièces jointes de la demande (bouton « Consulter », dans la demande en attente et dans l'historique) — considérées comme validées par l'utilisateur, sans test en navigateur (2026-09-23) |
 | Services | `/admin/services`, `/:id` | Validation des services de garage |
 | Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
 | Avis | `/admin/avis`, `/:id` | Masquage avec motif |
@@ -275,6 +276,11 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 
 ## 8. Derniers changements (depuis le 2026-09-20)
 
+**Lot du 2026-09-24 : fiche admin d'examen d'un dossier d'inscription**
+- Backend `e0d4be7` : `ProfessionalRegistrationResource` expose `representative` (prénom, nom, nom d'affichage, email, téléphone de la personne inscrite), **réservé à l'admin** comme IFU/NPI/profil/décisions (tests : présent sur la fiche admin, absent de `/auth/me`). Seule donnée manquante pour la fiche ; tout le reste était déjà renvoyé. Libellé du document de registre corrigé en « Registre de commerce (RCCM) » (`RegistrationDocumentType`).
+- Frontend `3df53f1` : fiche `/admin/registrations/:id` en sections (en-tête, représentant, structure avec « Voir sur la carte », horaires, photos, informations légales avec « Consulter le CIP », justificatifs, historique des décisions, compte/réactivation, décision), une colonne sur téléphone, rien de modifiable. Date de soumission corrigée : `submitted_at` (« Jamais soumis » si vide) au lieu de `created_at`. Libellé « Numéro RCCM » au lieu de « N° IFU-RCCM ». Liste : filtre « Profil à compléter », colonnes soumission / création du compte.
+- **Pas encore testé en navigateur.**
+
 **Lot du 2026-09-24 (v0.29, après les tests de l'inscription garagiste)**
 - Backend `885be9b` :
   - une `ApiException` (code faux, code expiré, demande déjà en attente…) n'est plus journalisée comme une erreur (`dontReport` dans `bootstrap/app.php`) ; la réponse JSON ne change pas ; test `Exceptions::fake()` ;
@@ -285,7 +291,7 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
   - « Mon profil » : « Nom du garage » / « Nom de la boutique » avec l'aide « Le nom sous lequel les automobilistes vous trouveront. », aussi dans la liste des éléments manquants (`missingFieldLabel`) ;
   - « Mon profil », position : aide pour relever les coordonnées avec Google Maps au téléphone (« atelier » / « boutique »), précision du relevé affichée (`coords.accuracy`), avertissement au-delà de 100 m.
 - Test `f89b5d6` : parcours d'inscription Market Space de bout en bout (`MarketSpaceSignupJourneyTest`), qui remplace deux tests Market Space qu'il couvre entièrement.
-- **Mot de passe oublié (v0.29)** : backend `85970a4` (table `password_reset_codes`, service, 2 routes, email, 14 tests ; règles du code mises en commun avec l'inscription dans `config/email_codes.php` et `App\Support\EmailCode`), frontend `b06fc59` (page `/mot-de-passe-oublie`, `CodeInput`, `useResendCountdown`). Migration appliquée sur la base de **développement** uniquement. **Pas encore testé en navigateur.**
+- **Mot de passe oublié (v0.29)** : backend `85970a4` (table `password_reset_codes`, service, 2 routes, email, 14 tests ; règles du code mises en commun avec l'inscription dans `config/email_codes.php` et `App\Support\EmailCode`), frontend `b06fc59` (page `/mot-de-passe-oublie`, `CodeInput`, `useResendCountdown`). Migration appliquée sur la base de **développement** uniquement. Considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 
 **Lot du 2026-09-23 (après les tests de « Mon profil »)**
 - Corrections frontend (`c0506e4`) :
