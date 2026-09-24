@@ -1,21 +1,25 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { resendSignupCode, verifySignupCode } from '@/api/signup'
 import AppButton from '@/shared/components/AppButton.vue'
+import CodeInput from '@/shared/components/CodeInput.vue'
 import { useSignupStore } from '@/stores/signup'
 import type { PendingSignup } from '@/types/signup'
-import { extractApiErrorMessage, extractValidationErrors } from '@/utils/apiError'
+import {
+  extractApiErrorCode,
+  extractApiErrorMessage,
+  extractValidationErrors,
+} from '@/utils/apiError'
+import { CODE_FORMAT_ERROR, isWellFormedCode, useResendCountdown } from '@/utils/emailCode'
 
 // Saisie du code reçu par email (CLAUDE.md §5, ajout v0.26). `id` vient de
 // l'URL (/inscription/verification/:id, `props: true` dans le routeur) : même
 // après un rechargement, qui vide le store (voir stores/signup.ts), la saisie
 // du code et le renvoi restent possibles.
 const props = defineProps<{ id: string }>()
-
-const CODE_LENGTH = 6
 
 const signup = useSignupStore()
 const router = useRouter()
@@ -40,44 +44,22 @@ const infoMessage = ref<string | null>(null)
 const isVerifying = ref(false)
 const isResending = ref(false)
 
-// Décompte avant le prochain renvoi possible. `now` est relu chaque seconde :
-// `secondsLeft`, qui en dépend, est alors recalculé et l'affichage suit.
-const now = ref(Date.now())
-const resendAvailableAt = ref<number | null>(
+// Décompte avant le prochain renvoi possible (composable commun avec le mot
+// de passe oublié, utils/emailCode.ts).
+const { secondsLeft, waitUntil, waitSeconds } = useResendCountdown(
   pending.value ? Date.parse(pending.value.resend_available_at) : null,
 )
-const secondsLeft = computed(() =>
-  resendAvailableAt.value === null
-    ? 0
-    : Math.max(0, Math.ceil((resendAvailableAt.value - now.value) / 1000)),
-)
-
-// `ReturnType<typeof setInterval>` : le type exact renvoyé par setInterval,
-// sans avoir à savoir s'il s'agit d'un nombre (navigateur) ou d'un objet.
-let timer: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now()
-  }, 1000)
-})
-// Arrêter le minuteur en quittant la page, sinon il tournerait indéfiniment.
-onUnmounted(() => clearInterval(timer))
-
-function errorCode(error: unknown): string | undefined {
-  if (!axios.isAxiosError(error)) return undefined
-  return (error.response?.data as { code?: string } | undefined)?.code
-}
 
 function applyPending(fresh: PendingSignup): void {
   signup.setPending(fresh)
-  resendAvailableAt.value = Date.parse(fresh.resend_available_at)
+  waitUntil(Date.parse(fresh.resend_available_at))
 }
 
 async function handleVerify(): Promise<void> {
   codeError.value = null
   infoMessage.value = null
-  if (!new RegExp(`^\\d{${CODE_LENGTH}}$`).test(code.value)) {
-    codeError.value = `Le code doit comporter ${CODE_LENGTH} chiffres.`
+  if (!isWellFormedCode(code.value)) {
+    codeError.value = CODE_FORMAT_ERROR
     return
   }
 
@@ -92,7 +74,7 @@ async function handleVerify(): Promise<void> {
       ? (error.response?.data as { remaining_attempts?: number } | undefined)
       : undefined
 
-    switch (errorCode(error)) {
+    switch (extractApiErrorCode(error)) {
       case 'verification_code_invalid':
         codeError.value = `Code incorrect. Il vous reste ${data?.remaining_attempts ?? 0} essai(s).`
         break
@@ -144,12 +126,12 @@ async function handleResend(): Promise<void> {
       ? (error.response?.data as { retry_after_seconds?: number } | undefined)?.retry_after_seconds
       : undefined
 
-    if (errorCode(error) === 'resend_too_soon' && retryAfter !== undefined) {
+    if (extractApiErrorCode(error) === 'resend_too_soon' && retryAfter !== undefined) {
       // Cas typique après un rechargement : le store ne connaissait plus le
       // délai, le backend le redonne.
-      resendAvailableAt.value = Date.now() + retryAfter * 1000
+      waitSeconds(retryAfter)
       infoMessage.value = `Nouvel envoi possible dans ${retryAfter} s.`
-    } else if (errorCode(error) === 'verification_not_found') {
+    } else if (extractApiErrorCode(error) === 'verification_not_found') {
       step.value = 'not_found'
     } else if (axios.isAxiosError(error) && error.response?.status === 429) {
       infoMessage.value = 'Trop de tentatives. Réessayez dans une minute.'
@@ -174,13 +156,6 @@ function editEmail(): void {
   }
 }
 
-// Seuls les chiffres sont gardés, au plus 6 (un code collé avec des espaces
-// reste utilisable).
-function onCodeInput(event: Event): void {
-  const input = event.target as HTMLInputElement
-  code.value = input.value.replace(/\D/g, '').slice(0, CODE_LENGTH)
-  input.value = code.value
-}
 </script>
 
 <template>
@@ -232,22 +207,7 @@ function onCodeInput(event: Event): void {
         <form class="mt-6 space-y-4" novalidate @submit.prevent="handleVerify">
           <div>
             <label for="code" class="block text-sm font-medium text-slate-700">Code</label>
-            <!-- `inputmode="numeric"` : clavier numérique sur téléphone, sans
-                 les défauts d'un `type="number"` (flèches, zéros de tête
-                 perdus). `autocomplete="one-time-code"` : le téléphone peut
-                 proposer de remplir le code tout seul à partir du message
-                 reçu. -->
-            <input
-              id="code"
-              :value="code"
-              type="text"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              :maxlength="CODE_LENGTH"
-              placeholder="●●●●●●"
-              class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-center font-mono text-xl tracking-[0.5em] focus:border-slate-500 focus:outline-none"
-              @input="onCodeInput"
-            />
+            <CodeInput id="code" v-model="code" />
             <p v-if="codeError" class="mt-1 text-sm text-red-600">{{ codeError }}</p>
             <p v-else-if="infoMessage" class="mt-1 text-sm text-slate-600">{{ infoMessage }}</p>
           </div>

@@ -37,6 +37,14 @@ const router = createRouter({
       component: () => import('@/views/auth/LoginView.vue'),
       meta: { guestOnly: true },
     },
+    // Mot de passe oublié par code email (CLAUDE.md §5, ajout v0.29), page
+    // publique en deux étapes.
+    {
+      path: '/mot-de-passe-oublie',
+      name: 'password.forgot',
+      component: () => import('@/views/auth/ForgotPasswordView.vue'),
+      meta: { guestOnly: true },
+    },
     // Inscription professionnelle (CLAUDE.md §5, ajout v0.26), pages publiques.
     {
       path: '/inscription',

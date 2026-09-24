@@ -9,6 +9,7 @@ import { useSignupStore } from '@/stores/signup'
 import type { SignupAccountType, SignupForm } from '@/types/signup'
 import { extractApiErrorMessage, extractValidationErrors } from '@/utils/apiError'
 import { BENIN_PHONE_ERROR, normalizeBeninPhone } from '@/utils/beninPhone'
+import { PASSWORD_MIN_LENGTH } from '@/utils/password'
 
 // Formulaire court d'inscription professionnelle (CLAUDE.md §5, ajout v0.26).
 // Un seul écran pour les deux types de comptes, comme les écrans partagés
@@ -19,9 +20,6 @@ const TITLES: Record<SignupAccountType, string> = {
   garagiste: 'Créer mon compte garagiste',
   market_space: 'Créer mon compte boutique',
 }
-
-// Aligné sur Password::defaults() côté backend (8 caractères minimum).
-const PASSWORD_MIN_LENGTH = 8
 
 const signup = useSignupStore()
 const router = useRouter()

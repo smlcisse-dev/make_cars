@@ -45,3 +45,10 @@ export function extractValidationErrors(error: unknown): Record<string, string> 
     Object.entries(errors).map(([field, messages]) => [field, messages[0] ?? '']),
   )
 }
+
+// Code d'erreur métier stable renvoyé par le backend (`{ message, code }`,
+// ex. `verification_locked`), à tester plutôt que le message.
+export function extractApiErrorCode(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) return undefined
+  return (error.response?.data as { code?: string } | undefined)?.code
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +18,10 @@ const errorMessage = ref<string | null>(null)
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+
+// Retour de « Mot de passe oublié » (`?reset=1`, posé par
+// ForgotPasswordView) : confirmation affichée au-dessus du formulaire.
+const passwordWasReset = computed(() => route.query.reset === '1')
 
 async function handleSubmit(): Promise<void> {
   isSubmitting.value = true
@@ -49,6 +53,13 @@ async function handleSubmit(): Promise<void> {
       <h1 class="text-xl font-semibold text-slate-900">Make Cars</h1>
       <p class="mt-1 text-sm text-slate-500">Espace Garagiste, Market Space et Administrateur.</p>
 
+      <p
+        v-if="passwordWasReset"
+        class="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+      >
+        Votre mot de passe a été modifié. Connectez-vous avec votre nouveau mot de passe.
+      </p>
+
       <form class="mt-6 space-y-4" @submit.prevent="handleSubmit">
         <div>
           <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
@@ -63,7 +74,15 @@ async function handleSubmit(): Promise<void> {
         </div>
 
         <div>
-          <label for="password" class="block text-sm font-medium text-slate-700">Mot de passe</label>
+          <div class="flex items-baseline justify-between">
+            <label for="password" class="block text-sm font-medium text-slate-700">Mot de passe</label>
+            <RouterLink
+              :to="{ name: 'password.forgot' }"
+              class="text-sm text-slate-600 underline hover:text-slate-900"
+            >
+              Mot de passe oublié ?
+            </RouterLink>
+          </div>
           <input
             id="password"
             v-model="password"
