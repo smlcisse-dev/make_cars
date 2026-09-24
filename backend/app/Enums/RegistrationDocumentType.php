@@ -19,7 +19,7 @@ enum RegistrationDocumentType: string
     public function label(): string
     {
         return match ($this) {
-            self::BusinessRegistration => 'Registre de commerce / IFU-RCCM',
+            self::BusinessRegistration => 'Registre de commerce (RCCM)',
             self::PremisesPhoto => 'Photo du local',
             self::IdentityCertificate => "Certificat d'Identification Personnelle (CIP)",
         };

@@ -37,6 +37,15 @@ class ProfessionalRegistrationResource extends JsonResource
             'structure_name' => $profile?->name,
             'address' => $profile?->address,
             'business_registration_number' => $this->business_registration_number,
+            // Personne inscrite (compte utilisateur), distincte de la
+            // structure : fiche d'examen admin uniquement.
+            'representative' => $this->when($isAdmin && $this->relationLoaded('user'), fn () => [
+                'first_name' => $this->user->first_name,
+                'last_name' => $this->user->last_name,
+                'name' => $this->user->name,
+                'email' => $this->user->email,
+                'phone' => $this->user->phone,
+            ]),
             'ifu' => $this->when($isAdmin, fn () => $this->ifu),
             'npi' => $this->when($isAdmin, fn () => $this->npi),
             'legal_status' => $this->when($isAdmin, fn () => $this->legalStatus()),

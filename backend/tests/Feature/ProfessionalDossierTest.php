@@ -302,7 +302,8 @@ class ProfessionalDossierTest extends TestCase
         $this->getJson('/api/auth/me')
             ->assertOk()
             ->assertJsonPath('data.profile_status.is_complete', false)
-            ->assertJsonMissingPath('data.professional_registration.ifu');
+            ->assertJsonMissingPath('data.professional_registration.ifu')
+            ->assertJsonMissingPath('data.professional_registration.representative');
     }
 
     public function test_legal_info_never_appears_in_public_or_mobile_resources(): void

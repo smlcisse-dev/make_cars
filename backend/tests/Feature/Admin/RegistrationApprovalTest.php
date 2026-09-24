@@ -107,7 +107,11 @@ class RegistrationApprovalTest extends TestCase
             ))
             ->assertJsonPath('data.decisions.0.decision', RegistrationStatus::Rejected->value)
             ->assertJsonPath('data.decisions.0.reason', 'Photo floue.')
-            ->assertJsonPath('data.decisions.0.decided_by.id', $admin->id);
+            ->assertJsonPath('data.decisions.0.decided_by.id', $admin->id)
+            ->assertJsonPath('data.representative.email', $registration->user->email)
+            ->assertJsonPath('data.representative.phone', $registration->user->phone)
+            ->assertJsonPath('data.representative.first_name', $registration->user->first_name)
+            ->assertJsonPath('data.representative.last_name', $registration->user->last_name);
     }
 
     public function test_a_non_admin_cannot_list_registrations(): void
