@@ -5,7 +5,7 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 **Vérifié dans le code / par commande**
 - **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **122 commits** au total après le lot « limites de débit et supervision admin » du 2026-09-24, ce commit de documentation compris (117 après le lot « correctifs et tableaux de bord », 112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
 - **Dernier commit de code** : `46af46b` feat(frontend): écrans de supervision admin, suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **615 tests, 615 réussis, 2111 assertions** après le lot « limites de débit et supervision admin » (608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **621 tests, 621 réussis, 2119 assertions** après les réglages proxy/CORS du 2026-09-24 (615 tests / 2111 assertions après le lot « limites de débit et supervision admin », 608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
 - **Routes** (`php artisan route:list`) : **197 routes** au total (+1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
@@ -239,7 +239,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - Vérification téléphone pour la finalisation d'un compte express.
 - ~~`POST /auth/express-claim` révèle l'existence d'un compte~~ : corrigé le 2026-09-24 (réponse identique, limite de débit), voir §8.
 - **Inscription** (automobiliste et professionnelle) : refuse un email ou un téléphone déjà utilisé, donc révèle qu'un compte existe. Exception assumée (CLAUDE.md §4), freinée par la limite de débit. Alternative possible plus tard : toujours répondre « code envoyé » et prévenir par email le titulaire du compte existant.
-- **Limites de débit par IP derrière un proxy** : en production, derrière un répartiteur de charge ou Cloudflare, `$request->ip()` renverrait l'IP du proxy (tous les visiteurs partageraient la même limite) tant que les proxys de confiance ne sont pas configurés (`trustProxies` dans `bootstrap/app.php`).
+- **Limites de débit par IP derrière un proxy** : en production, derrière un répartiteur de charge ou Cloudflare, `$request->ip()` renverrait l'IP du proxy (tous les visiteurs partageraient la même limite) tant que les proxys de confiance ne sont pas configurés. Réglage préparé le 2026-09-24 (`TRUSTED_PROXIES`, `config/trustedproxy.php`) : à renseigner, voir « Bloquant avant la mise en production ».
 - **Photos du chat et PDF des devis/commandes non consultables par l'admin** : aucun endpoint admin ne les sert ; les fiches de supervision le signalent. À ajouter si l'instruction des litiges le demande.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
@@ -275,6 +275,54 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
   - *Raison* : depuis la v0.26, les migrations n'ont été appliquées que sur la base de développement. Le code actuel en dépend (connexion, inscription, dossier, réactivation) : déployer sans elles casse la production.
   - *Procédure* : `switch-env.sh prod`, `switch-env.sh status` pour confirmer, sauvegarde de la base, `php artisan migrate:status` pour lister les migrations en attente (et les noter ici), `php artisan migrate`, nouvelle vérification avec `migrate:status`, puis retour sur `dev` et redémarrage de `php artisan serve --no-reload`.
   - Liste actuelle des migrations en attente attendues : toutes celles du 2026-09-23 (v0.26 et v0.28, dont `create_reactivation_request_attachments_table`) et `create_password_reset_codes_table` (v0.29, 2026-09-24). À vérifier par `migrate:status`, sans lancer `migrate` en production.
+
+**Valeurs actuelles de `backend/.env.production`** (relevées le 2026-09-24, sans les secrets) : `APP_ENV=local`, `APP_DEBUG=true`, `APP_URL=http://localhost:8000`, pas de `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS=http://localhost:5173`, pas de `TRUSTED_PROXIES`, `MAIL_MAILER=log` avec `MAIL_FROM_ADDRESS="hello@example.com"`, tous les disques en local (`KYC_DOCUMENTS_DISK=local`, `PUBLIC_MEDIA_DISK=public`, `PRIVATE_MEDIA_DISK=local`). Ce fichier n'est donc aujourd'hui qu'une copie du développement pointant sur la base de production : **aucune des cases ci-dessous n'est réglée**.
+
+- [ ] **Proxy de confiance**
+  - *Raison* : derrière un proxy ou un répartiteur de charge (Nginx de l'hébergeur, Cloudflare…), sans configuration, toutes les requêtes semblent venir de l'adresse du proxy. Les limites par IP (connexion : 20 par minute par IP, CLAUDE.md §4) bloqueraient alors **tous** les visiteurs en même temps.
+  - *Préparé* (2026-09-24) : variable `TRUSTED_PROXIES` (`config/trustedproxy.php`, lue par le middleware `TrustProxies` du framework), vide par défaut ; commentaire dans le fichier et dans `.env.example`.
+  - *Procédure* : renseigner dans `.env.production` les adresses ou plages des proxies que l'hébergeur documente (séparées par des virgules), ou `*` seulement si le serveur n'est joignable que par le proxy. Puis, **sur le serveur**, vérifier que l'IP réelle est vue : se connecter avec un mauvais mot de passe depuis deux réseaux différents (ex. wifi et 4G) ; le blocage de l'un (RECETTE.md, SE-01/SE-02) ne doit pas toucher l'autre.
+  - *Voir* : §6, « Autres pistes ouvertes » (limites de débit derrière un proxy).
+- [ ] **Service d'envoi d'emails**
+  - *Raison* : `MAIL_MAILER=log` (développement comme `.env.production` actuel) : aucun email ne part, ils sont seulement écrits dans `storage/logs/laravel.log`. Sans service réel, aucun professionnel ne reçoit son code d'inscription, et ni le mot de passe oublié, ni les devis aux clients express, ni l'activation de compte ne fonctionnent.
+  - *Procédure* : choisir un fournisseur (Brevo, Amazon SES, Mailtrap « sending »… : aucun changement de code, seulement les variables `MAIL_*`, voir le commentaire de `.env.example`), configurer SMTP (`MAIL_MAILER=smtp`, hôte, port, identifiants), une adresse d'expédition du domaine du projet (`MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`), et **l'authentification du domaine d'envoi** (enregistrements DNS SPF, DKIM et DMARC donnés par le fournisseur) : sans elle, les codes risquent d'arriver en courrier indésirable. Avant l'ouverture, tester un envoi réel vers une adresse Gmail (inscription d'une boutique : le code doit arriver en boîte de réception, pas en indésirables).
+- [ ] **HTTPS sur le site et sur l'API**
+  - *Raison* : sans HTTPS, mots de passe, jetons de session et justificatifs circulent en clair. Les navigateurs refusent aussi la géolocalisation (« Utiliser ma position » de « Mon profil ») sur une page non sécurisée, en particulier sur téléphone.
+  - *Procédure* : certificat pour les deux adresses (souvent fourni par l'hébergeur, ou Let's Encrypt), puis `APP_URL` et `FRONTEND_URL` en `https://` dans `.env.production`, et `VITE_API_BASE_URL` en `https://` pour le build du frontend. Les liens des emails sont construits à partir de ces valeurs.
+- [ ] **Origines autorisées (CORS)**
+  - *Raison* : l'API ne répond au navigateur que pour les adresses listées ; aujourd'hui seule `http://localhost:5173` l'est. Le site réel serait refusé par le navigateur.
+  - *Préparé* : `CORS_ALLOWED_ORIGINS` (`config/cors.php`), liste séparée par des virgules, `http://localhost:5173` par défaut. Elle était déjà lue depuis l'environnement ; les espaces autour des virgules sont ignorés depuis le 2026-09-24, et un test vérifie que les origines suivent la configuration.
+  - *Procédure* : mettre l'adresse réelle du site, en `https://` (en général la même valeur que `FRONTEND_URL`).
+- [ ] **Mode production**
+  - *Raison* : avec `APP_DEBUG=true`, toute erreur affiche à n'importe quel visiteur des détails techniques (chemins, requêtes SQL, parfois des valeurs de configuration). `APP_ENV=local` active aussi des comportements de développement.
+  - *Procédure* : `APP_ENV=production`, `APP_DEBUG=false` dans `.env.production`, puis `php artisan config:cache` au déploiement. Vérifier ensuite sur le serveur : `php artisan about` doit afficher `Environment … production` et `Debug Mode … OFF`. Puis provoquer une erreur serveur volontaire (ex. couper brièvement l'accès à la base) : la réponse ne doit contenir que « Server Error », sans trace, nom de fichier ni requête SQL.
+- [ ] **Stockage durable des fichiers**
+  - *Aujourd'hui* (relevé dans `config/filesystems.php` et les services) : trois réglages, tous sur le disque local du serveur, en développement comme dans `.env.production` :
+
+    | Réglage | Disque | Dossier | Fichiers |
+    |---|---|---|---|
+    | `KYC_DOCUMENTS_DISK` | `local` | `storage/app/private/registration-documents/` | justificatifs du dossier : registre de commerce, CIP |
+    | `PRIVATE_MEDIA_DISK` | `local` | `storage/app/private/` : `chat-attachments/`, `dispute-attachments/`, `reactivation-request-attachments/`, `quotes/`, `orders/` | images du chat, photos des réclamations, pièces jointes des demandes de réactivation, PDF des devis/factures et des factures de commande |
+    | `PUBLIC_MEDIA_DISK` | `public` | `storage/app/public/` : `garages/`, `market-space/`, `products/`, `repair-services/` | photos publiques : profils, produits, services (servies par le lien `public/storage`) |
+
+    Des disques Supabase Storage (`supabase` privé, `supabase_public` public, compatibles S3) sont déjà déclarés dans `config/filesystems.php` mais ne sont utilisés par aucun réglage.
+  - *Raison* : sur un hébergement où le serveur peut être remplacé (redéploiement, changement de machine), les fichiers écrits sur son disque disparaissent. Ce sont des pièces d'identité, des preuves de litige et des factures : leur perte casse la traçabilité (CLAUDE.md §6).
+  - *Procédure* : soit un volume persistant monté sur `storage/app` (avec `php artisan storage:link` si le disque public reste local), soit un stockage objet (ex. passer les trois réglages sur les disques Supabase, un bucket **privé** pour KYC et médias privés, public pour les photos) ; vérifier ensuite qu'un justificatif envoyé reste consultable après un redéploiement. Les fichiers déjà présents sont à recopier.
+- [ ] **Sauvegardes**
+  - *Raison* : une perte de la base ou des fichiers efface dossiers, devis, factures et avis, sans recours.
+  - *Procédure* : base de données : vérifier dans le tableau de bord du projet Supabase de production ce que prévoit le plan souscrit (sauvegardes automatiques, fréquence, durée de conservation, restauration à un instant donné) et le noter ici ; fichiers : sauvegarde du stockage choisi au point précédent (volume ou bucket). **Faire au moins une fois un essai de restauration** (base sur le projet de développement, quelques fichiers dans un dossier de test) et noter la date.
+
+### Bloquant pour le lancement de l'application mobile
+
+Distinct de la mise en ligne de l'espace professionnel (web), qui peut se faire avant l'application.
+
+- [ ] **Notifications push réelles**
+  - *Raison* : sans `FCM_SERVER_KEY`, les notifications sont enregistrées mais jamais envoyées (mode simulation, CLAUDE.md §5 ajout v0.12). Un automobiliste ne serait prévenu ni d'un RDV confirmé, ni d'un devis reçu.
+  - *Procédure* : projet Firebase, puis migration de l'API FCM « legacy » utilisée aujourd'hui vers l'API HTTP v1 (clé de compte de service, OAuth) avant de configurer la clé.
+  - *Voir* : §6, point 9.
+- [ ] **Liens de téléchargement de l'application** (Play Store, App Store)
+  - *Raison* : l'automobiliste est renvoyé vers l'application sans lien pour l'installer : page d'inscription (« Vous êtes automobiliste ? Make Cars s'utilise depuis l'application mobile. », `SignupChoiceView`) et page d'activation d'un compte express (`/compte/activer`, « Connectez-vous depuis l'application mobile Make Cars… »).
+  - *Procédure* : une fois l'application publiée, ajouter les deux liens sur ces deux pages.
 
 ## 7. Contrôle de cohérence du CLAUDE.md (v0.20 et suivantes)
 
