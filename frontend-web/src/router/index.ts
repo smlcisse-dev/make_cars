@@ -166,7 +166,8 @@ const router = createRouter({
         {
           path: '',
           name: 'garage.dashboard',
-          component: () => import('@/views/garage/DashboardView.vue'),
+          component: () => import('@/views/shared/DashboardView.vue'),
+          props: { space: 'garage' },
         },
         {
           path: 'profile',
@@ -263,7 +264,8 @@ const router = createRouter({
         {
           path: '',
           name: 'market-space.dashboard',
-          component: () => import('@/views/market-space/DashboardView.vue'),
+          component: () => import('@/views/shared/DashboardView.vue'),
+          props: { space: 'market-space' },
         },
         {
           path: 'profile',
