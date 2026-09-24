@@ -109,3 +109,9 @@ export async function activateAccount(
 ): Promise<void> {
   await publicHttp.post(url, payload)
 }
+
+// Demande d'un nouveau lien d'activation, depuis un lien expiré
+// (`POST /auth/express-claim`). Chemin fixe, résolu sur `VITE_API_BASE_URL`.
+export async function requestNewActivationLink(email: string): Promise<void> {
+  await publicHttp.post(`${import.meta.env.VITE_API_BASE_URL}/auth/express-claim`, { email })
+}

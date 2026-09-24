@@ -7,6 +7,7 @@ import {
   ACCOUNT_ACTIVATION_PATH,
   activateAccount,
   fetchAccountActivation,
+  requestNewActivationLink,
   signedApiUrl,
   type AccountActivationDetails,
 } from '@/api/emailLinks'
@@ -105,6 +106,43 @@ async function submit(): Promise<void> {
   }
 }
 
+// --- Nouveau lien, depuis un lien expiré ---------------------------------
+//
+// Le message affiché après l'envoi est le même que l'adresse corresponde ou
+// non à un compte à activer : la page ne doit pas permettre de deviner quels
+// emails ont un compte. C'est pourquoi une erreur 422 du backend (qui, lui,
+// distingue encore ce cas) aboutit au même message que la réussite ; le
+// format de l'adresse est donc vérifié ici, avant l'envoi.
+const NEW_LINK_SENT_MESSAGE =
+  "Si un compte à activer existe avec cette adresse, un nouveau lien vient d'y être envoyé. Pensez à regarder dans les courriers indésirables."
+const newLinkEmail = ref('')
+const newLinkError = ref<string | null>(null)
+const newLinkSent = ref(false)
+const isRequestingNewLink = ref(false)
+
+async function requestNewLink(): Promise<void> {
+  const email = newLinkEmail.value.trim()
+  newLinkError.value = null
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    newLinkError.value = 'Saisissez une adresse email valide.'
+    return
+  }
+
+  isRequestingNewLink.value = true
+  try {
+    await requestNewActivationLink(email)
+    newLinkSent.value = true
+  } catch (error) {
+    if (httpStatus(error) === 422) {
+      newLinkSent.value = true
+    } else {
+      newLinkError.value = extractApiErrorMessage(error, 'Une erreur est survenue. Réessayez.')
+    }
+  } finally {
+    isRequestingNewLink.value = false
+  }
+}
+
 // `text-base` : en dessous de 16 px, Safari iOS zoome sur le champ à la saisie.
 const inputClass =
   'mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-slate-500 focus:outline-none'
@@ -124,6 +162,31 @@ onMounted(load)
         <p class="mt-3 text-base text-slate-600">
           Ce lien a expiré ou n'est plus valide.
         </p>
+
+        <p v-if="newLinkSent" class="mt-6 rounded-md bg-slate-100 p-3 text-base text-slate-700">
+          {{ NEW_LINK_SENT_MESSAGE }}
+        </p>
+        <form v-else class="mt-6 space-y-4" novalidate @submit.prevent="requestNewLink">
+          <div>
+            <label for="new-link-email" class="block text-sm font-medium text-slate-700">
+              Votre adresse email
+            </label>
+            <input
+              id="new-link-email"
+              v-model="newLinkEmail"
+              type="email"
+              autocomplete="email"
+              inputmode="email"
+              required
+              :class="inputClass"
+            />
+            <p v-if="newLinkError" class="mt-1 text-sm text-red-600">{{ newLinkError }}</p>
+          </div>
+
+          <AppButton type="submit" :loading="isRequestingNewLink" class="w-full py-3 text-base">
+            Recevoir un nouveau lien
+          </AppButton>
+        </form>
       </template>
 
       <template v-else-if="state === 'claimed'">
