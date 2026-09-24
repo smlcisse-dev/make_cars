@@ -1,11 +1,11 @@
 # Make Cars : document de passation (état au 2026-09-24)
 
-Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, liens email v0.30, puis correctifs et tableaux de bord professionnels), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
+Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, liens email v0.30, correctifs et tableaux de bord professionnels, puis limites de débit et écrans de supervision admin), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **117 commits** au total après le lot « correctifs et tableaux de bord » du 2026-09-24, ce commit de documentation compris (112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `73dfee2` feat(frontend): tableaux de bord des espaces professionnels, suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **608 tests, 608 réussis, 2050 assertions** après le lot « correctifs et tableaux de bord » (596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **122 commits** au total après le lot « limites de débit et supervision admin » du 2026-09-24, ce commit de documentation compris (117 après le lot « correctifs et tableaux de bord », 112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `46af46b` feat(frontend): écrans de supervision admin, suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **615 tests, 615 réussis, 2111 assertions** après le lot « limites de débit et supervision admin » (608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
 - **Routes** (`php artisan route:list`) : **197 routes** au total (+1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
@@ -17,6 +17,8 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 11 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim`, mot de passe oublié en 2 routes (`password/forgot`, `password/reset`, v0.29) |
 | Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2 (`GET` lecture seule + `POST` décision, même URL signée, v0.30), réclamation de compte express 2, `health` 1 |
+
+Toutes les routes publiques (sans `auth:sanctum`) ont une limite de débit depuis le 2026-09-24 : valeurs et règle dans CLAUDE.md §4 « Limites de débit et réponses publiques », tableau complet au §8.
 | Hors `api/` | 5 | `sanctum/csrf-cookie`, `storage/{path}` ×2, `up`, `_boost/browser-logs` |
 
 **Niveau de vérification des écrans**
@@ -38,10 +40,11 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Mot de passe oublié (v0.29)** : construit, couvert par les tests backend (`tests/Feature/Auth/PasswordResetTest.php`), considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 - **Fiche admin d'examen d'un dossier (2026-09-24)** : construite, **pas encore testée en navigateur**.
 - **Pages des liens email (v0.30, 2026-09-24)** : `/devis/decision` et `/compte/activer`, construites, couvertes côté backend par les tests (`QuoteEmailDecisionTest`, `ExpressClaimTest`), **pas encore testées en navigateur** (ni sur téléphone).
+- **Écrans de supervision admin et 429 de la page de connexion (2026-09-24)** : construits, **pas encore testés en navigateur**.
 - **Correctifs et tableaux de bord professionnels (2026-09-24)** : double décision d'un devis (tests backend), nouveau lien d'activation depuis `/compte/activer`, tableaux de bord Garagiste et Market Space (tests backend de chaque compteur). Construits, **pas encore testés en navigateur**.
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans partagent le code du Garagiste (tableau de bord compris depuis le 2026-09-24) (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
-  - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
+  - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail, plus les 6 rubriques « Supervision » du 2026-09-24).
 
 ---
 
@@ -61,7 +64,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 - `/inscription` et ses étapes (v0.26) : choix du type de compte, formulaire court, saisie du code, confirmation (parcours garagiste testé en navigateur le 2026-09-24, parcours boutique vérifié par test automatique backend et relecture).
 - `/devis/decision` et `/compte/activer` (v0.30) : pages publiques ouvertes depuis un lien reçu par email (décision de devis par un client express, activation d'un compte express), sans `guestOnly`, dans `views/public/`. Pas encore testées en navigateur.
 - `/403` et page 404.
-- Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28), `ConfirmDialog` (fenêtre de confirmation unique, montée dans `App.vue`, pilotée par `confirmAction()` de `utils/confirmDialog.ts` — remplace tous les `window.confirm`, 2026-09-24), `CodeInput` (champ du code à 6 chiffres, commun à l'inscription et au mot de passe oublié).
+- Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28), `ConfirmDialog` (fenêtre de confirmation unique, montée dans `App.vue`, pilotée par `confirmAction()` de `utils/confirmDialog.ts` — remplace tous les `window.confirm`, 2026-09-24), `CodeInput` (champ du code à 6 chiffres, commun à l'inscription et au mot de passe oublié). Depuis le 2026-09-24 (supervision admin) : `StructureProfileSections` (profil, horaires, photos d'une structure : fiche d'examen d'un dossier et fiche de supervision), `ConversationMessageList` (fil de messages en lecture seule : fiche litige et supervision), `FilterButtons`, `LineItemsTable` (lignes d'un devis ou d'une commande), `DetailField`.
 - Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
 
 **Espace Admin (`/admin`)** : construit, relu, jamais testé en navigateur
@@ -74,6 +77,13 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 | Produits | `/admin/products`, `/:id` | Validation des produits (mini-boutique et Market Space). Rendu résistant à un vendeur orphelin depuis `7095e8d` |
 | Avis | `/admin/avis`, `/:id` | Masquage avec motif |
 | Litiges | `/admin/litiges`, `/:id` | Instruction, décision (fondée + suspension ou avertissement, ou rejet), clôture |
+| *Supervision* (titre de groupe, 2026-09-24, lecture seule, pas encore testé en navigateur) | | Vues dans `views/admin/supervision/` |
+| Garages | `/admin/garages`, `/:id` | `StructuresView` / `StructureDetailView` (prop `kind`, partagées avec Boutiques). Liste : nom, adresse, téléphone, Visible/Suspendu. Fiche : profil complet (blocs de la fiche d'examen), « Voir ses rendez-vous » (filtre `garage_id`). Pas de lien vers le dossier d'inscription : son identifiant n'est pas renvoyé |
+| Boutiques | `/admin/boutiques`, `/:id` | Mêmes vues, `kind="market_space"` |
+| Rendez-vous | `/admin/appointments`, `/:id` | Filtres statut et `garage_id`. Fiche : garage, client, service/description, dates (demandée, proposée, confirmée), motif de refus |
+| Devis | `/admin/quotes`, `/:id` | Filtre statut ; montant de la dernière version. Fiche : versions (plus récente en premier), lignes, totaux, décision (qui, quand), lien RDV. Pas de PDF : aucun endpoint admin |
+| Commandes | `/admin/orders`, `/:id` | Filtre statut. Fiche : vendeur (lien), client, lignes, total, paiement |
+| Conversations | `/admin/conversations`, `/:id` | Sans filtre. Fiche : mention « Conversation privée… consultée à des fins de supervision », messages en lecture seule ; photos signalées mais non consultables (aucun endpoint admin) |
 
 **Espace Garagiste (`/garage`)** : testé manuellement en navigateur (déclaration utilisateur)
 
@@ -112,8 +122,7 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 
 ## 2. Backend construit et testé, sans écran frontend
 
-- **Supervision admin en lecture** (12 routes, aucun écran, absentes du menu) : `admin/garages`, `admin/market-space-accounts`, `admin/appointments`, `admin/quotes`, `admin/orders`, `admin/conversations`, chacune en liste et en détail.
-  - Depuis v0.26, `admin/garages` et `admin/market-space-accounts` (liste et fiche) ne portent que sur les structures au dossier `approved`, suspendues comprises (404 sur la fiche sinon) ; les dossiers en cours se consultent via `admin/registrations`. Même périmètre pour la répartition géographique de `admin/statistics` (données destinées aux autorités : structures validées uniquement).
+- **Supervision admin** : écrans construits le 2026-09-24 (§1). Rappel du périmètre backend : depuis v0.26, `admin/garages` et `admin/market-space-accounts` (liste et fiche) ne portent que sur les structures au dossier `approved`, suspendues comprises (404 sur la fiche sinon) ; les dossiers en cours se consultent via `admin/registrations`. Même périmètre pour la répartition géographique de `admin/statistics` (données destinées aux autorités : structures validées uniquement).
 - **Côté automobiliste (`/mobile/*`, 39 routes)** : l'API est complète, mais il n'existe pas d'application Flutter.
   - Listes et fiches garages et Market Space, avec leurs avis.
   - Recherche `nearby` : position, rayon, nom, service, produit, prix, tri.
@@ -139,7 +148,6 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 
 - **Application mobile Flutter** : le dépôt ne contient que `backend/` et `frontend-web/`.
 - **Écran d'inscription automobiliste** côté web : volontairement absent (l'automobiliste passe par l'application mobile). Le parcours pro v0.26 est complet côté web : formulaire court et saisie du code (`/inscription`, 2026-09-23), puis informations légales, document, soumission et suivi du dossier sur « Mon profil ».
-- **Écrans de supervision admin** : garages, boutiques, RDV, devis, commandes, conversations.
 - **Paiement en ligne réel** : seul le paiement manuel V1 existe.
 - **Chat temps réel** : ni WebSocket ni Reverb. Il faut recharger pour voir les nouveaux messages.
 - **Envoi push FCM réel.**
@@ -227,7 +235,10 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 **Autres pistes ouvertes**
 - `scopePubliclyVisible()` ne filtre toujours pas sur la complétude du profil (vérifié dans `Garage.php`). Une fiche incomplète reste visible côté mobile.
 - Vérification téléphone pour la finalisation d'un compte express.
-- **`POST /auth/express-claim` révèle l'existence d'un compte** (relevé le 2026-09-24, non corrigé) : réponse 422 « Aucun compte express en attente de réclamation ne correspond à cet email » pour un email inconnu ou déjà activé, 200 sinon ; et la route n'a pas de limite de débit (`throttle`), contrairement à `password/forgot`. La page `/compte/activer` affiche le même message dans les deux cas, mais l'API reste interrogeable directement. Correctif possible : même réponse générique que le mot de passe oublié (v0.29) et `throttle:10,1`.
+- ~~`POST /auth/express-claim` révèle l'existence d'un compte~~ : corrigé le 2026-09-24 (réponse identique, limite de débit), voir §8.
+- **Inscription** (automobiliste et professionnelle) : refuse un email ou un téléphone déjà utilisé, donc révèle qu'un compte existe. Exception assumée (CLAUDE.md §4), freinée par la limite de débit. Alternative possible plus tard : toujours répondre « code envoyé » et prévenir par email le titulaire du compte existant.
+- **Limites de débit par IP derrière un proxy** : en production, derrière un répartiteur de charge ou Cloudflare, `$request->ip()` renverrait l'IP du proxy (tous les visiteurs partageraient la même limite) tant que les proxys de confiance ne sont pas configurés (`trustProxies` dans `bootstrap/app.php`).
+- **Photos du chat et PDF des devis/commandes non consultables par l'admin** : aucun endpoint admin ne les sert ; les fiches de supervision le signalent. À ajouter si l'instruction des litiges le demande.
 - Index géospatial si le volume de professionnels croît.
 - **Frontend, sujets mis de côté lors du backend v0.26** :
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
@@ -242,7 +253,8 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
     - la durée de conservation de ces documents ;
     - l'information du professionnel et le recueil de son consentement au moment de l'envoi ;
     - le sort des documents d'un dossier refusé ou d'un compte fermé ;
-    - l'éventuelle déclaration ou autorisation du traitement.
+    - l'éventuelle déclaration ou autorisation du traitement ;
+    - **consultation des conversations privées par l'admin** (écrans de supervision du 2026-09-24) : en informer les utilisateurs (conditions d'utilisation) et définir quand elle est permise (litige, signalement).
   - **À valider avec un juriste avant tout lancement public.**
   - *Voir* : §6, point 5 (cadre légal) ; CLAUDE.md §5 « Certificat d'Identification Personnelle (ajout v0.27) » et §7.
 - [ ] **`FRONTEND_URL` renseignée dans `.env.production`**
@@ -276,6 +288,32 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
    - middleware `profile.complete` présent.
 
 ## 8. Derniers changements (depuis le 2026-09-20)
+
+**Lot du 2026-09-24 : limites de débit des endpoints publics et écrans de supervision admin**
+- **Sécurité** (`40d9c13`) :
+  - `POST /auth/express-claim` répond toujours 200 avec le même message, que l'email corresponde ou non à un compte express ; l'email n'est envoyé que si le compte existe (tests : réponse identique pour un compte express, un email inconnu et un compte non express).
+  - Limites de débit nommées, définies uniquement dans `AppServiceProvider::configureRateLimiting()` ; 429 en français avec `retry_after` (`bootstrap/app.php`). Connexion : seuls les échecs comptent pour la paire email + IP, une connexion réussie la remet à zéro (tests `LoginRateLimitTest` : 6e échec refusé, levée après 60 s, remise à zéro, autre IP non bloquée, limite par IP).
+  - Frontend (`a8d31b7`) : `/login` affiche « Trop de tentatives. Réessayez dans {n} secondes. » avec décompte, bouton désactivé ; `/compte/activer` n'a plus de cas particulier pour le 422.
+- **Routes publiques et limites** (relevé par `php artisan route:list`, par minute) :
+
+| Route | Limite |
+|---|---|
+| `POST auth/login` | `login` : 5 échecs par email + IP, 20 par IP |
+| `POST auth/login/google` | `login-google` : 10 par IP |
+| `POST auth/register/automobiliste` | `register` : 10 par IP |
+| `POST auth/register/professionnel`, `…/{uuid}/verify`, `…/{uuid}/resend` | `email-code` : 10 par IP |
+| `POST auth/password/forgot`, `auth/password/reset` | `email-code` : 10 par IP |
+| `POST auth/express-claim` | `express-claim` : 3 par email, 10 par IP |
+| `GET`/`POST express-clients/{user}/claim` | `email-link` : 30 par IP (+ signature) |
+| `GET`/`POST quotes/{quote}/versions/{version}/email-decision` | `email-link` : 30 par IP (+ signature) |
+| `GET health`, `locations/*` (3) | `public` : 120 par IP |
+| `GET mobile/garages`, `/{garage}`, `/{garage}/reviews`, `mobile/market-space-accounts` (3 idem), `mobile/search/nearby` | `public` : 120 par IP |
+| Hors `api/` : `up`, `sanctum/csrf-cookie`, `storage/{path}` (×2), `_boost/browser-logs` | aucune (routes du framework ; `_boost` n'existe qu'en développement) |
+
+- **Supervision admin** : backend `01481f0` (seules données indispensables manquantes : `OrderResource.seller` — id et nom du vendeur, admin seul — et `QuoteVersionResource.decided_by` ; 2 tests), frontend `46af46b` (§1 ; blocs du profil extraits de la fiche d'examen et fil de messages extrait de la fiche litige, sans changement visible sur ces deux fiches ; `AppTable` défile horizontalement sur téléphone).
+  - Filtres par liste (ceux que le backend accepte déjà) : RDV `status`, `garage_id` ; devis `status` ; commandes `status` ; garages, boutiques, conversations : aucun.
+  - Non disponible, donc non affiché : lien vers le dossier d'inscription depuis une structure, note moyenne (non calculée par ces routes), historique des statuts d'un RDV, PDF d'un devis, photos du chat.
+- **Pas encore testé en navigateur.**
 
 **Lot du 2026-09-24 : correctifs (double décision, lien d'activation expiré) et tableaux de bord professionnels**
 - **Double décision d'un devis** (`7d4c11b`) : deux `POST` simultanés (double clic, ou lien email + application) pouvaient passer tous les deux la vérification et décrémenter le stock deux fois. `QuoteService::accept()/reject()` vérifient désormais l'état **dans** la transaction, après verrou (`lockForUpdate`) sur le devis puis la version ; le second appel reçoit 409 `quote_version_not_decidable`. Les contrôleurs n'appellent plus `assertVersionIsDecidable` eux-mêmes. Autres chemins protégés de la même façon :
