@@ -1,13 +1,13 @@
 # Make Cars : document de passation (état au 2026-09-24)
 
-Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, puis fiche admin d'examen), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
+Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, puis liens email v0.30), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **109 commits** au total après la fiche admin d'examen du 2026-09-24, ce commit de documentation compris (106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `3df53f1` feat(frontend): fiche admin d'examen complète d'un dossier d'inscription, suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **586 tests, 586 réussis, 1937 assertions** après la fiche admin d'examen (1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **112 commits** au total après le lot v0.30 (liens email) du 2026-09-24, ce commit de documentation compris (109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : `82b733f` feat(frontend): pages de confirmation des liens email (v0.30), suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **596 tests, 596 réussis, 1995 assertions** après le lot v0.30 (586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **195 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29).
+- **Routes** (`php artisan route:list`) : **195 routes** au total (183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
 | Espace | Routes | Détail |
 |---|---|---|
@@ -16,7 +16,7 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 | `api/admin/*` | 41 | inscriptions 9 (dont `reactivation-request/refuse` et `reactivation-requests/{reactivationRequest}/attachments/{attachment}`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 11 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim`, mot de passe oublié en 2 routes (`password/forgot`, `password/reset`, v0.29) |
-| Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2, réclamation de compte express 2, `health` 1 |
+| Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2 (`GET` lecture seule + `POST` décision, même URL signée, v0.30), réclamation de compte express 2, `health` 1 |
 | Hors `api/` | 5 | `sanctum/csrf-cookie`, `storage/{path}` ×2, `up`, `_boost/browser-logs` |
 
 **Niveau de vérification des écrans**
@@ -37,6 +37,7 @@ Aucun test automatisé côté frontend : `package.json` n'a pas de script de tes
 - **Parcours d'inscription boutique (Market Space)** : vérifié par un **test automatique backend** de bout en bout (`tests/Feature/MarketSpace/MarketSpaceSignupJourneyTest.php` : inscription, code, compte et profil vides, lien de l'email vers `/market-space/profile`, connexion, profil, informations légales, registre de commerce, CIP, soumission, approbation admin, routes métier ouvertes) et par **relecture du code frontend** (titre « Créer mon compte boutique », `account_type=market_space` envoyé, « Modifier l'email » qui revient à `/inscription/boutique`, redirection après connexion vers `/market-space/profile`, libellé « Nom de la boutique »). **Pas testé en navigateur** ; affichage sur téléphone non testé.
 - **Mot de passe oublié (v0.29)** : construit, couvert par les tests backend (`tests/Feature/Auth/PasswordResetTest.php`), considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 - **Fiche admin d'examen d'un dossier (2026-09-24)** : construite, **pas encore testée en navigateur**.
+- **Pages des liens email (v0.30, 2026-09-24)** : `/devis/decision` et `/compte/activer`, construites, couvertes côté backend par les tests (`QuoteEmailDecisionTest`, `ExpressClaimTest`), **pas encore testées en navigateur** (ni sur téléphone).
 - **Construit et vérifié par relecture de code, jamais testé en navigateur** :
   - le **dashboard Market Space**. Depuis le 2026-09-23, ses écrans (hors tableau de bord) partagent le code du Garagiste (`views/shared/`, prop `space`) : ce partage de code ne vaut pas test, l'espace reste à vérifier en navigateur ;
   - le **dashboard Admin** (6 écrans, antérieurs à cette période de travail).
@@ -57,6 +58,7 @@ Toutes les routes sont dans `frontend-web/src/router/index.ts`, avec garde de na
 - `/login` : connexion email/mot de passe, avec lien vers l'inscription professionnelle et lien « Mot de passe oublié ? » (v0.29).
 - `/mot-de-passe-oublie` (v0.29) : email, puis code + nouveau mot de passe sur la même page ; retour sur `/login?reset=1` avec message de confirmation. Considéré comme validé par l'utilisateur, sans test en navigateur (2026-09-24).
 - `/inscription` et ses étapes (v0.26) : choix du type de compte, formulaire court, saisie du code, confirmation (parcours garagiste testé en navigateur le 2026-09-24, parcours boutique vérifié par test automatique backend et relecture).
+- `/devis/decision` et `/compte/activer` (v0.30) : pages publiques ouvertes depuis un lien reçu par email (décision de devis par un client express, activation d'un compte express), sans `guestOnly`, dans `views/public/`. Pas encore testées en navigateur.
 - `/403` et page 404.
 - Composants partagés (`src/shared/components`) : `AppButton`, `AppTable`, `AppPagination`, `BaseModal`, `ReasonPromptModal` (libellé du champ et couleur du bouton paramétrables depuis v0.28), `ReactivationRequestModal` (message + pièces jointes de la demande de réactivation, v0.28), `ReactivationAttachmentList` (pièces jointes d'une demande sur la fiche admin, ouverture en blob authentifié), `StatusBadge`, `LocationSelect`, `LegalDocumentField` (justificatif privé du dossier, v0.27), `SuspensionBanner` (bandeau de suspension et demande de réactivation, v0.28), `ConfirmDialog` (fenêtre de confirmation unique, montée dans `App.vue`, pilotée par `confirmAction()` de `utils/confirmDialog.ts` — remplace tous les `window.confirm`, 2026-09-24), `CodeInput` (champ du code à 6 chiffres, commun à l'inscription et au mot de passe oublié).
 - Layouts : `AdminLayout`, `GarageLayout`, `MarketSpaceLayout`, tous construits sur `DashboardShell`.
@@ -125,7 +127,6 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
   - inscription professionnelle en deux temps (v0.26) : formulaire court + code email, puis dossier (informations légales, document RCCM, soumission) depuis l'espace pro ;
   - login Google ;
   - `express-claim` ;
-  - liens signés de décision de devis et de réclamation de compte express (réponse JSON brute) ;
   - `locations/*` (utilisé par `LocationSelect`).
 - **Jetons FCM des espaces pro** : `PUT garage|market-space/device-tokens` existent, mais le frontend web ne les appelle pas.
 - **Transversal** :
@@ -143,7 +144,6 @@ Tant que le dossier n'est pas approuvé ou que le profil est incomplet (`mustSta
 - **Chat temps réel** : ni WebSocket ni Reverb. Il faut recharger pour voir les nouveaux messages.
 - **Envoi push FCM réel.**
 - **Affichage carte** (frontend).
-- **Pages Vue de confirmation** pour les liens email (décision de devis, réclamation de compte express).
 - **Authentification par téléphone/SMS.**
 - **Extension multi-pays** : table `countries`, fuseau par structure.
 - **Contestation d'un avis** par le professionnel.
@@ -216,7 +216,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 5. **Cadre légal** du partage des données agrégées avec l'administration. **Complément (2026-09-23)** : la plateforme stocke désormais des pièces d'identité (CIP, v0.27 : photo, date de naissance, filiation). Avant la mise en production, définir au regard de la loi n° 2017-20 portant Code du numérique (protection des données personnelles, Bénin) : la durée de conservation de ces documents, l'information et le consentement du professionnel, et le sort des documents d'un dossier refusé ou d'un compte fermé.
 6. **Auth téléphone/SMS** pour l'automobiliste.
 7. **Périmètre de la mini-boutique** : catégories, limite, seuil de bascule vers un compte Market Space.
-8. **Pages de confirmation** des liens email (devis, compte express).
+8. ~~**Pages de confirmation** des liens email~~ : construites en v0.30 (2026-09-24), voir §8.
 9. **FCM** : `FCM_SERVER_KEY` non configurée, mode simulation. Migration future vers l'API HTTP v1.
 10. **Fuseau horaire unique** `Africa/Porto-Novo`.
 11. **Design system / identité visuelle** non choisis.
@@ -245,7 +245,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
   - **À valider avec un juriste avant tout lancement public.**
   - *Voir* : §6, point 5 (cadre légal) ; CLAUDE.md §5 « Certificat d'Identification Personnelle (ajout v0.27) » et §7.
 - [ ] **`FRONTEND_URL` renseignée dans `.env.production`**
-  - *Raison* : les liens des emails d'inscription (compte créé, approbation, refus) sont construits à partir de cette valeur ; vide, ils pointent au mauvais endroit.
+  - *Raison* : les liens des emails d'inscription (compte créé, approbation, refus) et, depuis v0.30, ceux de la décision de devis et de l'activation d'un compte express sont construits à partir de cette valeur ; vide, ils pointent au mauvais endroit.
   - *Voir* : §6, point 13 ; CLAUDE.md §5 « Parcours d'inscription professionnelle en deux temps (ajout v0.26) ».
 - [ ] **Limites d'envoi de fichiers PHP et du serveur web reproduites sur le serveur de production**
   - *Raison* : avec les valeurs PHP par défaut (2M / 8M), les justificatifs de 10 Mo (registre de commerce, CIP) sont refusés avant même la validation Laravel ; le serveur web peut avoir sa propre limite (ex. `client_max_body_size` pour Nginx).
@@ -275,6 +275,22 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
    - middleware `profile.complete` présent.
 
 ## 8. Derniers changements (depuis le 2026-09-20)
+
+**Lot du 2026-09-24 : liens email et correctif de sécurité (v0.30)**
+- **Faille corrigée** : la décision d'un devis par un client express se faisait sur un simple `GET`. Une messagerie ou un antivirus qui ouvre le lien pour l'analyser pouvait accepter le devis (et décrémenter le stock) ou le refuser sans action du client. Règle désormais : un `GET` sur un lien reçu par email n'a jamais d'effet ; seul un `POST` explicite décide.
+- Backend `5f2dbeb` :
+  - une seule URL signée `quotes/{quote}/versions/{version}/email-decision` : `GET` lecture seule (détail, `is_decidable`, expiration), `POST { decision: accept|reject }` ;
+  - signatures relatives (`absolute: false`, `signed:relative`) pour la décision de devis et l'activation d'un compte express : le frontend joint l'API par `127.0.0.1` alors qu'`APP_URL` dit `localhost` ;
+  - les emails pointent vers le frontend (`/devis/decision?link=…&choix=accepter|refuser`, `/compte/activer?link=…`) ;
+  - réclamation : le `GET` renvoie le prénom et l'email masqué, plus l'adresse complète ;
+  - `assertVersionIsDecidable` renvoie **409 `quote_version_not_decidable`** (version déjà décidée, périmée ou non envoyée) au lieu de 403, **y compris sur les endpoints mobiles** accepter/refuser (aucun client mobile n'existait encore). 403 reste réservé à l'accès refusé ;
+  - tests : un `GET` ne change ni le statut, ni le stock, ni les notifications ; `POST` accept/reject ; `decision` invalide ; lien expiré, modifié, ou appelé par un autre hôte ; version déjà décidée ou périmée (409). OpenAPI mis à jour.
+- Frontend `82b733f` : pages `/devis/decision` et `/compte/activer` (`views/public/`), client `api/emailLinks.ts` (instance Axios sans jeton ni redirection, paramètre `link` vérifié : même origine que l'API et route attendue).
+- **Pas encore testé en navigateur.**
+- Lien d'activation expiré : aucun écran web ne permet d'en demander un nouveau (`POST /auth/express-claim` n'est appelé par aucune interface, l'application mobile n'existant pas). La page dit seulement que le lien n'est plus valide.
+- Lire les liens reçus en développement (`MAIL_MAILER=log`), depuis `backend/` :
+  - décision de devis : `grep -o 'http[^"]*/devis/decision?[^"]*' storage/logs/laravel.log | tail -2 | sed 's/&amp;/\&/g'` (lien « accepter » puis « refuser ») ;
+  - activation d'un compte express : `grep -o 'http[^"]*/compte/activer?[^"]*' storage/logs/laravel.log | tail -1`.
 
 **Lot du 2026-09-24 : fiche admin d'examen d'un dossier d'inscription**
 - Backend `e0d4be7` : `ProfessionalRegistrationResource` expose `representative` (prénom, nom, nom d'affichage, email, téléphone de la personne inscrite), **réservé à l'admin** comme IFU/NPI/profil/décisions (tests : présent sur la fiche admin, absent de `/auth/me`). Seule donnée manquante pour la fiche ; tout le reste était déjà renvoyé. Libellé du document de registre corrigé en « Registre de commerce (RCCM) » (`RegistrationDocumentType`).
