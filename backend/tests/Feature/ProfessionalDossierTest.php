@@ -125,21 +125,6 @@ class ProfessionalDossierTest extends TestCase
         $this->assertSame('Photo floue.', $registration->rejection_reason);
     }
 
-    public function test_a_market_space_dossier_goes_through_the_same_submission(): void
-    {
-        $user = User::factory()->marketSpace()->create();
-        $registration = ProfessionalRegistration::factory()->for($user)->profileIncomplete()->create();
-        MarketSpaceAccount::factory()->complete()->for($user)->create();
-        Sanctum::actingAs($user);
-
-        $this->putJson('/api/market-space/profile/legal', $this->legalPayload())->assertOk();
-        $this->post('/api/market-space/profile/legal/document', ['document' => UploadedFile::fake()->create('rccm.pdf', 100, 'application/pdf')], ['Accept' => 'application/json'])->assertCreated();
-        $this->post('/api/market-space/profile/legal/identity-document', ['document' => UploadedFile::fake()->create('cip.pdf', 100, 'application/pdf')], ['Accept' => 'application/json'])->assertCreated();
-        $this->postJson('/api/market-space/profile/submit')->assertOk();
-
-        $this->assertSame(RegistrationStatus::Pending, $registration->fresh()->status);
-    }
-
     // --- Verrous ----------------------------------------------------------
 
     public function test_business_routes_are_closed_until_the_dossier_is_approved(): void

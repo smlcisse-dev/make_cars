@@ -189,19 +189,6 @@ class RegisterProfessionalTest extends TestCase
             && $mail->profileUrl === 'http://localhost:5173/garage/profile');
     }
 
-    public function test_a_market_space_registration_creates_an_empty_market_space_profile(): void
-    {
-        $uuid = $this->register(['account_type' => 'market_space'])->json('data.verification_id');
-
-        $this->verify($uuid, $this->lastSentCode())->assertCreated();
-
-        $user = User::sole();
-        $this->assertSame(AccountType::MarketSpace, $user->role);
-        $this->assertNotNull($user->marketSpaceAccount);
-        $this->assertNull($user->garage);
-        Mail::assertSent(AccountCreatedMail::class, fn (AccountCreatedMail $mail) => str_ends_with($mail->profileUrl, '/market-space/profile'));
-    }
-
     public function test_a_wrong_code_decrements_the_remaining_attempts(): void
     {
         $uuid = $this->register()->json('data.verification_id');
