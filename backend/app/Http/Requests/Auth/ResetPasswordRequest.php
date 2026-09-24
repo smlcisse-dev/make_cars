@@ -5,12 +5,13 @@ namespace App\Http\Requests\Auth;
 use App\Support\EmailCode;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Password;
 
-class VerifyProfessionalRegistrationRequest extends FormRequest
+class ResetPasswordRequest extends FormRequest
 {
     /**
-     * Saisie du code reçu par email (CLAUDE.md §5, ajout v0.26) : publique,
-     * l'identifiant de la demande (uuid) et le code font office de preuve.
+     * Nouveau mot de passe avec le code reçu par email (CLAUDE.md §5, ajout
+     * v0.29) : publique, l'email et le code font office de preuve.
      */
     public function authorize(): bool
     {
@@ -18,15 +19,16 @@ class VerifyProfessionalRegistrationRequest extends FormRequest
     }
 
     /**
-     * Un code mal formé est refusé ici, sans consommer d'essai : seul un code
-     * au bon format mais faux décrémente le compteur.
+     * Un code mal formé est refusé ici, sans consommer d'essai.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
+            'email' => ['required', 'email', 'max:255'],
             'code' => ['required', 'string', EmailCode::formatRule()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ];
     }
 

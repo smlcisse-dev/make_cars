@@ -9,8 +9,8 @@ use App\Mail\AccountCreatedMail;
 use App\Mail\VerificationCodeMail;
 use App\Models\PendingProfessionalRegistration;
 use App\Models\User;
+use App\Support\EmailCode;
 use App\Support\FrontendUrl;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -45,7 +45,7 @@ class ProfessionalSignupService
             ->orWhere(fn ($query) => $query->stale())
             ->delete();
 
-        $code = $this->generateCode();
+        $code = EmailCode::generate();
 
         $pending = PendingProfessionalRegistration::create([
             'uuid' => (string) Str::uuid(),
@@ -55,10 +55,10 @@ class ProfessionalSignupService
             'email' => $data['email'],
             'phone' => $data['phone'],
             'password' => Hash::make($data['password']),
-            ...$this->freshCodeAttributes($code),
+            ...EmailCode::freshAttributes($code),
         ]);
 
-        Mail::to($pending->email)->send(new VerificationCodeMail($code, config('registration.code_ttl_minutes')));
+        Mail::to($pending->email)->send(new VerificationCodeMail($code, EmailCode::ttlMinutes()));
 
         return $pending;
     }
@@ -142,10 +142,10 @@ class ProfessionalSignupService
             ]);
         }
 
-        $code = $this->generateCode();
-        $pending->update($this->freshCodeAttributes($code));
+        $code = EmailCode::generate();
+        $pending->update(EmailCode::freshAttributes($code));
 
-        Mail::to($pending->email)->send(new VerificationCodeMail($code, config('registration.code_ttl_minutes')));
+        Mail::to($pending->email)->send(new VerificationCodeMail($code, EmailCode::ttlMinutes()));
 
         return $pending;
     }
@@ -194,29 +194,5 @@ class ProfessionalSignupService
             422,
             'verification_locked',
         );
-    }
-
-    /**
-     * `random_int` (générateur cryptographique) puis complétion à gauche :
-     * un code comme « 004217 » garde ses zéros en tête.
-     */
-    private function generateCode(): string
-    {
-        $length = config('registration.code_length');
-
-        return str_pad((string) random_int(0, 10 ** $length - 1), $length, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * @return array{code_hash: string, code_expires_at: CarbonInterface, attempts_left: int, last_code_sent_at: CarbonInterface}
-     */
-    private function freshCodeAttributes(string $code): array
-    {
-        return [
-            'code_hash' => Hash::make($code),
-            'code_expires_at' => now()->addMinutes(config('registration.code_ttl_minutes')),
-            'attempts_left' => config('registration.max_attempts'),
-            'last_code_sent_at' => now(),
-        ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AccountType;
+use App\Support\EmailCode;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -50,6 +51,6 @@ class PendingProfessionalRegistration extends Model
 
     public function resendAvailableAt(): CarbonInterface
     {
-        return $this->last_code_sent_at->copy()->addSeconds(config('registration.resend_cooldown_seconds'));
+        return EmailCode::resendAvailableAt($this->last_code_sent_at);
     }
 }
