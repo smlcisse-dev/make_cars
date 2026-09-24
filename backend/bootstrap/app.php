@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -30,6 +31,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // expiré, demande déjà en attente…), pas une erreur du serveur :
         // elle est rendue au client mais jamais écrite dans le journal.
         $exceptions->dontReport(ApiException::class);
+
+        // Limite de débit dépassée (limites définies dans
+        // AppServiceProvider::configureRateLimiting) : message en français et
+        // délai d'attente en secondes, que le frontend affiche tel quel.
+        $exceptions->render(function (ThrottleRequestsException $exception) {
+            $retryAfter = (int) ($exception->getHeaders()['Retry-After'] ?? 60);
+
+            return response()->json([
+                'message' => "Trop de tentatives. Réessayez dans {$retryAfter} secondes.",
+                'code' => 'too_many_attempts',
+                'retry_after' => $retryAfter,
+            ], 429, $exception->getHeaders());
+        });
 
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

@@ -10,15 +10,17 @@ Route::get('/health', function () {
         'status' => 'ok',
         'app' => config('app.name'),
     ]);
-});
+})->middleware('throttle:public');
 
 /**
  * Référentiel du découpage administratif, pour les selects en cascade
  * (CLAUDE.md §5, ajout v0.19).
  */
-Route::get('locations/departments', [LocationController::class, 'departments']);
-Route::get('locations/departments/{department}/communes', [LocationController::class, 'communes']);
-Route::get('locations/communes/{commune}/arrondissements', [LocationController::class, 'arrondissements']);
+Route::middleware('throttle:public')->group(function () {
+    Route::get('locations/departments', [LocationController::class, 'departments']);
+    Route::get('locations/departments/{department}/communes', [LocationController::class, 'communes']);
+    Route::get('locations/communes/{commune}/arrondissements', [LocationController::class, 'arrondissements']);
+});
 
 /**
  * Liens reçus par email (CLAUDE.md §5, ajouts v0.9, v0.17 et v0.30).
@@ -29,7 +31,7 @@ Route::get('locations/communes/{commune}/arrondissements', [LocationController::
  * vérification ne porte que sur l'URL, jamais sur la méthode HTTP. Un GET
  * n'a jamais d'effet ; seul le POST (action explicite) agit.
  */
-Route::middleware('signed:relative')->group(function () {
+Route::middleware(['throttle:email-link', 'signed:relative'])->group(function () {
     // Décision d'un devis par un client "compte express" sans app.
     Route::get('quotes/{quote}/versions/{version}/email-decision', [QuoteEmailDecisionController::class, 'show'])
         ->name('quotes.email-decision');

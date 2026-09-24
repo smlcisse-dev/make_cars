@@ -13,15 +13,18 @@ use App\Http\Controllers\Api\Mobile\ReviewController;
 use App\Http\Controllers\Api\Mobile\SearchController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('garages', [GarageController::class, 'index']);
-Route::get('garages/{garage}', [GarageController::class, 'show']);
-Route::get('garages/{garage}/reviews', [ReviewController::class, 'garageReviews']);
+// Lectures publiques (sans session) : limite `public` (CLAUDE.md §4).
+Route::middleware('throttle:public')->group(function () {
+    Route::get('garages', [GarageController::class, 'index']);
+    Route::get('garages/{garage}', [GarageController::class, 'show']);
+    Route::get('garages/{garage}/reviews', [ReviewController::class, 'garageReviews']);
 
-Route::get('market-space-accounts', [MarketSpaceController::class, 'index']);
-Route::get('market-space-accounts/{marketSpaceAccount}', [MarketSpaceController::class, 'show']);
-Route::get('market-space-accounts/{marketSpaceAccount}/reviews', [ReviewController::class, 'marketSpaceReviews']);
+    Route::get('market-space-accounts', [MarketSpaceController::class, 'index']);
+    Route::get('market-space-accounts/{marketSpaceAccount}', [MarketSpaceController::class, 'show']);
+    Route::get('market-space-accounts/{marketSpaceAccount}/reviews', [ReviewController::class, 'marketSpaceReviews']);
 
-Route::get('search/nearby', [SearchController::class, 'nearby']);
+    Route::get('search/nearby', [SearchController::class, 'nearby']);
+});
 
 Route::middleware(['auth:sanctum', 'role:automobiliste'])->group(function () {
     Route::get('appointments', [AppointmentController::class, 'index']);

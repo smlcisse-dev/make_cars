@@ -19,6 +19,6 @@ class ExpressClaimController extends Controller
     {
         $this->claimService->requestClaim($request->string('email')->toString());
 
-        return $this->success(message: 'Un email vous a été envoyé pour définir votre mot de passe.');
+        return $this->success(message: 'Si un compte express existe avec cette adresse, un email vient d\'être envoyé pour définir votre mot de passe.');
     }
 }

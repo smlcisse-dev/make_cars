@@ -34,25 +34,39 @@ class ExpressClaimTest extends TestCase
         Mail::assertSent(ExpressClientClaimMail::class, fn ($mail) => $mail->hasTo('express@example.com'));
     }
 
-    public function test_requesting_a_claim_link_fails_for_an_unknown_email(): void
+    /**
+     * Aucune fuite d'information (CLAUDE.md §4) : la réponse est identique
+     * pour un compte express, un email inconnu et un compte non express ;
+     * seul le compte express reçoit un email.
+     */
+    public function test_the_response_is_identical_whether_or_not_the_email_matches_an_express_account(): void
     {
         Mail::fake();
-
-        $this->postJson('/api/auth/express-claim', ['email' => 'nobody@example.com'])
-            ->assertUnprocessable();
-
-        Mail::assertNothingSent();
-    }
-
-    public function test_requesting_a_claim_link_fails_for_a_non_express_account(): void
-    {
-        Mail::fake();
+        $this->expressClient();
         User::factory()->create(['email' => 'regular@example.com']);
 
-        $this->postJson('/api/auth/express-claim', ['email' => 'regular@example.com'])
-            ->assertUnprocessable();
+        $responses = collect(['express@example.com', 'nobody@example.com', 'regular@example.com'])
+            ->map(fn (string $email) => $this->postJson('/api/auth/express-claim', ['email' => $email]));
 
-        Mail::assertNothingSent();
+        $responses->each(fn ($response) => $response->assertOk());
+        $this->assertCount(1, $responses->map(fn ($response) => $response->getContent())->unique());
+
+        Mail::assertSent(ExpressClientClaimMail::class, 1);
+        Mail::assertSent(ExpressClientClaimMail::class, fn ($mail) => $mail->hasTo('express@example.com'));
+    }
+
+    public function test_claim_requests_are_rate_limited_per_email(): void
+    {
+        Mail::fake();
+
+        foreach (range(1, 3) as $attempt) {
+            $this->postJson('/api/auth/express-claim', ['email' => 'nobody@example.com'])->assertOk();
+        }
+
+        $this->postJson('/api/auth/express-claim', ['email' => 'nobody@example.com'])
+            ->assertStatus(429)
+            ->assertJsonPath('code', 'too_many_attempts')
+            ->assertJsonStructure(['message', 'retry_after']);
     }
 
     private function signedPath(User $client, int $days = 1): string

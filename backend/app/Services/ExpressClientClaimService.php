@@ -8,7 +8,6 @@ use App\Support\FrontendUrl;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Réclamation d'un compte "express" par son propriétaire réel (CLAUDE.md §5,
@@ -31,16 +30,17 @@ class ExpressClientClaimService
     private const EXPIRATION_DAYS = 7;
 
     /**
-     * @throws ValidationException si aucun compte express ne correspond à cet email.
+     * Ne révèle jamais si l'email correspond à un compte : le contrôleur
+     * répond la même chose dans tous les cas (CLAUDE.md §4, même principe
+     * que le mot de passe oublié, ajout v0.29). L'email n'est envoyé que si
+     * un compte express non encore réclamé existe.
      */
     public function requestClaim(string $email): void
     {
         $user = User::where('email', $email)->first();
 
         if (! $user || ! $user->is_express) {
-            throw ValidationException::withMessages([
-                'email' => ['Aucun compte express en attente de réclamation ne correspond à cet email.'],
-            ]);
+            return;
         }
 
         Mail::to($email)->send(new ExpressClientClaimMail(
