@@ -40,18 +40,40 @@ Le site est à l'adresse **http://localhost:5173**. Laisser ce terminal ouvert.
 cd ~/make_cars/backend
 ```
 
+Les commandes de la recette utilisent l'outil `jq`. Vérifier qu'il est installé :
+```bash
+jq --version
+```
+Si la commande répond `jq-1.…`, c'est bon. Si elle répond « commande introuvable » (`command not found`), l'installer (le mot de passe de la session Linux est demandé) :
+```bash
+sudo dnf install jq
+```
+
+**Message « Trop de tentatives. Réessayez dans … secondes. »** Il peut apparaître pendant la recette, car la plateforme limite le nombre d'essais : par exemple 10 par minute depuis un même ordinateur pour les inscriptions et les codes reçus par email. **Ce n'est pas un défaut** : attendre la fin du délai affiché, puis continuer là où on s'était arrêté. (Seul le test SE-02 le provoque volontairement.)
+
 ### 1.2 Où lire les emails
 
 En développement, **aucun email n'est réellement envoyé** : chacun est écrit dans le fichier `storage/logs/laravel.log`. Depuis le terminal 3 (dossier `backend`) :
 
-| Pour lire… | Commande |
-|---|---|
-| le dernier code à 6 chiffres (inscription ou mot de passe oublié) | `grep -A1 "letter-spacing:8px" storage/logs/laravel.log \| tail -1 \| tr -d ' \r'` |
-| le lien « Compléter mon profil » d'une boutique | `grep -o 'http[^"]*/market-space/profile' storage/logs/laravel.log \| tail -1` |
-| les deux liens de décision d'un devis (« accepter » puis « refuser ») | `grep -o 'http[^"]*/devis/decision?[^"]*' storage/logs/laravel.log \| tail -2 \| sed 's/&amp;/\&/g'` |
-| le lien d'activation d'un compte express | `grep -o 'http[^"]*/compte/activer?[^"]*' storage/logs/laravel.log \| tail -1` |
+Le dernier code à 6 chiffres (inscription ou mot de passe oublié) :
+```bash
+grep -A1 "letter-spacing:8px" storage/logs/laravel.log | tail -1 | tr -d ' \r'
+```
 
-(Dans les commandes ci-dessus, `\|` s'écrit simplement `|` : la barre oblique n'est là que pour le tableau.)
+Le lien « Compléter mon profil » d'une boutique :
+```bash
+grep -o 'http[^"]*/market-space/profile' storage/logs/laravel.log | tail -1
+```
+
+Les deux liens de décision d'un devis (« accepter » puis « refuser ») :
+```bash
+grep -o 'http[^"]*/devis/decision?[^"]*' storage/logs/laravel.log | tail -2 | sed 's/&amp;/\&/g'
+```
+
+Le lien d'activation d'un compte express :
+```bash
+grep -o 'http[^"]*/compte/activer?[^"]*' storage/logs/laravel.log | tail -1
+```
 
 Copier le lien affiché et le coller dans la barre d'adresse du navigateur.
 
@@ -99,7 +121,7 @@ Fenêtre normale, **déconnecté**.
 | ☐ | N° | Action | Résultat attendu | Remarque |
 |---|---|---|---|---|
 | ☐ | MS-01 | Ouvrir http://localhost:5173/login, cliquer « Créer un compte professionnel », puis « Je vends des pièces ou du matériel automobile ». | Page « Créer mon compte boutique ». | |
-| ☐ | MS-02 | Remplir : prénom, nom, email `horuskoeus6+boutique1@gmail.com` (changer le mot après « + » si déjà utilisé), téléphone `+229 01 97 11 22 33`, mot de passe de 8 caractères et confirmation. Cliquer « Créer mon compte ». Noter l'email et le mot de passe dans le tableau 1.3. | Page « Vérifiez votre email », qui cite l'adresse saisie et « valable 15 minutes ». | |
+| ☐ | MS-02 | Remplir : prénom, nom, email `horuskoeus6+boutique1@gmail.com` (changer le mot après « + » si déjà utilisé), téléphone `+229 01 97 11 22 33` (si « téléphone déjà utilisé », changer les derniers chiffres, ex. `+229 01 97 11 22 34`), mot de passe de 8 caractères et confirmation. Cliquer « Créer mon compte ». Noter l'email et le mot de passe dans le tableau 1.3. | Page « Vérifiez votre email », qui cite l'adresse saisie et « valable 15 minutes ». | |
 | ☐ | MS-03 | Saisir un code faux (`000000`), « Vérifier ». | Message d'erreur avec le nombre d'essais restants ; on reste sur la page. | |
 | ☐ | MS-04 | Lire le vrai code (commande du 1.2), le saisir, « Vérifier ». | Page « Votre compte a été créé ». | |
 | ☐ | MS-05 | Lire le lien « Compléter mon profil » (1.2) et l'ouvrir. Se connecter avec le compte créé. | Arrivée sur « Mon profil » de l'**Espace Market Space**. Le menu ne propose que « Mon profil ». Bandeau : « Complétez votre profil et vos informations légales, puis soumettez votre dossier pour validation. », avec la liste de ce qui manque. | |
@@ -238,7 +260,7 @@ Fenêtre normale : se déconnecter, puis se connecter en **`garage.excellence.ap
 | ☐ | DV-10 | Garagiste : fiche du devis (`F5`), puis « Tableau de bord » > « Actualiser ». | Devis « Accepté ». Carte « Devis acceptés, prestation à démarrer » (+1). | |
 | ☐ | DV-11 | Fiche du devis : « Démarrer la prestation ». | « Prestation en cours ». Tableau de bord : carte « Prestations en cours, à facturer » (+1). | |
 | ☐ | DV-12 | « Marquer comme payé » > « Annuler », puis « Marquer comme payé » > « Marquer comme payé ». | Fenêtre « Marquer le devis comme payé » ; après « Annuler » rien ne change. Après confirmation : « Facturé », une version « Facture » dans l'historique, avec « Télécharger le PDF ». « Facturé en … » du tableau de bord a augmenté de 30 000 FCFA. | |
-| ☐ | DV-13 | Admin : « Services », ouvrir « Vidange complète (test validation admin) », « Rejeter » avec motif. Garagiste : « Tableau de bord » > « Actualiser ». | Carte « Services refusés par l'administrateur, à corriger » = 1 ; un clic mène à « Services », où le motif est affiché. | |
+| ☐ | DV-13 | Admin : « Services », ouvrir « Vidange complète (test validation admin) », « Rejeter » avec motif. **Si ce service n'est pas « En attente »** (le seeder le conserve tel quel quand il a déjà servi dans un devis) : Garagiste, « Services », créer un nouveau service (nom, catégorie, prix, image), puis rejeter celui-là côté Admin. Garagiste : « Tableau de bord » > « Actualiser ». | Carte « Services refusés par l'administrateur, à corriger » = 1 ; un clic mène à « Services », où le motif est affiché. | |
 
 Carte « Rendez-vous en attente de votre réponse » (facultatif, seul moyen d'en créer un sans l'application) : dans le terminal 3, après avoir exécuté les 3 premières lignes du bloc C (API, PHOTO, TOKEN) :
 ```bash
