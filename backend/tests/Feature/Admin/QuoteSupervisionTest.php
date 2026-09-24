@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Quote;
+use App\Models\QuoteVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -30,6 +31,18 @@ class QuoteSupervisionTest extends TestCase
         $response = $this->getJson("/api/admin/quotes/{$quote->id}");
 
         $response->assertOk()->assertJsonPath('data.id', $quote->id);
+    }
+
+    public function test_the_admin_sees_who_decided_a_version(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+        $quote = Quote::factory()->create();
+        QuoteVersion::factory()->forQuote($quote)->accepted()->create(['decided_by' => $quote->user_id]);
+
+        $this->getJson("/api/admin/quotes/{$quote->id}")
+            ->assertOk()
+            ->assertJsonPath('data.versions.0.decision', 'accepted')
+            ->assertJsonPath('data.versions.0.decided_by', $quote->user_id);
     }
 
     public function test_a_non_admin_cannot_list_quotes(): void

@@ -24,6 +24,7 @@ class QuoteVersionResource extends JsonResource
             'is_sent' => $this->sent_at !== null,
             'sent_at' => $this->sent_at,
             'decision' => $this->decision,
+            'decided_by' => $this->decided_by,
             'decided_at' => $this->decided_at,
             'total' => $this->whenLoaded('lines', fn () => $this->total()),
             'lines' => QuoteLineResource::collection($this->whenLoaded('lines')),
