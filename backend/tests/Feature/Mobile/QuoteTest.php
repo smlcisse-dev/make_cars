@@ -111,7 +111,7 @@ class QuoteTest extends TestCase
         $this->assertSame(QuoteStatus::Rejected, $quote->fresh()->status);
     }
 
-    public function test_accepting_a_draft_version_that_was_never_sent_is_forbidden(): void
+    public function test_accepting_a_draft_version_that_was_never_sent_is_a_conflict(): void
     {
         $client = User::factory()->create();
         $appointment = $this->confirmedAppointmentWithClient($this->approvedGarage(), $client);
@@ -119,10 +119,12 @@ class QuoteTest extends TestCase
         $version = QuoteVersion::factory()->forQuote($quote, 1)->create();
         Sanctum::actingAs($client);
 
-        $this->postJson("/api/mobile/quotes/{$quote->id}/versions/{$version->id}/accept")->assertForbidden();
+        $this->postJson("/api/mobile/quotes/{$quote->id}/versions/{$version->id}/accept")
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'quote_version_not_decidable');
     }
 
-    public function test_accepting_a_stale_version_is_forbidden(): void
+    public function test_accepting_a_stale_version_is_a_conflict(): void
     {
         $client = User::factory()->create();
         $appointment = $this->confirmedAppointmentWithClient($this->approvedGarage(), $client);
@@ -131,7 +133,9 @@ class QuoteTest extends TestCase
         QuoteVersion::factory()->forQuote($quote, 2)->sent()->create();
         Sanctum::actingAs($client);
 
-        $this->postJson("/api/mobile/quotes/{$quote->id}/versions/{$staleVersion->id}/accept")->assertForbidden();
+        $this->postJson("/api/mobile/quotes/{$quote->id}/versions/{$staleVersion->id}/accept")
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'quote_version_not_decidable');
     }
 
     public function test_an_automobiliste_can_download_the_pdf(): void

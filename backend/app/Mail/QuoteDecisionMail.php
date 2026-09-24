@@ -13,7 +13,8 @@ use Illuminate\Queue\SerializesModels;
 /**
  * Envoyé à un client "compte express" (sans app) lors de l'envoi d'un devis
  * (CLAUDE.md §5, ajout v0.9) : contient le PDF du devis en pièce jointe et
- * deux boutons (accepter/refuser) pointant vers les liens signés, sans
+ * deux boutons (accepter/refuser) menant à la page de décision du frontend
+ * (lien signé en paramètre, CLAUDE.md §5 ajout v0.30), sans
  * connexion à l'application requise.
  */
 class QuoteDecisionMail extends Mailable

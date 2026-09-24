@@ -7,6 +7,7 @@ use App\Enums\QuoteDocumentType;
 use App\Enums\QuoteLineType;
 use App\Enums\QuoteStatus;
 use App\Enums\QuoteVersionDecision;
+use App\Exceptions\ApiException;
 use App\Models\Appointment;
 use App\Models\Garage;
 use App\Models\Product;
@@ -314,13 +315,41 @@ class QuoteService
      * par email pour un client "compte express" (CLAUDE.md §5, ajout v0.9) :
      * seule la version la plus récente, déjà envoyée et pas encore décidée,
      * peut être acceptée/refusée.
+     *
+     * 404 si la version n'appartient pas au devis ; 409
+     * `quote_version_not_decidable` si son état ne permet plus la décision
+     * (déjà décidée, périmée, pas encore envoyée). Le 403 reste réservé à
+     * l'accès refusé (devis d'un autre client, lien signé invalide) —
+     * CLAUDE.md §5, ajout v0.30.
+     *
+     * @throws ApiException
      */
     public function assertVersionIsDecidable(Quote $quote, QuoteVersion $version): void
     {
         abort_unless($version->quote_id === $quote->id, 404);
+
+        if (! $this->isVersionDecidable($quote, $version)) {
+            throw new ApiException(
+                'Ce devis a déjà reçu une décision ou n\'est plus en attente de réponse.',
+                409,
+                'quote_version_not_decidable',
+            );
+        }
+    }
+
+    /**
+     * Même règle qu'assertVersionIsDecidable, sans erreur : sert aussi à
+     * l'affichage de la page de décision par email (`is_decidable`).
+     */
+    public function isVersionDecidable(Quote $quote, QuoteVersion $version): bool
+    {
         $current = $quote->currentVersion()->first();
-        abort_unless($current && $current->id === $version->id, 403, 'Seule la version la plus récente du devis peut être traitée.');
-        abort_unless($version->sent_at !== null, 403, 'Ce devis n\'a pas encore été envoyé.');
-        abort_unless(in_array($quote->status, [QuoteStatus::Sent, QuoteStatus::Negotiating], strict: true), 403, 'Ce devis n\'est plus en attente d\'une décision.');
+
+        return $version->quote_id === $quote->id
+            && $current !== null
+            && $current->id === $version->id
+            && $version->sent_at !== null
+            && $version->decision === null
+            && in_array($quote->status, [QuoteStatus::Sent, QuoteStatus::Negotiating], strict: true);
     }
 }

@@ -596,13 +596,16 @@ paths:
                   app:
                     type: string
 
-  /quotes/{quote}/versions/{version}/email-decision/accept:
+  /quotes/{quote}/versions/{version}/email-decision:
     get:
       summary: >
-        Accepte un devis via le lien signé reçu par email par un client
-        "compte express" sans app (CLAUDE.md §5, ajout v0.9). Route publique
-        protégée par signature+expiration (pas de Sanctum) : à usage limité,
-        7 jours, une seule décision possible par version.
+        Lecture seule, SANS AUCUN EFFET, d'une version de devis via le lien
+        signé reçu par email par un client "compte express" (CLAUDE.md §5,
+        ajouts v0.9 et v0.30). Appelée par la page frontend `/devis/decision`.
+        Route publique protégée par signature relative + expiration
+        (`signed:relative`, pas de Sanctum), 7 jours. Un GET ne décide jamais :
+        les messageries et antivirus ouvrent les liens des emails pour les
+        analyser.
       tags: [Auth]
       security: []
       parameters:
@@ -624,13 +627,22 @@ paths:
           schema: {type: integer}
       responses:
         '200':
-          description: Devis accepté. Réponse JSON brute (API REST pure — CLAUDE.md §4) ; une page de confirmation sera ajoutée par le futur frontend Vue, sans changement côté backend.
+          description: >
+            `quote_id`, `version_id`, `version`, `garage_name`, `client_name`,
+            `lines` (`label`, `quantity`, `unit_price`, `line_total`), `total`,
+            `status` (statut du devis), `decision` (null, accepted, rejected),
+            `decided_at`, `is_decidable` (vrai seulement si la version peut
+            encore être décidée), `expires_at` (expiration du lien).
         '403':
-          description: Signature invalide/expirée, ou version pas envoyée/plus la version courante/devis plus en attente de décision.
-
-  /quotes/{quote}/versions/{version}/email-decision/reject:
-    get:
-      summary: Refuse un devis via le lien signé reçu par email (mêmes garde-fous que l'acceptation).
+          description: Signature invalide ou expirée.
+        '404':
+          description: La version n'appartient pas à ce devis.
+    post:
+      summary: >
+        Décide la version du devis — action explicite du client, tracée sur
+        son compte (`decided_by`), mêmes règles que depuis l'app. Même URL
+        signée que le GET : la vérification ne porte que sur l'URL, pas sur la
+        méthode HTTP. L'acceptation décrémente le stock des lignes de pièces.
       tags: [Auth]
       security: []
       parameters:
@@ -650,11 +662,28 @@ paths:
           in: query
           required: true
           schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [accept, reject]
       responses:
         '200':
-          description: Devis refusé.
+          description: Devis accepté ou refusé (QuoteVersion).
         '403':
-          description: Signature invalide/expirée, ou version pas envoyée/plus la version courante/devis plus en attente de décision.
+          description: Signature invalide ou expirée.
+        '409':
+          description: >
+            `code: quote_version_not_decidable` — version déjà décidée, plus
+            la version courante, ou devis plus en attente de décision.
+        '422':
+          description: Champ decision absent ou invalide.
 
   /auth/register/automobiliste:
     post:
@@ -887,11 +916,10 @@ paths:
   /express-clients/{user}/claim:
     get:
       summary: >
-        Confirme la validité du lien signé reçu par email (CLAUDE.md §5,
-        ajout v0.17). Route publique protégée par signature+expiration (pas
-        de Sanctum), 7 jours. Réponse JSON brute (API REST pure — CLAUDE.md
-        §4) ; une page de confirmation sera ajoutée par le futur frontend
-        Vue, sans changement côté backend.
+        Confirme, sans aucun effet, la validité du lien signé reçu par email
+        (CLAUDE.md §5, ajouts v0.17 et v0.30). Appelée par la page frontend
+        `/compte/activer`. Route publique protégée par signature relative +
+        expiration (`signed:relative`, pas de Sanctum), 7 jours.
       tags: [Auth]
       security: []
       parameters:
@@ -909,7 +937,9 @@ paths:
           schema: {type: integer}
       responses:
         '200':
-          description: Lien valide, compte encore "express".
+          description: >
+            Lien valide, compte encore "express" : `first_name` et
+            `masked_email` (ex. `j***@gmail.com`, jamais l'adresse complète).
         '403':
           description: Signature invalide/expirée.
         '409':
@@ -3335,7 +3365,13 @@ paths:
         '200':
           description: Devis accepté.
         '403':
-          description: Version pas envoyée, plus la version courante, ou devis plus en attente de décision.
+          description: Devis d'un autre client (accès refusé).
+        '409':
+          description: >
+            `code: quote_version_not_decidable` — version déjà décidée, plus
+            la version courante, pas encore envoyée, ou devis plus en attente
+            de décision (CLAUDE.md §5, ajout v0.30 : 403 = accès refusé, 409 =
+            état qui ne permet plus l'action).
 
   /mobile/quotes/{quote}/versions/{version}/reject:
     post:
@@ -3354,7 +3390,13 @@ paths:
         '200':
           description: Devis refusé.
         '403':
-          description: Version pas envoyée, plus la version courante, ou devis plus en attente de décision.
+          description: Devis d'un autre client (accès refusé).
+        '409':
+          description: >
+            `code: quote_version_not_decidable` — version déjà décidée, plus
+            la version courante, pas encore envoyée, ou devis plus en attente
+            de décision (CLAUDE.md §5, ajout v0.30 : 403 = accès refusé, 409 =
+            état qui ne permet plus l'action).
 
   /mobile/quotes/{quote}/versions/{version}/pdf:
     get:

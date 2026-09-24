@@ -26,7 +26,7 @@
                                 Vous le trouverez en pièce jointe (PDF) à cet email.
                             </p>
 
-                            <p style="margin:0 0 24px;">Vous pouvez donner votre réponse directement depuis cet email :</p>
+                            <p style="margin:0 0 24px;">Pour donner votre réponse, cliquez sur l'un des boutons ci-dessous : vous confirmerez votre choix sur la page qui s'ouvrira.</p>
 
                             <!-- Boutons (table-based pour compatibilité maximale avec les clients mail) -->
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">

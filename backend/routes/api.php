@@ -21,22 +21,22 @@ Route::get('locations/departments/{department}/communes', [LocationController::c
 Route::get('locations/communes/{commune}/arrondissements', [LocationController::class, 'arrondissements']);
 
 /**
- * Décision d'un devis par lien signé, pour un client "compte express" sans
- * app (CLAUDE.md §5, ajout v0.9). Publique (pas de Sanctum) : la signature
- * temporaire fait office d'authentification à usage limité.
+ * Liens reçus par email (CLAUDE.md §5, ajouts v0.9, v0.17 et v0.30).
+ * Publics (pas de Sanctum) : la signature temporaire fait office
+ * d'authentification à usage limité. Signature relative (`signed:relative`,
+ * chemin + paramètres) : le frontend appelle l'API par un hôte qui peut
+ * différer d'`APP_URL`. Une même URL signée sert au GET et au POST : la
+ * vérification ne porte que sur l'URL, jamais sur la méthode HTTP. Un GET
+ * n'a jamais d'effet ; seul le POST (action explicite) agit.
  */
-Route::middleware('signed')->group(function () {
-    Route::get('quotes/{quote}/versions/{version}/email-decision/accept', [QuoteEmailDecisionController::class, 'accept'])
-        ->name('quotes.email-decision.accept');
-    Route::get('quotes/{quote}/versions/{version}/email-decision/reject', [QuoteEmailDecisionController::class, 'reject'])
-        ->name('quotes.email-decision.reject');
+Route::middleware('signed:relative')->group(function () {
+    // Décision d'un devis par un client "compte express" sans app.
+    Route::get('quotes/{quote}/versions/{version}/email-decision', [QuoteEmailDecisionController::class, 'show'])
+        ->name('quotes.email-decision');
+    Route::post('quotes/{quote}/versions/{version}/email-decision', [QuoteEmailDecisionController::class, 'decide'])
+        ->name('quotes.email-decision.decide');
 
-    /**
-     * Réclamation d'un compte "express" par son propriétaire réel
-     * (CLAUDE.md §5, ajout v0.17). GET et POST partagent la même URL signée
-     * (voir ExpressClientClaimService) : la vérification de signature ne
-     * porte que sur l'URL, pas sur la méthode HTTP.
-     */
+    // Réclamation d'un compte "express" par son propriétaire réel.
     Route::get('express-clients/{user}/claim', [ExpressClientClaimController::class, 'show'])
         ->name('express-clients.claim.show');
     Route::post('express-clients/{user}/claim', [ExpressClientClaimController::class, 'confirm'])
