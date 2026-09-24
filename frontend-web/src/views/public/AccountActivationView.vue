@@ -110,9 +110,9 @@ async function submit(): Promise<void> {
 //
 // Le message affiché après l'envoi est le même que l'adresse corresponde ou
 // non à un compte à activer : la page ne doit pas permettre de deviner quels
-// emails ont un compte. C'est pourquoi une erreur 422 du backend (qui, lui,
-// distingue encore ce cas) aboutit au même message que la réussite ; le
-// format de l'adresse est donc vérifié ici, avant l'envoi.
+// emails ont un compte. Le backend répond d'ailleurs de la même façon dans
+// les deux cas (CLAUDE.md §4). Une erreur (format refusé, 429 « Trop de
+// tentatives ») affiche le message du backend.
 const NEW_LINK_SENT_MESSAGE =
   "Si un compte à activer existe avec cette adresse, un nouveau lien vient d'y être envoyé. Pensez à regarder dans les courriers indésirables."
 const newLinkEmail = ref('')
@@ -133,11 +133,7 @@ async function requestNewLink(): Promise<void> {
     await requestNewActivationLink(email)
     newLinkSent.value = true
   } catch (error) {
-    if (httpStatus(error) === 422) {
-      newLinkSent.value = true
-    } else {
-      newLinkError.value = extractApiErrorMessage(error, 'Une erreur est survenue. Réessayez.')
-    }
+    newLinkError.value = extractApiErrorMessage(error, 'Une erreur est survenue. Réessayez.')
   } finally {
     isRequestingNewLink.value = false
   }

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { useResendCountdown } from '@/utils/emailCode'
 
 // `ref()` crée une valeur réactive : Vue suit qui la lit (ici le template,
 // via `v-model`) et republie automatiquement l'affichage quand elle change.
@@ -23,6 +24,12 @@ const route = useRoute()
 // ForgotPasswordView) : confirmation affichée au-dessus du formulaire.
 const passwordWasReset = computed(() => route.query.reset === '1')
 
+// Trop de tentatives (429, limite de débit côté backend — CLAUDE.md §4) :
+// le backend indique le délai d'attente (`retry_after`, en secondes). Le
+// décompte est affiché en direct et le bouton reste désactivé jusqu'à zéro.
+const { secondsLeft: throttleSecondsLeft, waitSeconds } = useResendCountdown()
+const isThrottled = computed(() => throttleSecondsLeft.value > 0)
+
 async function handleSubmit(): Promise<void> {
   isSubmitting.value = true
   errorMessage.value = null
@@ -36,7 +43,10 @@ async function handleSubmit(): Promise<void> {
     const target = typeof redirect === 'string' ? redirect : null
     await router.push(target ?? '/')
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 422) {
+    if (axios.isAxiosError(error) && error.response?.status === 429) {
+      const retryAfter = (error.response.data as { retry_after?: number } | undefined)?.retry_after
+      waitSeconds(retryAfter ?? 60)
+    } else if (axios.isAxiosError(error) && error.response?.status === 422) {
       errorMessage.value = (error.response.data as { message?: string }).message ?? 'Identifiants invalides.'
     } else {
       errorMessage.value = extractApiErrorMessage(error, 'Une erreur est survenue. Réessayez.')
@@ -93,11 +103,14 @@ async function handleSubmit(): Promise<void> {
           />
         </div>
 
-        <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
+        <p v-if="isThrottled" class="text-sm text-red-600" role="alert">
+          Trop de tentatives. Réessayez dans {{ throttleSecondsLeft }} secondes.
+        </p>
+        <p v-else-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
 
         <button
           type="submit"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || isThrottled"
           class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {{ isSubmitting ? 'Connexion...' : 'Se connecter' }}
