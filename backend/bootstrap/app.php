@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ApiException;
 use App\Http\Middleware\EnsureProfileIsComplete;
 use App\Http\Middleware\EnsureRegistrationIsApproved;
 use App\Http\Middleware\EnsureRegistrationIsEditable;
@@ -25,6 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Une ApiException est un refus métier normal (code faux, code
+        // expiré, demande déjà en attente…), pas une erreur du serveur :
+        // elle est rendue au client mais jamais écrite dans le journal.
+        $exceptions->dontReport(ApiException::class);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

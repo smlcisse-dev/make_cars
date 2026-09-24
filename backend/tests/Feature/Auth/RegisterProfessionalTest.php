@@ -4,11 +4,13 @@ namespace Tests\Feature\Auth;
 
 use App\Enums\AccountType;
 use App\Enums\RegistrationStatus;
+use App\Exceptions\ApiException;
 use App\Mail\AccountCreatedMail;
 use App\Mail\VerificationCodeMail;
 use App\Models\PendingProfessionalRegistration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -107,6 +109,16 @@ class RegisterProfessionalTest extends TestCase
         $this->register()->assertUnprocessable()->assertJsonValidationErrors('email');
     }
 
+    public function test_validation_messages_are_in_french(): void
+    {
+        User::factory()->create(['email' => 'moussa@garage.test']);
+
+        $this->register(['first_name' => ''])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.email.0', 'Cet email est déjà utilisé par un autre compte.')
+            ->assertJsonPath('errors.first_name.0', 'Le champ prénom est obligatoire.');
+    }
+
     public function test_the_phone_must_not_already_belong_to_an_account(): void
     {
         User::factory()->create(['phone' => '+2290123456789']);
@@ -202,6 +214,19 @@ class RegisterProfessionalTest extends TestCase
 
         $this->verify($uuid, $wrong)->assertJsonPath('remaining_attempts', 3);
         $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_a_business_refusal_is_not_reported_to_the_error_log(): void
+    {
+        Exceptions::fake();
+
+        $uuid = $this->register()->json('data.verification_id');
+
+        $this->verify($uuid, $this->wrongCode($this->lastSentCode()))
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 'verification_code_invalid');
+
+        Exceptions::assertNotReported(ApiException::class);
     }
 
     public function test_the_request_is_locked_at_the_fifth_failure(): void
