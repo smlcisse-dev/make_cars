@@ -25,6 +25,8 @@ Toutes les routes publiques (sans `auth:sanctum`) ont une limite de débit depui
 
 Aucun test automatisé côté frontend : `package.json` n'a pas de script de test. On distingue deux niveaux.
 
+**Tout ce qui reste à tester en navigateur est regroupé dans [RECETTE.md](RECETTE.md)** (2026-09-24) : préparation, parcours pas à pas avec résultat attendu, contrôles de non-régression. À dérouler avant la mise en ligne ; une fois une étape validée, mettre à jour la ligne correspondante ci-dessous.
+
 - **Testé manuellement en navigateur, écran par écran** : le **dashboard Garagiste au complet**, c'est-à-dire Services, Produits, Rendez-vous, Devis/Factures, Chat, Commandes, Avis, Réclamations et Notifications (plus Mon profil).
   - *Source : déclaration de l'utilisateur. Rien dans le dépôt ne permet de le constater.*
 - **« Mon profil » v0.26 (espaces Garagiste et Market Space)** : testé manuellement en navigateur — remplissage et soumission, verrouillage pendant l'examen, approbation puis « Actualiser », bandeau de suspension, dossier refusé corrigeable.
