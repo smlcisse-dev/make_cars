@@ -5,14 +5,12 @@ namespace App\Services;
 use App\Enums\AccountType;
 use App\Enums\DisputeStatus;
 use App\Enums\OrderStatus;
-use App\Enums\QuoteDocumentType;
 use App\Enums\QuoteStatus;
 use App\Enums\RegistrationStatus;
 use App\Models\Appointment;
 use App\Models\Dispute;
 use App\Models\Order;
 use App\Models\Quote;
-use App\Models\QuoteLine;
 use App\Models\Review;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +25,8 @@ use Illuminate\Support\Facades\DB;
  */
 class AdminStatisticsService
 {
+    public function __construct(private readonly InvoicedAmountService $invoicedAmountService) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -161,21 +161,7 @@ class AdminStatisticsService
             ->when($periodEnd, fn ($q) => $q->where('paid_at', '<=', $periodEnd))
             ->count();
 
-        $invoicedQuotesAmount = (float) QuoteLine::query()
-            ->join('quote_versions', 'quote_versions.id', '=', 'quote_lines.quote_version_id')
-            ->join('quotes', 'quotes.id', '=', 'quote_versions.quote_id')
-            ->where('quote_versions.document_type', QuoteDocumentType::Invoice->value)
-            ->where('quotes.status', QuoteStatus::Invoiced->value)
-            ->when($periodStart, fn ($q) => $q->where('quotes.paid_at', '>=', $periodStart))
-            ->when($periodEnd, fn ($q) => $q->where('quotes.paid_at', '<=', $periodEnd))
-            ->sum('quote_lines.line_total');
-
-        $paidOrdersAmount = (float) DB::table('order_lines')
-            ->join('orders', 'orders.id', '=', 'order_lines.order_id')
-            ->where('orders.status', OrderStatus::Paid->value)
-            ->when($periodStart, fn ($q) => $q->where('orders.paid_at', '>=', $periodStart))
-            ->when($periodEnd, fn ($q) => $q->where('orders.paid_at', '<=', $periodEnd))
-            ->sum('order_lines.line_total');
+        $totalInvoicedAmount = $this->invoicedAmountService->total($periodStart, $periodEnd);
 
         return [
             'period' => [
@@ -186,7 +172,7 @@ class AdminStatisticsService
             'quotes_issued_count' => $quotesIssuedCount,
             'orders_count' => $ordersCount,
             'invoices_count' => $invoicedQuotesCount + $paidOrdersCount,
-            'total_invoiced_amount' => number_format($invoicedQuotesAmount + $paidOrdersAmount, 2, '.', ''),
+            'total_invoiced_amount' => InvoicedAmountService::format($totalInvoicedAmount),
         ];
     }
 

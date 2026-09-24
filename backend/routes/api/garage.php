@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Garage\ProfileController;
 use App\Http\Controllers\Api\Garage\QuoteController;
 use App\Http\Controllers\Api\Garage\ReviewController;
 use App\Http\Controllers\Api\Garage\ServiceController;
+use App\Http\Controllers\Api\Professional\DashboardController;
 use App\Http\Controllers\Api\Professional\RegistrationDossierController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +44,8 @@ Route::middleware(['auth:sanctum', 'role:garagiste'])->group(function () {
     // Tout le reste de l'espace pro exige un dossier approuvé (CLAUDE.md §5,
     // ajout v0.26) puis un profil complet (ajout v0.20).
     Route::middleware(['registration.approved', 'profile.complete'])->group(function () {
+        Route::get('dashboard', [DashboardController::class, 'show']);
+
         Route::get('products', [ProductController::class, 'index']);
         Route::post('products', [ProductController::class, 'store']);
         Route::put('products/{product}', [ProductController::class, 'update']);
