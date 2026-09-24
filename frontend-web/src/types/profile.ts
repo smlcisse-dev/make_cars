@@ -1,4 +1,5 @@
 import type { LocationValue } from '@/types/location'
+import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { RegistrationStatus } from '@/types/registration'
 
 export interface OpeningHour {
@@ -31,10 +32,17 @@ export interface ProfessionalProfile extends LocationValue {
   images: ProfileImage[]
 }
 
+// Le champ `name` est le nom de la STRUCTURE (vu par les automobilistes),
+// pas celui de la personne : son libellé dépend donc de l'espace.
+export const STRUCTURE_NAME_LABELS: Record<ProfessionalSpace, string> = {
+  garage: 'Nom du garage',
+  'market-space': 'Nom de la boutique',
+}
+
 // Libellés des éléments manquants, indexés par les clés renvoyées par le
-// backend (`missing_fields`).
+// backend (`missing_fields`). `name` n'y figure pas : voir
+// `missingFieldLabel`, qui le prend dans STRUCTURE_NAME_LABELS.
 export const MISSING_FIELD_LABELS: Record<string, string> = {
-  name: 'Nom',
   address: 'Adresse',
   phone: 'Téléphone',
   latitude: 'Latitude',
@@ -45,6 +53,13 @@ export const MISSING_FIELD_LABELS: Record<string, string> = {
   neighborhood: 'Quartier',
   opening_hours: "Horaires d'ouverture",
   images: 'Au moins une photo',
+}
+
+export function missingFieldLabel(field: string, space: ProfessionalSpace): string {
+  if (field === 'name') {
+    return STRUCTURE_NAME_LABELS[space]
+  }
+  return MISSING_FIELD_LABELS[field] ?? field
 }
 
 // Libellés des informations légales manquantes, indexés par les clés renvoyées

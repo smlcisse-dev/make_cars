@@ -244,7 +244,7 @@ function onCodeInput(event: Event): void {
               inputmode="numeric"
               autocomplete="one-time-code"
               :maxlength="CODE_LENGTH"
-              placeholder="123456"
+              placeholder="●●●●●●"
               class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-center font-mono text-xl tracking-[0.5em] focus:border-slate-500 focus:outline-none"
               @input="onCodeInput"
             />

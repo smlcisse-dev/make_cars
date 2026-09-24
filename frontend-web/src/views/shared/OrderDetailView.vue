@@ -10,6 +10,7 @@ import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatAmount } from '@/utils/money'
 import { orderStatusLabel, orderStatusTone } from '@/utils/orderStatus'
+import { confirmAction } from '@/utils/confirmDialog'
 
 // Même écran pour les deux espaces professionnels : `space` choisit le
 // préfixe des endpoints et des noms de route (CLAUDE.md §4).
@@ -42,11 +43,13 @@ async function loadOrder(): Promise<void> {
 }
 
 async function handleMarkPaid(): Promise<void> {
-  if (
-    !window.confirm(
-      'Marquer cette commande comme payée ? Le stock sera décrémenté et la facture générée, cette action est irréversible.',
-    )
-  ) {
+  const confirmed = await confirmAction({
+    title: 'Marquer la commande comme payée',
+    message:
+      'Le stock sera décrémenté et la facture générée. Cette action est irréversible.',
+    confirmLabel: 'Marquer comme payée',
+  })
+  if (!confirmed) {
     return
   }
 

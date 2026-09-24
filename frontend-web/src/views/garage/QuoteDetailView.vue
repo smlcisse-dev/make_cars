@@ -19,6 +19,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatAmount } from '@/utils/money'
 import { documentTypeLabel, lineTypeLabel, quoteStatusLabel, quoteStatusTone } from '@/utils/quoteStatus'
 import QuoteLineEditor from '@/views/garage/QuoteLineEditor.vue'
+import { confirmAction } from '@/utils/confirmDialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -158,16 +159,27 @@ function handleStart(): Promise<void> {
   return runAction('start', () => startQuote(quoteId), 'Prestation démarrée.')
 }
 
-function handleMarkPaid(): Promise<void> {
-  if (!window.confirm('Marquer ce devis comme payé ? La facture sera générée, cette action est irréversible.')) {
-    return Promise.resolve()
+async function handleMarkPaid(): Promise<void> {
+  const confirmed = await confirmAction({
+    title: 'Marquer le devis comme payé',
+    message: 'La facture sera générée. Cette action est irréversible.',
+    confirmLabel: 'Marquer comme payé',
+  })
+  if (!confirmed) {
+    return
   }
   return runAction('paid', () => markQuotePaid(quoteId), 'Paiement enregistré, facture générée.')
 }
 
-function handleAbandon(): Promise<void> {
-  if (!window.confirm('Abandonner ce devis ? Aucune prestation ni facture ne sera créée.')) {
-    return Promise.resolve()
+async function handleAbandon(): Promise<void> {
+  const confirmed = await confirmAction({
+    title: 'Abandonner le devis',
+    message: 'Aucune prestation ni facture ne sera créée.',
+    confirmLabel: 'Abandonner',
+    variant: 'danger',
+  })
+  if (!confirmed) {
+    return
   }
   return runAction('abandon', () => abandonQuote(quoteId), 'Devis abandonné.')
 }

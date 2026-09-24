@@ -22,8 +22,9 @@ import { useAuthStore } from '@/stores/auth'
 import { BENIN_PHONE_ERROR, normalizeBeninPhone } from '@/utils/beninPhone'
 import type { LoadedProfile, OpeningHourPayload } from '@/api/professionalProfile'
 import {
-  MISSING_FIELD_LABELS,
   MISSING_LEGAL_FIELD_LABELS,
+  STRUCTURE_NAME_LABELS,
+  missingFieldLabel,
   type LegalInfo,
   type LegalStatus,
   type ProfessionalProfile,
@@ -32,6 +33,7 @@ import {
 import type { ProfessionalSpace } from '@/types/professionalSpace'
 import type { ProfileStatus } from '@/types/user'
 import { extractApiErrorMessage, extractValidationErrors } from '@/utils/apiError'
+import { confirmAction } from '@/utils/confirmDialog'
 
 // Écran de profil unique des deux espaces professionnels (Garagiste et Market
 // Space) : la prop `space` ne change que le préfixe d'URL de l'API. C'est la
@@ -121,7 +123,7 @@ const legalState = sectionState()
 const submitState = sectionState()
 
 const missingLabels = computed(() =>
-  (status.value?.missing_fields ?? []).map((field) => MISSING_FIELD_LABELS[field] ?? field),
+  (status.value?.missing_fields ?? []).map((field) => missingFieldLabel(field, props.space)),
 )
 const missingLegalLabels = computed(() =>
   (legalStatus.value?.missing_fields ?? []).map(
@@ -288,17 +290,43 @@ function removeImage(imageId: number): Promise<void> {
 // Position via l'API de géolocalisation du navigateur (nécessite l'accord de
 // l'utilisateur ; https ou localhost). Pas de carte pour l'instant : c'est le
 // point ouvert du CLAUDE.md §7 sur l'affichage cartographique.
+//
+// Sur un ordinateur sans puce GPS, le navigateur déduit la position de
+// l'adresse internet ou des réseaux Wi-Fi voisins : elle peut être fausse de
+// plusieurs kilomètres. D'où l'aide sous les champs, et l'affichage de la
+// précision annoncée par le navigateur après chaque relevé.
+const WORKPLACE_LABELS: Record<ProfessionalSpace, string> = {
+  garage: 'atelier',
+  'market-space': 'boutique',
+}
+const ACCURACY_WARNING_THRESHOLD_METERS = 100
+
 const isLocating = ref(false)
+// Précision du dernier relevé, en mètres (null : pas encore de relevé).
+const positionAccuracy = ref<number | null>(null)
+
+function formatAccuracy(meters: number): string {
+  return meters < 1000
+    ? `${Math.round(meters)} m`
+    : `${(meters / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`
+}
+
 function useMyPosition(): void {
   if (!navigator.geolocation) {
     infoState.error = "La géolocalisation n'est pas disponible sur ce navigateur."
     return
   }
   isLocating.value = true
+  positionAccuracy.value = null
   navigator.geolocation.getCurrentPosition(
     (position) => {
       info.latitude = position.coords.latitude.toFixed(7)
       info.longitude = position.coords.longitude.toFixed(7)
+      // `coords.accuracy` : rayon (en mètres) du cercle dans lequel le
+      // navigateur estime que se trouve la vraie position. Quelques mètres
+      // avec un vrai GPS (téléphone dehors), souvent plusieurs kilomètres sur
+      // un ordinateur qui se repère par son adresse internet.
+      positionAccuracy.value = position.coords.accuracy
       isLocating.value = false
     },
     () => {
@@ -378,11 +406,13 @@ async function onLegalDocumentUploaded(): Promise<void> {
 const submitMissingLabels = ref<string[]>([])
 
 async function submitDossier(): Promise<void> {
-  if (
-    !window.confirm(
+  const confirmed = await confirmAction({
+    title: 'Soumettre votre dossier',
+    message:
       "Une fois soumis, votre profil ne pourra plus être modifié pendant l'examen. Soumettre votre dossier ?",
-    )
-  ) {
+    confirmLabel: 'Soumettre',
+  })
+  if (!confirmed) {
     return
   }
 
@@ -401,8 +431,8 @@ async function submitDossier(): Promise<void> {
     const data = axios.isAxiosError(error) ? error.response?.data : undefined
     if (data?.code === 'registration_incomplete') {
       submitMissingLabels.value = [
-        ...((data.missing_fields ?? []) as string[]).map(
-          (field) => MISSING_FIELD_LABELS[field] ?? field,
+        ...((data.missing_fields ?? []) as string[]).map((field) =>
+          missingFieldLabel(field, props.space),
         ),
         ...((data.missing_legal_fields ?? []) as string[]).map(
           (field) => MISSING_LEGAL_FIELD_LABELS[field] ?? field,
@@ -510,7 +540,7 @@ async function refreshDossier(): Promise<void> {
         <fieldset :disabled="isUnderReview" class="space-y-4">
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block text-sm font-medium text-slate-700">
-              Nom
+              {{ STRUCTURE_NAME_LABELS[space] }}
               <input
                 v-model="info.name"
                 type="text"
@@ -518,6 +548,9 @@ async function refreshDossier(): Promise<void> {
                 maxlength="255"
                 :class="inputClasses"
               />
+              <span class="mt-1 block text-xs font-normal text-slate-500">
+                Le nom sous lequel les automobilistes vous trouveront.
+              </span>
             </label>
             <label class="block text-sm font-medium text-slate-700">
               Téléphone
@@ -576,6 +609,7 @@ async function refreshDossier(): Promise<void> {
                 max="90"
                 required
                 :class="inputClasses"
+                @input="positionAccuracy = null"
               />
             </label>
             <label class="block text-sm font-medium text-slate-700">
@@ -588,12 +622,31 @@ async function refreshDossier(): Promise<void> {
                 max="180"
                 required
                 :class="inputClasses"
+                @input="positionAccuracy = null"
               />
             </label>
           </div>
+          <p class="text-xs text-slate-500">
+            Pour une position précise, relevez vos coordonnées avec votre téléphone, sur place à
+            votre {{ WORKPLACE_LABELS[space] }} : ouvrez Google Maps, appuyez longuement sur le point
+            bleu, puis copiez les deux nombres affichés en haut (le premier est la latitude, le
+            second la longitude).
+          </p>
           <AppButton variant="secondary" :loading="isLocating" @click="useMyPosition">
             Utiliser ma position
           </AppButton>
+          <template v-if="positionAccuracy !== null">
+            <p
+              v-if="positionAccuracy > ACCURACY_WARNING_THRESHOLD_METERS"
+              class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            >
+              Position approximative (à environ {{ formatAccuracy(positionAccuracy) }} près).
+              Relevez plutôt vos coordonnées avec votre téléphone, sur place.
+            </p>
+            <p v-else class="text-sm text-slate-600">
+              Position relevée (précision : environ {{ formatAccuracy(positionAccuracy) }}).
+            </p>
+          </template>
         </fieldset>
 
         <div v-if="!isUnderReview" class="flex items-center gap-3">

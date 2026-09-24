@@ -18,6 +18,7 @@ import type { ProfessionalProduct } from '@/types/professionalProduct'
 import type { ProfessionalSpace } from '@/types/professionalSpace'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { reviewStatusLabel, reviewStatusTone } from '@/utils/reviewStatus'
+import { confirmAction } from '@/utils/confirmDialog'
 
 // Même écran pour les deux espaces professionnels : `space` choisit le
 // préfixe des endpoints et des noms de route (CLAUDE.md §4).
@@ -90,7 +91,13 @@ const inputClasses =
 
 // --- Suppression
 async function handleDelete(product: ProfessionalProduct): Promise<void> {
-  if (!window.confirm(`Supprimer le produit « ${product.name} » ?`)) {
+  const confirmed = await confirmAction({
+    title: 'Supprimer le produit',
+    message: `Supprimer le produit « ${product.name} » ?`,
+    confirmLabel: 'Supprimer',
+    variant: 'danger',
+  })
+  if (!confirmed) {
     return
   }
 

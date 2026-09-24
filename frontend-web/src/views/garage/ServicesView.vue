@@ -18,6 +18,7 @@ import { SERVICE_CATEGORY_OPTIONS } from '@/types/garageService'
 import type { GarageService, ServiceCategory } from '@/types/garageService'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { reviewStatusLabel, reviewStatusTone } from '@/utils/reviewStatus'
+import { confirmAction } from '@/utils/confirmDialog'
 
 const columns: TableColumn[] = [
   { key: 'name', label: 'Nom' },
@@ -80,9 +81,15 @@ async function handleToggleAvailability(service: GarageService): Promise<void> {
   }
 }
 
-// --- Suppression : confirmation native, pas de motif à saisir.
+// --- Suppression : simple confirmation, pas de motif à saisir.
 async function handleDelete(service: GarageService): Promise<void> {
-  if (!window.confirm(`Supprimer le service « ${service.name} » ?`)) {
+  const confirmed = await confirmAction({
+    title: 'Supprimer le service',
+    message: `Supprimer le service « ${service.name} » ?`,
+    confirmLabel: 'Supprimer',
+    variant: 'danger',
+  })
+  if (!confirmed) {
     return
   }
 
