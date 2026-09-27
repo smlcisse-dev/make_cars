@@ -107,7 +107,17 @@ return [
 
         // Supabase Storage expose une API compatible S3 (Project Settings >
         // Storage > S3 Connection dans le dashboard Supabase). Bucket privé
-        // pour les justificatifs KYC.
+        // pour les justificatifs KYC et les médias privés (chat, réclamations,
+        // PDF) : jamais d'URL publique, téléchargement par l'API seulement.
+        // Pilote S3 : paquet league/flysystem-aws-s3-v3 (DEPLOIEMENT.md).
+        //
+        // `*_checksum_*` = "when_required" : depuis 2025, le SDK AWS ajoute
+        // par défaut des sommes de contrôle que les stockages compatibles S3
+        // (dont Supabase) ne gèrent pas toujours ; on ne les envoie que
+        // lorsque l'opération l'exige, comme avant.
+        // `report` : un envoi ou une lecture en échec est écrit dans le
+        // journal (Render efface le disque local, le stockage distant est la
+        // seule copie : une erreur ne doit pas passer inaperçue).
         'supabase' => [
             'driver' => 's3',
             'key' => env('SUPABASE_STORAGE_KEY'),
@@ -116,12 +126,18 @@ return [
             'bucket' => env('SUPABASE_STORAGE_BUCKET'),
             'endpoint' => env('SUPABASE_STORAGE_ENDPOINT'),
             'use_path_style_endpoint' => true,
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
             'throw' => false,
-            'report' => false,
+            'report' => true,
         ],
 
         // Même compte Supabase, bucket public distinct pour les médias
-        // affichés côté app mobile (photos de garage, de produits...).
+        // affichés côté app mobile (photos de garage, de produits...). C'est
+        // le réglage « Public bucket » de Supabase qui rend les fichiers
+        // lisibles ; `url` est l'adresse publique du bucket
+        // (https://<projet>.supabase.co/storage/v1/object/public/<bucket>),
+        // à laquelle Storage::url() ajoute le chemin du fichier.
         'supabase_public' => [
             'driver' => 's3',
             'key' => env('SUPABASE_STORAGE_KEY'),
@@ -131,9 +147,11 @@ return [
             'endpoint' => env('SUPABASE_STORAGE_ENDPOINT'),
             'url' => env('SUPABASE_PUBLIC_URL'),
             'use_path_style_endpoint' => true,
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
             'visibility' => 'public',
             'throw' => false,
-            'report' => false,
+            'report' => true,
         ],
 
     ],
