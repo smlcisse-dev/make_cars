@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Support\QueryCounter;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -16,7 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(QueryCounter::class);
     }
 
     /**
@@ -25,6 +28,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiting();
+        $this->countQueriesForSlowRequestLog();
+    }
+
+    /**
+     * Compte les requêtes SQL pour le journal des requêtes lentes
+     * (middleware LogSlowRequests). Un simple compteur en mémoire : coût
+     * négligeable, même quand le journal est désactivé.
+     */
+    private function countQueriesForSlowRequestLog(): void
+    {
+        DB::listen(fn (QueryExecuted $query) => $this->app->make(QueryCounter::class)->record($query->time));
     }
 
     /**

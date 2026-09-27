@@ -38,6 +38,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Requêtes lentes
+    |--------------------------------------------------------------------------
+    |
+    | Toute requête HTTP plus longue que le seuil est journalisée (niveau
+    | warning) avec sa route, sa durée, son nombre de requêtes SQL et leur
+    | durée cumulée (middleware LogSlowRequests) — pour repérer ce qui est
+    | lent en production. Actif par défaut en production seulement ;
+    | LOG_SLOW_REQUESTS=true l'active ailleurs (ex. mesurer en local).
+    |
+    */
+
+    'slow_requests' => [
+        'enabled' => (bool) env('LOG_SLOW_REQUESTS', env('APP_ENV') === 'production'),
+        'threshold_ms' => (int) env('SLOW_REQUEST_THRESHOLD_MS', 1000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Log Channels
     |--------------------------------------------------------------------------
     |

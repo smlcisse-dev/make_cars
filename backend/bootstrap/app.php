@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureProfileIsComplete;
 use App\Http\Middleware\EnsureRegistrationIsApproved;
 use App\Http\Middleware\EnsureRegistrationIsEditable;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\LogSlowRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // En premier : mesure la requête entière (config logging.slow_requests).
+        $middleware->prepend(LogSlowRequests::class);
+
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'profile.complete' => EnsureProfileIsComplete::class,
