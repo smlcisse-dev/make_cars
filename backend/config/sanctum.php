@@ -54,6 +54,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Date de dernière utilisation des jetons
+    |--------------------------------------------------------------------------
+    |
+    | Par défaut, Sanctum écrit `last_used_at` dans personal_access_tokens à
+    | chaque requête authentifiée : une écriture en base de plus par requête,
+    | coûteuse avec la latence de Supabase. Rien dans l'application ne lit
+    | cette date (l'expiration se calcule depuis la création du jeton) :
+    | SANCTUM_TRACK_LAST_USED_AT=false la supprime en production.
+    |
+    */
+
+    'last_used_at' => (bool) env('SANCTUM_TRACK_LAST_USED_AT', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Token Prefix
     |--------------------------------------------------------------------------
     |
