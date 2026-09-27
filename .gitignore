@@ -22,3 +22,6 @@ mobile/.flutter-plugins
 mobile/.flutter-plugins-dependencies
 mobile/build/
 mobile/*.iml
+
+# Sauvegardes de base (bin/backup-db.sh) : données personnelles, jamais dans le dépôt.
+*.dump
