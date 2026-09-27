@@ -5,9 +5,9 @@ namespace App\Services;
 use App\Mail\QuoteDecisionMail;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
+use App\Support\DeferredMail;
 use App\Support\FrontendUrl;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -41,7 +41,7 @@ class QuoteEmailDecisionService
 
         $link = rawurlencode($this->signedPath($quote, $version));
 
-        Mail::to($client->email)->send(new QuoteDecisionMail(
+        DeferredMail::send($client->email, new QuoteDecisionMail(
             $version,
             FrontendUrl::to("devis/decision?link={$link}&choix=accepter"),
             FrontendUrl::to("devis/decision?link={$link}&choix=refuser"),

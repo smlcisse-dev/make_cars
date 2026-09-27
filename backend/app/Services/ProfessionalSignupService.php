@@ -9,11 +9,11 @@ use App\Mail\AccountCreatedMail;
 use App\Mail\VerificationCodeMail;
 use App\Models\PendingProfessionalRegistration;
 use App\Models\User;
+use App\Support\DeferredMail;
 use App\Support\EmailCode;
 use App\Support\FrontendUrl;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -58,7 +58,7 @@ class ProfessionalSignupService
             ...EmailCode::freshAttributes($code),
         ]);
 
-        Mail::to($pending->email)->send(new VerificationCodeMail($code, EmailCode::ttlMinutes()));
+        DeferredMail::send($pending->email, new VerificationCodeMail($code, EmailCode::ttlMinutes()));
 
         return $pending;
     }
@@ -122,7 +122,7 @@ class ProfessionalSignupService
             return $user;
         });
 
-        Mail::to($user->email)->send(new AccountCreatedMail($user, FrontendUrl::professionalProfile($user->role)));
+        DeferredMail::send($user->email, new AccountCreatedMail($user, FrontendUrl::professionalProfile($user->role)));
 
         return $user;
     }
@@ -145,7 +145,7 @@ class ProfessionalSignupService
         $code = EmailCode::generate();
         $pending->update(EmailCode::freshAttributes($code));
 
-        Mail::to($pending->email)->send(new VerificationCodeMail($code, EmailCode::ttlMinutes()));
+        DeferredMail::send($pending->email, new VerificationCodeMail($code, EmailCode::ttlMinutes()));
 
         return $pending;
     }

@@ -12,11 +12,11 @@ use App\Models\ProfessionalRegistration;
 use App\Models\ReactivationRequest;
 use App\Models\RegistrationDocument;
 use App\Models\User;
+use App\Support\DeferredMail;
 use App\Support\FrontendUrl;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -326,7 +326,7 @@ class ProfessionalRegistrationService
     private function sendMail(User $user, Mailable $mail): void
     {
         if ($user->email !== null) {
-            Mail::to($user->email)->send($mail);
+            DeferredMail::send($user->email, $mail);
         }
     }
 }

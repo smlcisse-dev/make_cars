@@ -13,9 +13,9 @@ use App\Models\Garage;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Models\User;
+use App\Support\DeferredMail;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Une réclamation n'est possible que sur une transaction terminée — un
@@ -199,6 +199,6 @@ class DisputeService
             return;
         }
 
-        Mail::to($client->email)->send(new DisputeDecisionMail($dispute));
+        DeferredMail::send($client->email, new DisputeDecisionMail($dispute));
     }
 }

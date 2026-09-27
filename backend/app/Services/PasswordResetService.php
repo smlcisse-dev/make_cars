@@ -6,10 +6,10 @@ use App\Exceptions\ApiException;
 use App\Mail\PasswordResetCodeMail;
 use App\Models\PasswordResetCode;
 use App\Models\User;
+use App\Support\DeferredMail;
 use App\Support\EmailCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Mot de passe oublié par code email (CLAUDE.md §5, ajout v0.29), pour tout
@@ -51,7 +51,7 @@ class PasswordResetService
         $user = User::where('email', $email)->first();
 
         if ($user !== null) {
-            Mail::to($email)->send(new PasswordResetCodeMail($code, EmailCode::ttlMinutes()));
+            DeferredMail::send($email, new PasswordResetCodeMail($code, EmailCode::ttlMinutes()));
         }
     }
 

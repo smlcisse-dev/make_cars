@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Mail\ExpressClientClaimMail;
 use App\Models\User;
+use App\Support\DeferredMail;
 use App\Support\FrontendUrl;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -43,7 +43,7 @@ class ExpressClientClaimService
             return;
         }
 
-        Mail::to($email)->send(new ExpressClientClaimMail(
+        DeferredMail::send($email, new ExpressClientClaimMail(
             $user,
             FrontendUrl::to('compte/activer?link='.rawurlencode($this->signedPath($user))),
         ));
