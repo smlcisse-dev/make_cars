@@ -1,0 +1,21 @@
+# En-têtes HTTP de Cloudflare Pages (copié tel quel dans dist/ par Vite).
+# Guide : DEPLOIEMENT.md à la racine du dépôt.
+#
+# Fichiers de Vite (nom contenant une empreinte du contenu, ex.
+# index-3f9a1c.js) : un nouveau déploiement change leur nom, ils peuvent donc
+# être gardés un an par le navigateur sans jamais être périmés.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Page d'entrée : jamais gardée en cache, pour que chaque visite charge
+# la dernière version (qui désigne les bons fichiers /assets/).
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+
+# Routes de l'application (/garage/profile…) : pas de fichier _redirects.
+# Sans 404.html dans le site, Cloudflare Pages sert index.html pour toute
+# adresse inconnue (mode « application à page unique ») : un F5 sur
+# /garage/profile fonctionne, avec la revalidation par défaut de Pages
+# (max-age=0, must-revalidate). Ne pas ajouter de 404.html dans public/.
