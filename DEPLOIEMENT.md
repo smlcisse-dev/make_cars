@@ -22,6 +22,7 @@ Ce guide est à suivre **dans l'ordre**. Les textes entre guillemets sont ceux q
 | Contrainte de Render gratuit | Conséquence | Réponse dans le code |
 |---|---|---|
 | Mise en veille après 15 minutes sans visite ; réveil en 30 à 60 s | La première visite après une pause est très lente | Tâche externe qui appelle `/api/health` toutes les 10 minutes (étape 6). Cette route ne touche pas la base. |
+| Projet Supabase mis en pause après 7 jours sans activité sur la base | L'API ne peut plus lire ni écrire ; il faut restaurer le projet à la main | Seconde tâche externe qui appelle `/api/health/db` (une requête `SELECT 1`) une fois par jour (étape 6). |
 | 512 Mo de RAM, 0,1 CPU | Peu de calcul disponible | nginx + PHP-FPM, 4 processus fixes, OPcache sans vérification des fichiers, caches Laravel (`php artisan optimize`) au démarrage |
 | Disque effacé à chaque redémarrage | Fichiers envoyés perdus | Tous les fichiers sur Supabase Storage (étape 2) |
 | SMTP sortant bloqué | Aucun email par SMTP | Emails par l'API Resend (`MAIL_MAILER=resend`) |
@@ -118,7 +119,7 @@ bin/restore-db.sh ~/makecars-sauvegardes/makecars-production-2026-09-27_174047.d
 
 1. Ouvrir https://supabase.com/dashboard et choisir le projet de **production** (identifiant `aowpgpeabffpqneflzas`, voir CLAUDE.md §4).
 2. **Vérifier qu'il est actif** : en haut de la page, aucun bandeau « Project is paused ». S'il est en pause : « Restore project ».
-   - Sur l'offre gratuite de Supabase, un projet sans aucune activité pendant 7 jours est mis en pause. La tâche de l'étape 6 **ne l'empêche pas** (`/api/health` ne touche pas la base) : pendant le pilote, une connexion à l'application de temps en temps suffit.
+   - Sur l'offre gratuite de Supabase, un projet sans aucune activité pendant 7 jours sur la base est mis en pause. La seconde tâche de l'étape 6 (`/api/health/db`, une fois par jour) l'en empêche ; la première (`/api/health`, toutes les 10 minutes) ne touche pas la base.
 3. **Vérifier la région** : « Project Settings » → « General » : « Region » doit indiquer **Central EU (Frankfurt)** / `eu-central-1`.
 4. **Créer les deux buckets** : menu « Storage » → « New bucket ».
    - `documents-prives` : **« Public bucket » décoché**. Contiendra justificatifs (registre de commerce, CIP), images du chat, photos des réclamations, pièces jointes des demandes de réactivation, PDF des devis et factures. Aucune adresse publique : ces fichiers ne sont lisibles qu'à travers l'API, après vérification des droits.
@@ -209,7 +210,11 @@ Le code du pilote a besoin de **toutes** les migrations appliquées sur la base 
 1. https://cron-job.org → créer un compte gratuit → « Create cronjob ».
 2. Title : `Make Cars - réveil API` ; URL : `https://makecars-api.onrender.com/api/health` ; Schedule : **toutes les 10 minutes** ; « Create ».
 3. Après quelques exécutions, « History » doit montrer des réponses `200 OK` en moins d'une seconde.
-4. Bon à savoir : l'offre gratuite de Render donne 750 heures par mois, ce qui couvre un seul service éveillé en permanence. N'en créez pas un second éveillé de la même façon.
+4. **Seconde tâche, pour la base** : « Create cronjob » à nouveau. Title : `Make Cars - activité base` ; URL : `https://makecars-api.onrender.com/api/health/db` ; Schedule : **une fois par jour** (par exemple chaque jour à 6 h) ; « Create ».
+   - Cette route exécute une requête minimale (`SELECT 1`) : Supabase gratuit met en pause un projet sans activité sur la base pendant 7 jours, et la tâche des 10 minutes ne touche pas la base.
+   - Réponse attendue : `{"status":"ok","db":"ok"}`. Un `503` (`{"status":"error","db":"unavailable"}`) signifie que la base ne répond pas : vérifier dans Supabase qu'aucun bandeau « Project is paused » n'est affiché (étape 2) et les journaux Render.
+   - Dans les réglages de la tâche, activer la notification par email en cas d'échec : c'est la seule alerte si la base tombe.
+5. Bon à savoir : l'offre gratuite de Render donne 750 heures par mois, ce qui couvre un seul service éveillé en permanence. N'en créez pas un second éveillé de la même façon.
 
 ## Étape 7 : vérifications finales
 

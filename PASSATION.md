@@ -5,9 +5,9 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 **Vérifié dans le code / par commande**
 - **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **137 commits** au total après la sauvegarde manuelle de la base du 2026-09-27, ce commit de documentation compris (135 après la préparation du déploiement gratuit, 122 après le lot « limites de débit et supervision admin », 117 après le lot « correctifs et tableaux de bord », 112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
 - **Dernier commit de code** : préparation du déploiement gratuit (2026-09-27 : `render.yaml`, `backend/Dockerfile`, `frontend-web/public/_headers`), suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **635 tests, 635 réussis, 2155 assertions** après la préparation du déploiement gratuit du 2026-09-27 (621 tests / 2119 assertions après les réglages proxy/CORS du 2026-09-24, 615 tests / 2111 assertions après le lot « limites de débit et supervision admin », 608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **639 tests, 639 réussis, 2164 assertions** après l'ajout de `/api/health/db` du 2026-09-27 (635 tests / 2155 assertions après la préparation du déploiement gratuit, 621 tests / 2119 assertions après les réglages proxy/CORS du 2026-09-24, 615 tests / 2111 assertions après le lot « limites de débit et supervision admin », 608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
-- **Routes** (`php artisan route:list`) : **197 routes** au total (+1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
+- **Routes** (`php artisan route:list`) : **198 routes** au total (+1 pour `health/db`, 2026-09-27 ; +1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
 | Espace | Routes | Détail |
 |---|---|---|
@@ -16,7 +16,7 @@ Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section
 | `api/admin/*` | 41 | inscriptions 9 (dont `reactivation-request/refuse` et `reactivation-requests/{reactivationRequest}/attachments/{attachment}`, v0.28), litiges 7, services 4, produits 4, avis 3, statistiques 1, supervision en lecture 12 (garages, boutiques, RDV, devis, commandes, conversations : 2 chacun) |
 | `api/mobile/*` | 39 | automobiliste (voir §3) |
 | `api/auth/*` | 11 | login, login Google, logout, me, inscription automobiliste, inscription pro en 3 routes (`register/professionnel`, `{uuid}/verify`, `{uuid}/resend`), `express-claim`, mot de passe oublié en 2 routes (`password/forgot`, `password/reset`, v0.29) |
-| Publiques hors auth | 8 | `locations/*` 3, décision de devis par email 2 (`GET` lecture seule + `POST` décision, même URL signée, v0.30), réclamation de compte express 2, `health` 1 |
+| Publiques hors auth | 9 | `locations/*` 3, décision de devis par email 2 (`GET` lecture seule + `POST` décision, même URL signée, v0.30), réclamation de compte express 2, `health` 1, `health/db` 1 |
 
 Toutes les routes publiques (sans `auth:sanctum`) ont une limite de débit depuis le 2026-09-24 : valeurs et règle dans CLAUDE.md §4 « Limites de débit et réponses publiques », tableau complet au §8.
 | Hors `api/` | 5 | `sanctum/csrf-cookie`, `storage/{path}` ×2, `up`, `_boost/browser-logs` |
@@ -276,7 +276,7 @@ Préparé le 2026-09-27, **pas encore déployé** : l'assistant n'a accès à au
   | `GET /garage/profile` | 17 | 4 requêtes séparées de présence des documents ; utilisateur et dossier relus deux fois |
 
   Pour mémoire : `GET /auth/me` 8 (dont l'écriture de `last_used_at`, supprimée en production), listes garagiste 7 à 11, `GET /admin/statistics` 15.
-- **Supabase gratuit** : un projet sans activité pendant 7 jours est mis en pause ; le réveil de l'API (`/api/health`) ne touche pas la base et ne l'empêche donc pas.
+- **Supabase gratuit** : un projet sans activité sur la base pendant 7 jours est mis en pause. Le réveil de l'API (`/api/health`, toutes les 10 minutes) ne touche pas la base ; une seconde tâche cron-job.org appelle donc `GET /api/health/db` (`SELECT 1`, 503 si la base ne répond pas, limite `public`) une fois par jour (DEPLOIEMENT.md, étape 6).
 - **Sauvegarde de la base** : Supabase gratuit n'en fait aucune (« No backups ») ; sauvegarde manuelle `backend/bin/backup-db.sh prod` obligatoire avant toute migration de la production et avant chaque mise en ligne (liste bloquante, case « Sauvegardes »).
 - **Resend sans domaine vérifié** : n'envoie qu'à l'adresse du compte Resend. Un domaine (et ses enregistrements DNS) est nécessaire pour que de vrais professionnels reçoivent leurs codes.
 
@@ -410,7 +410,7 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
 | `POST auth/express-claim` | `express-claim` : 3 par email, 10 par IP |
 | `GET`/`POST express-clients/{user}/claim` | `email-link` : 30 par IP (+ signature) |
 | `GET`/`POST quotes/{quote}/versions/{version}/email-decision` | `email-link` : 30 par IP (+ signature) |
-| `GET health`, `locations/*` (3) | `public` : 120 par IP |
+| `GET health`, `health/db`, `locations/*` (3) | `public` : 120 par IP |
 | `GET mobile/garages`, `/{garage}`, `/{garage}/reviews`, `mobile/market-space-accounts` (3 idem), `mobile/search/nearby` | `public` : 120 par IP |
 | Hors `api/` : `up`, `sanctum/csrf-cookie`, `storage/{path}` (×2), `_boost/browser-logs` | aucune (routes du framework ; `_boost` n'existe qu'en développement) |
 

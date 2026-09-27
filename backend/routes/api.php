@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\Public\ExpressClientClaimController;
 use App\Http\Controllers\Api\Public\LocationController;
 use App\Http\Controllers\Api\Public\QuoteEmailDecisionController;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -10,6 +12,24 @@ Route::get('/health', function () {
         'status' => 'ok',
         'app' => config('app.name'),
     ]);
+})->middleware('throttle:public');
+
+/**
+ * Contrôle de la base : une requête minimale, appelée une fois par jour par
+ * une tâche externe pour que le projet Supabase gratuit ne soit jamais mis en
+ * pause (7 jours sans activité). `/health` reste sans requête SQL : il est
+ * appelé toutes les 10 minutes pour garder le serveur éveillé.
+ */
+Route::get('/health/db', function () {
+    try {
+        DB::select('select 1');
+    } catch (Throwable $e) {
+        Log::error('Contrôle de la base en échec', ['exception' => $e->getMessage()]);
+
+        return response()->json(['status' => 'error', 'db' => 'unavailable'], 503);
+    }
+
+    return response()->json(['status' => 'ok', 'db' => 'ok']);
 })->middleware('throttle:public');
 
 /**
