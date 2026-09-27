@@ -1,0 +1,59 @@
+# Configuration nginx de production (Dockerfile). ${PORT} est remplacé au
+# démarrage par docker/start.sh (port fourni par Render).
+user www-data;
+worker_processes 1;
+pid /run/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 256;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Pas de journal d'accès : Render compte déjà les requêtes, et les
+    # requêtes lentes sont journalisées par Laravel (LogSlowRequests).
+    access_log off;
+    server_tokens off;
+    sendfile on;
+    keepalive_timeout 65;
+
+    # Même limite que post_max_size (docker/php.ini).
+    client_max_body_size 50m;
+
+    # Réponses JSON compressées : utile sur une connexion mobile lente.
+    gzip on;
+    gzip_min_length 1024;
+    gzip_types application/json text/plain text/css application/javascript;
+
+    server {
+        listen ${PORT} default_server;
+        root /var/www/html/public;
+        index index.php;
+
+        location / {
+            try_files $uri /index.php?$query_string;
+        }
+
+        location = /index.php {
+            fastcgi_pass 127.0.0.1:9000;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+            fastcgi_param DOCUMENT_ROOT $realpath_root;
+            fastcgi_read_timeout 60s;
+            fastcgi_buffer_size 32k;
+            fastcgi_buffers 16 16k;
+        }
+
+        # Aucun autre fichier PHP exécutable, aucun fichier caché servi.
+        location ~ \.php$ {
+            return 404;
+        }
+
+        location ~ /\.(?!well-known) {
+            deny all;
+        }
+    }
+}

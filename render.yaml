@@ -1,0 +1,116 @@
+# Blueprint Render : API Laravel (backend/) pour le pilote sur l'offre
+# gratuite. Guide pas à pas : DEPLOIEMENT.md.
+#
+# Aucune valeur secrète ici. Les variables `sync: false` sont demandées par
+# Render à la création du service (Blueprint), puis modifiables dans
+# l'onglet « Environment » du service.
+# Aucune migration au déploiement : la base de production se migre à la
+# main (PASSATION.md, « Toutes les migrations en attente… »).
+services:
+  - type: web
+    name: makecars-api
+    runtime: docker
+    # Même région que Supabase (eu-central-1, Francfort) : chaque requête
+    # SQL fait un aller-retour de quelques millisecondes au lieu de plus de 100 ms
+    # depuis les États-Unis.
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Léger : ne touche pas la base (sert aussi à garder le serveur éveillé).
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # --- Application ---
+      - key: APP_NAME
+        value: Make Cars
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false # base64:… généré avec `php artisan key:generate --show`
+      - key: APP_URL
+        sync: false # https://makecars-api.onrender.com (adresse du service)
+      - key: FRONTEND_URL
+        sync: false # https://<projet>.pages.dev (adresse Cloudflare Pages)
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # même valeur que FRONTEND_URL
+      - key: APP_LOCALE
+        value: fr
+      - key: APP_FAKER_LOCALE
+        value: fr_FR
+      # Le conteneur n'est joignable que par le proxy de Render : on fait
+      # confiance à l'appelant direct pour lire l'IP réelle du visiteur
+      # (limites de débit) et le protocole https (config/trustedproxy.php).
+      - key: TRUSTED_PROXIES
+        value: "*"
+
+      # --- Journal (disque effacé à chaque redémarrage : onglet « Logs ») ---
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: SLOW_REQUEST_THRESHOLD_MS
+        value: "1000"
+
+      # --- Base de données : projet Supabase de PRODUCTION ---
+      # Supabase > Project Settings > Database > Connection string >
+      # « Session pooler ».
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        value: aws-0-eu-central-1.pooler.supabase.com
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        value: postgres
+      - key: DB_USERNAME
+        sync: false # postgres.<identifiant du projet de production>
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+
+      # --- Anti-lenteur : aucun aller-retour vers la base pour ces pilotes ---
+      - key: CACHE_STORE
+        value: file
+      - key: SESSION_DRIVER
+        value: array
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: SANCTUM_TRACK_LAST_USED_AT
+        value: "false"
+
+      # --- Emails par API (SMTP bloqué sur l'offre gratuite) ---
+      - key: MAIL_MAILER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false # ex. no-reply@<domaine vérifié chez Resend>
+      - key: MAIL_FROM_NAME
+        value: Make Cars
+
+      # --- Fichiers : Supabase Storage (disque du serveur effacé) ---
+      - key: KYC_DOCUMENTS_DISK
+        value: supabase
+      - key: PRIVATE_MEDIA_DISK
+        value: supabase
+      - key: PUBLIC_MEDIA_DISK
+        value: supabase_public
+      - key: SUPABASE_STORAGE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_SECRET
+        sync: false
+      - key: SUPABASE_STORAGE_REGION
+        value: eu-central-1
+      - key: SUPABASE_STORAGE_ENDPOINT
+        sync: false # https://<projet>.storage.supabase.co/storage/v1/s3
+      - key: SUPABASE_STORAGE_BUCKET
+        value: documents-prives
+      - key: SUPABASE_PUBLIC_BUCKET
+        value: medias-publics
+      - key: SUPABASE_PUBLIC_URL
+        sync: false # https://<projet>.supabase.co/storage/v1/object/public/medias-publics

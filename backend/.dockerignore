@@ -1,0 +1,35 @@
+# Contexte de construction de l'image Docker de production (Dockerfile).
+# Jamais de secrets dans l'image : les variables viennent de Render.
+.env
+.env.*
+!.env.example
+
+# Réinstallés proprement dans l'image (sans les paquets de développement).
+vendor
+node_modules
+
+# Fichiers générés en local : caches de développement (paquets de dev
+# comme boost ou pail listés dans bootstrap/cache), fichiers envoyés, journaux.
+bootstrap/cache/*.php
+storage/app/private/*
+storage/app/public/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+public/storage
+
+# Inutiles en production.
+tests
+phpunit.xml
+.phpunit.cache
+.phpunit.result.cache
+.git
+.editorconfig
+.ai
+AGENTS.md
+CLAUDE.md
+README.md
+boost.json
+docs
