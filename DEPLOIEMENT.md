@@ -14,6 +14,7 @@ Ce guide est à suivre **dans l'ordre**. Les textes entre guillemets sont ceux q
 > **À retenir avant de commencer**
 > - **Aucun secret dans le dépôt** : mots de passe, clés API et `APP_KEY` se saisissent uniquement dans les tableaux de bord Render et Cloudflare.
 > - **Aucune migration automatique** : la base de production se migre à la main (étape 3).
+> - **Sauvegarde manuelle obligatoire** avant toute migration de la production et avant chaque mise en ligne : Supabase gratuit n'en fait aucune (section « Sauvegarde de la base » ci-dessous).
 > - **Pilote seulement** : ne faites envoyer **aucune vraie pièce d'identité** tant que la case « Protection des données personnelles » de PASSATION.md (« Bloquant avant la mise en production ») n'est pas cochée. Utilisez des documents fictifs.
 
 ## Ce que l'hébergement gratuit impose, et ce qui a été fait contre la lenteur
@@ -32,6 +33,77 @@ Autres réglages anti-lenteur (tous dans `render.yaml`) :
 - **Requêtes lentes journalisées** : toute requête de plus d'1 seconde apparaît dans l'onglet « Logs » de Render (`Requête lente {"route":…,"duration_ms":…,"sql_queries":…}`).
 
 ---
+
+## Sauvegarde de la base (manuelle, obligatoire)
+
+Le projet Supabase de production est sur l'offre gratuite : la page « Database » → « Backups » affiche **« No backups »**. Supabase ne fait **aucune** sauvegarde : c'est à vous de la faire, depuis votre ordinateur.
+
+> **Règle** : une sauvegarde de la production est **obligatoire**
+> - avant **toute migration** de la base de production (étape 3, et toute migration future) ;
+> - avant **chaque mise en ligne** (chaque `git push` sur `main` qui redéploie Render, étape 4.6).
+>
+> Pas de sauvegarde du jour → pas de migration, pas de mise en ligne.
+
+### Faire une sauvegarde
+
+Depuis `backend/` :
+```
+bin/backup-db.sh prod
+```
+- Les paramètres de connexion sont lus dans `backend/.env.production`, **quel que soit l'environnement actif** ; le mot de passe n'est jamais affiché (il est transmis à `pg_dump` par une variable d'environnement).
+- Format compressé de `pg_dump` (`.dump`), fichier daté, par exemple `makecars-production-2026-09-27_174047.dump`.
+- Contenu : toutes les tables de l'application (schéma `public`, table `migrations` comprise). **Pas** les fichiers de Supabase Storage (justificatifs, photos) : ils ne sont pas dans la base.
+- Vous devez voir à la fin :
+  ```
+  Base      : production (.env.production)
+  Serveur   : aws-0-eu-central-1.pooler.supabase.com:5432, utilisateur postgres.aowpgpeabffpqneflzas
+  Fichier   : /home/<vous>/makecars-sauvegardes/makecars-production-2026-09-27_174047.dump
+  Outils    : conteneur postgres:17 via podman (machine : 16, serveur 17)
+
+  Sauvegarde terminée : /home/<vous>/makecars-sauvegardes/makecars-production-…dump (160K, 42 tables)
+  ```
+  (Mesuré sur la base de développement le 2026-09-27 : 156 Ko, 42 tables.)
+- `bin/backup-db.sh dev` sauvegarde de la même façon la base de développement.
+
+### Où ranger les fichiers
+
+- Par défaut dans `~/makecars-sauvegardes/` (dossier créé par le script, lisible par vous seul ; fichiers en droits `600`). Autre dossier : `BACKUP_DIR=/chemin bin/backup-db.sh prod`.
+- **Jamais dans le dépôt Git** (le `.gitignore` refuse de toute façon les fichiers `*.dump`) : une sauvegarde contient des données personnelles (noms, emails, téléphones, IFU, NPI, mots de passe hachés).
+- Garder **une deuxième copie hors de l'ordinateur** (clé USB ou disque externe rangé à part, ou stockage chiffré), pour survivre à la perte de l'ordinateur.
+- Conserver au minimum les 7 dernières sauvegardes et celle qui précède chaque migration ; supprimer les plus anciennes (durée à aligner sur la future politique de protection des données, PASSATION.md, liste bloquante).
+
+### Tester une sauvegarde (base de DÉVELOPPEMENT uniquement)
+
+Une sauvegarde jamais relue n'est pas une sauvegarde. Pour vérifier qu'elle est utilisable, la restaurer dans la base de **développement** :
+```
+bin/restore-db.sh ~/makecars-sauvegardes/makecars-production-2026-09-27_174047.dump
+```
+- La cible est **toujours** la base de développement (`.env.development`), jamais la production ; le script refuse si les deux fichiers `.env` désignent le même projet, et demande de taper `RESTAURER`.
+- Il remplace toutes les tables de l'application de la base de développement par celles de la sauvegarde, **en une seule transaction** : en cas d'erreur, rien n'est modifié.
+- Commande exécutée (pour information) : `pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --exit-on-error --dbname=<base de développement> <fichier>`.
+- Vérifier ensuite : `bin/switch-env.sh status` (doit afficher `.env.development`), `php artisan migrate:status`, puis connexion à l'application en local.
+- Après le test, la base de développement contient les données de production : **relancer les seeders** si vous voulez retrouver les comptes de test (PASSATION.md §5), et ne pas partager cette base.
+- Testé le 2026-09-27 : sauvegarde de la base de développement puis restauration dans cette même base, mêmes nombres de lignes avant et après, séquences correctes, `migrate:status` normal.
+- **Restaurer la production** n'est volontairement pas automatisé : c'est une décision exceptionnelle (perte de données), à prendre explicitement, après une nouvelle sauvegarde de l'état actuel, avec la même commande `pg_restore` et la connexion de production.
+
+### Si `pg_dump` manque ou n'a pas la bonne version
+
+`pg_dump` et `pg_restore` doivent avoir une version majeure **au moins égale** à celle du serveur. Serveurs Supabase (production et développement) : **PostgreSQL 17.6** (relevé le 2026-09-27). Sur cet ordinateur (Fedora 40), `pg_dump` est en version **16.8** : il refuserait (« server version mismatch »).
+
+- **Rien à installer dans ce cas** : les scripts le détectent et utilisent automatiquement l'image officielle `postgres:17` avec **podman** (installé par défaut sur Fedora). Le premier lancement télécharge l'image (environ 150 Mo).
+- Vérifier la version installée : `pg_dump --version`.
+- Installer un vrai `pg_dump` 17 sur l'ordinateur (facultatif) :
+  - **Fedora 40** : ni Fedora 40 ni le dépôt officiel PostgreSQL (qui ne prend plus en charge que Fedora 42 et suivantes) ne proposent PostgreSQL 17. Garder la solution podman, ou mettre Fedora à jour.
+  - **Fedora 43 ou plus récente**, dépôt officiel PostgreSQL :
+    ```
+    sudo dnf install https://download.postgresql.org/pub/repos/yum/reporpms/F-43-x86_64/pgdg-fedora-repo-latest.noarch.rpm
+    sudo dnf install postgresql17
+    export PATH=/usr/pgsql-17/bin:$PATH    # à ajouter dans ~/.bashrc
+    pg_dump --version                     # doit afficher 17.x
+    ```
+    (Remplacer `F-43` par votre version de Fedora.)
+- Si podman n'est pas installé : `sudo dnf install podman`.
+- Quand Supabase passera à une version plus récente (18…), les scripts prendront automatiquement l'image correspondante.
 
 ## Étape 1 : créer les comptes
 
@@ -65,11 +137,7 @@ Autres réglages anti-lenteur (tous dans `render.yaml`) :
 
 Le code du pilote a besoin de **toutes** les migrations appliquées sur la base de production (connexion, inscription, dossier, réactivation, mot de passe oublié en dépendent).
 
-1. **Sauvegarde d'abord** : Supabase → « Database » → « Backups ». Sur l'offre gratuite, pas de sauvegarde téléchargeable : faire un export depuis votre poste :
-   ```
-   pg_dump "postgresql://postgres.aowpgpeabffpqneflzas:<mot de passe>@aws-0-eu-central-1.pooler.supabase.com:5432/postgres" -Fc -f sauvegarde-prod-$(date +%F).dump
-   ```
-   Vous devez obtenir un fichier `.dump` de quelques centaines de Ko à quelques Mo.
+1. **Sauvegarde d'abord (obligatoire)** : `bin/backup-db.sh prod` depuis `backend/` (section « Sauvegarde de la base »). Vous devez obtenir « Sauvegarde terminée : …dump ». Idéalement, la tester avec `bin/restore-db.sh` (base de développement) avant de migrer.
 2. Appliquer **la procédure de PASSATION.md**, case « Toutes les migrations en attente appliquées sur la base de production » : `switch-env.sh prod`, `switch-env.sh status`, `php artisan migrate:status` (noter la liste « Pending »), `php artisan migrate`, nouveau `migrate:status` (plus aucune « Pending »), puis **retour sur `dev`** (`switch-env.sh dev`).
 3. Aucune migration ne sera jamais lancée par Render.
 
@@ -114,7 +182,7 @@ Le code du pilote a besoin de **toutes** les migrations appliquées sur la base 
    ```
    {"status":"ok","app":"Make Cars"}
    ```
-6. Chaque `git push` sur `main` redéploie automatiquement le service (`autoDeploy`). Une variable modifiée dans « Environment » redéploie aussi.
+6. Chaque `git push` sur `main` redéploie automatiquement le service (`autoDeploy`). Une variable modifiée dans « Environment » redéploie aussi. **Avant chaque mise en ligne** (push sur `main`), faire une sauvegarde de la production : `bin/backup-db.sh prod`.
 
 ## Étape 5 : Cloudflare Pages, le site web
 
