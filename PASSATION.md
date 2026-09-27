@@ -3,9 +3,9 @@
 Remplace la version du 2026-09-20 (commit `473b70c`). Chaque point de la section « Vérifié » a été contrôlé le 2026-09-23, puis mis à jour le 2026-09-24 (lot v0.29, fiche admin d'examen, liens email v0.30, correctifs et tableaux de bord professionnels, puis limites de débit et écrans de supervision admin), par une commande ou une lecture de code. Les points qui n'ont pas pu l'être sont signalés comme tels.
 
 **Vérifié dans le code / par commande**
-- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **122 commits** au total après le lot « limites de débit et supervision admin » du 2026-09-24, ce commit de documentation compris (117 après le lot « correctifs et tableaux de bord », 112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
-- **Dernier commit de code** : `46af46b` feat(frontend): écrans de supervision admin, suivi du commit de documentation qui met ce fichier à jour.
-- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **621 tests, 621 réussis, 2119 assertions** après les réglages proxy/CORS du 2026-09-24 (615 tests / 2111 assertions après le lot « limites de débit et supervision admin », 608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
+- **Git** : `main` est synchronisée avec `origin/main` (0 commit d'avance, 0 de retard après `git fetch`). Seul élément non suivi : `.claude/`. **135 commits** au total après la préparation du déploiement gratuit du 2026-09-27, ce commit de documentation compris (122 après le lot « limites de débit et supervision admin », 117 après le lot « correctifs et tableaux de bord », 112 après le lot v0.30, 109 après la fiche admin d'examen, 106 après le lot v0.29, 98 après les pièces jointes de la demande de réactivation, 69 à la rédaction initiale de ce document).
+- **Dernier commit de code** : préparation du déploiement gratuit (2026-09-27 : `render.yaml`, `backend/Dockerfile`, `frontend-web/public/_headers`), suivi du commit de documentation qui met ce fichier à jour.
+- **Tests backend** (`php artisan test`, SQLite en mémoire via `phpunit.xml`, donc sans toucher Supabase) : **635 tests, 635 réussis, 2155 assertions** après la préparation du déploiement gratuit du 2026-09-27 (621 tests / 2119 assertions après les réglages proxy/CORS du 2026-09-24, 615 tests / 2111 assertions après le lot « limites de débit et supervision admin », 608 tests / 2050 assertions après le lot « correctifs et tableaux de bord », 596 tests / 1995 assertions après le lot v0.30, 586 tests / 1937 assertions après la fiche admin d'examen, 1932 après le lot v0.29, 571 après les pièces jointes de la demande de réactivation, 558 après v0.27/v0.28, 523 après le backend v0.26).
 - **Environnement actif** (`backend/bin/switch-env.sh status`) : `.env.development`, `DB_USERNAME=postgres.ppfflfwzqmckciqikhzn` (projet Supabase de développement, pooler `eu-central-1`).
 - **Routes** (`php artisan route:list`) : **197 routes** au total (+1 par espace pro pour le tableau de bord, 2026-09-24 ; 183 après v0.26 ; +3 par espace pro et +1 admin pour v0.27/v0.28 ; +1 par espace pro et +1 admin pour les pièces jointes de la demande de réactivation ; +2 pour le mot de passe oublié, v0.29 ; v0.30 : les 2 routes `GET` de décision de devis deviennent 1 `GET` + 1 `POST`, total inchangé).
 
@@ -245,6 +245,40 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - **Frontend, sujets mis de côté lors du backend v0.26** :
 - **Infra (§4 ci-dessus)** : ramener le timeout Axios à 15 s, suivre le ticket SU-481692, fixer le mode `serve --no-reload` dans un script si on veut qu'il survive aux redémarrages.
 
+## Hébergement gratuit (pilote)
+
+Préparé le 2026-09-27, **pas encore déployé** : l'assistant n'a accès à aucun compte d'hébergement. Guide pas à pas pour l'utilisateur : **DEPLOIEMENT.md** (racine du dépôt).
+
+- **Cible** : API sur **Render** (offre gratuite : 512 Mo, 0,1 CPU, veille après 15 min, disque effacé à chaque redémarrage, SMTP bloqué), région **Francfort** comme Supabase ; site sur **Cloudflare Pages** ; base et fichiers sur le projet Supabase de **production** ; emails par **Resend**. Même code pour un futur hébergement payant : seules les variables changent.
+- **Fichiers** : `render.yaml` (Blueprint, variables sans secrets), `backend/Dockerfile`, `backend/.dockerignore`, `backend/docker/` (nginx, PHP-FPM, php.ini, `start.sh`), `frontend-web/public/_headers`, `frontend-web/.nvmrc`. Aucune migration au démarrage (`php artisan optimize` seulement). Image construite et lancée en local avec podman le 2026-09-27 : `/api/health` 200, OPcache actif, `.env` et autres fichiers `.php` non servis, arrêt propre.
+- **Serveur web** : nginx + PHP-FPM (`pm = static`, 4 processus), plutôt que FrankenPHP ou Apache : le plus éprouvé, mémoire prévisible sous 512 Mo, et `fastcgi_finish_request()` disponible (envoi des emails après la réponse). Justification en tête du `Dockerfile`.
+- **Nouvelles dépendances Composer** : `league/flysystem-aws-s3-v3` (sans lui, les disques `supabase`/`supabase_public`, déclarés depuis longtemps, étaient inutilisables) et `resend/resend-php` (transport `resend` natif de Laravel).
+- **Pilotes, avant → production** (développement inchangé) :
+
+  | Pilote | Avant (dev et `.env.production`) | Production (Render) | Pourquoi |
+  |---|---|---|---|
+  | Cache et limites de débit | `database` | `file` | une seule instance ; avec `database`, chaque requête limitée faisait jusqu'à 12 requêtes SQL de plus (connexion : 19 → 7, `/api/health` : 8 → 0) |
+  | Sessions | `database` | `array` | l'API s'authentifie par jeton et ne sert aucune page : aucune route n'utilise de session |
+  | File d'attente | `database` (inutilisée) | `sync` | aucune tâche mise en file, aucun worker sur l'offre gratuite |
+  | `last_used_at` des jetons Sanctum | écrit à chaque requête authentifiée | désactivé (`SANCTUM_TRACK_LAST_USED_AT=false`) | une écriture en base par requête, date jamais lue |
+  | Emails | synchrones (`Mail::to()->send()`) | après la réponse (`App\Support\DeferredMail`, `defer()` de Laravel) | l'utilisateur n'attend plus le fournisseur ; jamais d'envoi si la requête finit en erreur ; échec journalisé. Sous `php artisan serve`, rien ne change (pas de `fastcgi_finish_request`) |
+  | Journal | `stack`/`single` (fichier) | `stderr`, niveau `warning` | disque effacé ; lisible dans l'onglet « Logs » de Render |
+
+- **Requêtes lentes** : middleware `LogSlowRequests`, actif par défaut en production (`LOG_SLOW_REQUESTS`), seuil `SLOW_REQUEST_THRESHOLD_MS` (1000 ms) : ligne `Requête lente` avec méthode, route, statut, durée, nombre de requêtes SQL et leur durée cumulée.
+- **Routes les plus coûteuses en requêtes SQL** (mesurées le 2026-09-27 sur SQLite : un garage approuvé avec 10 produits, services, RDV, devis, commandes, conversations et avis, et 11 dossiers d'inscription ; cache `array`) — **non corrigées**, à traiter dans un lot dédié :
+
+  | Route | Requêtes SQL | Cause principale |
+  |---|---|---|
+  | `GET /admin/registrations` | 31 (11 dossiers) | N+1 : 2 requêtes « document présent ? » par dossier ; croît avec la page (~39 pour 15 dossiers) |
+  | `GET /admin/quotes` | 24 (10 devis) | N+1 : utilisateur puis dossier d'inscription relus pour chaque devis |
+  | `GET /garage/dashboard` | 22 | une requête `count`/`sum` par chiffre (nombre fixe) |
+  | `POST /auth/login` | 19 avec le cache `database`, 7 avec `file` | limites de débit en base ; puis dossier, garage, horaires, photos pour `profile_status` |
+  | `GET /garage/profile` | 17 | 4 requêtes séparées de présence des documents ; utilisateur et dossier relus deux fois |
+
+  Pour mémoire : `GET /auth/me` 8 (dont l'écriture de `last_used_at`, supprimée en production), listes garagiste 7 à 11, `GET /admin/statistics` 15.
+- **Supabase gratuit** : un projet sans activité pendant 7 jours est mis en pause ; le réveil de l'API (`/api/health`) ne touche pas la base et ne l'empêche donc pas.
+- **Resend sans domaine vérifié** : n'envoie qu'à l'adresse du compte Resend. Un domaine (et ses enregistrements DNS) est nécessaire pour que de vrais professionnels reçoivent leurs codes.
+
 ## Bloquant avant la mise en production
 
 À distinguer des points ouverts ordinaires (§6) : aucun lancement public tant qu'une case reste décochée.
@@ -262,9 +296,11 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
 - [ ] **`FRONTEND_URL` renseignée dans `.env.production`**
   - *Raison* : les liens des emails d'inscription (compte créé, approbation, refus) et, depuis v0.30, ceux de la décision de devis et de l'activation d'un compte express sont construits à partir de cette valeur ; vide, ils pointent au mauvais endroit.
   - *Voir* : §6, point 13 ; CLAUDE.md §5 « Parcours d'inscription professionnelle en deux temps (ajout v0.26) ».
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : variable du service Render (`render.yaml`, `sync: false`) à renseigner avec l'adresse Cloudflare Pages (DEPLOIEMENT.md, étape 4).
 - [ ] **Limites d'envoi de fichiers PHP et du serveur web reproduites sur le serveur de production**
   - *Raison* : avec les valeurs PHP par défaut (2M / 8M), les justificatifs de 10 Mo (registre de commerce, CIP) sont refusés avant même la validation Laravel ; le serveur web peut avoir sa propre limite (ex. `client_max_body_size` pour Nginx).
   - *Voir* : §4 « Limites PHP d'envoi de fichiers ».
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : `backend/docker/php.ini` (`upload_max_filesize = 12M`, `post_max_size = 50M`) et `client_max_body_size 50m` (`backend/docker/nginx.conf.template`), vérifiés dans l'image construite en local ; à confirmer sur Render par l'envoi d'un justificatif (DEPLOIEMENT.md, étape 7).
 - [ ] **Suppression d'un compte professionnel : désactivation ou suppression logique**
   - *Raison* : une suppression réelle supprime en cascade RDV, devis et conversations, et laisse orphelins commandes, avis et réclamations. Aucun devis, facture ou commande ne doit jamais disparaître (traçabilité, CLAUDE.md §6).
   - *Voir* : §6, point 14 ; CLAUDE.md §7 « Suppression d'un compte professionnel ».
@@ -283,19 +319,24 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
   - *Préparé* (2026-09-24) : variable `TRUSTED_PROXIES` (`config/trustedproxy.php`, lue par le middleware `TrustProxies` du framework), vide par défaut ; commentaire dans le fichier et dans `.env.example`.
   - *Procédure* : renseigner dans `.env.production` les adresses ou plages des proxies que l'hébergeur documente (séparées par des virgules), ou `*` seulement si le serveur n'est joignable que par le proxy. Puis, **sur le serveur**, vérifier que l'IP réelle est vue : se connecter avec un mauvais mot de passe depuis deux réseaux différents (ex. wifi et 4G) ; le blocage de l'un (RECETTE.md, SE-01/SE-02) ne doit pas toucher l'autre.
   - *Voir* : §6, « Autres pistes ouvertes » (limites de débit derrière un proxy).
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : `TRUSTED_PROXIES=*` dans `render.yaml` (le conteneur n'est joignable que par le proxy de Render). Vérification par deux réseaux après le déploiement (DEPLOIEMENT.md, étape 7).
 - [ ] **Service d'envoi d'emails**
   - *Raison* : `MAIL_MAILER=log` (développement comme `.env.production` actuel) : aucun email ne part, ils sont seulement écrits dans `storage/logs/laravel.log`. Sans service réel, aucun professionnel ne reçoit son code d'inscription, et ni le mot de passe oublié, ni les devis aux clients express, ni l'activation de compte ne fonctionnent.
   - *Procédure* : choisir un fournisseur (Brevo, Amazon SES, Mailtrap « sending »… : aucun changement de code, seulement les variables `MAIL_*`, voir le commentaire de `.env.example`), configurer SMTP (`MAIL_MAILER=smtp`, hôte, port, identifiants), une adresse d'expédition du domaine du projet (`MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`), et **l'authentification du domaine d'envoi** (enregistrements DNS SPF, DKIM et DMARC donnés par le fournisseur) : sans elle, les codes risquent d'arriver en courrier indésirable. Avant l'ouverture, tester un envoi réel vers une adresse Gmail (inscription d'une boutique : le code doit arriver en boîte de réception, pas en indésirables).
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : Render gratuit bloque le SMTP : `MAIL_MAILER=resend` + `RESEND_API_KEY` (transport natif, paquet `resend/resend-php`), le SMTP restant possible ailleurs par simple changement de variables. Domaine d'envoi à vérifier chez Resend (SPF, DKIM, DMARC) : DEPLOIEMENT.md, étape 1. Emails envoyés après la réponse HTTP.
 - [ ] **HTTPS sur le site et sur l'API**
   - *Raison* : sans HTTPS, mots de passe, jetons de session et justificatifs circulent en clair. Les navigateurs refusent aussi la géolocalisation (« Utiliser ma position » de « Mon profil ») sur une page non sécurisée, en particulier sur téléphone.
   - *Procédure* : certificat pour les deux adresses (souvent fourni par l'hébergeur, ou Let's Encrypt), puis `APP_URL` et `FRONTEND_URL` en `https://` dans `.env.production`, et `VITE_API_BASE_URL` en `https://` pour le build du frontend. Les liens des emails sont construits à partir de ces valeurs.
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : Render et Cloudflare Pages fournissent HTTPS automatiquement ; adresses `https://` à saisir dans Render (`APP_URL`, `FRONTEND_URL`) et Cloudflare (`VITE_API_BASE_URL`) : DEPLOIEMENT.md, étapes 4 et 5.
 - [ ] **Origines autorisées (CORS)**
   - *Raison* : l'API ne répond au navigateur que pour les adresses listées ; aujourd'hui seule `http://localhost:5173` l'est. Le site réel serait refusé par le navigateur.
   - *Préparé* : `CORS_ALLOWED_ORIGINS` (`config/cors.php`), liste séparée par des virgules, `http://localhost:5173` par défaut. Elle était déjà lue depuis l'environnement ; les espaces autour des virgules sont ignorés depuis le 2026-09-24, et un test vérifie que les origines suivent la configuration.
   - *Procédure* : mettre l'adresse réelle du site, en `https://` (en général la même valeur que `FRONTEND_URL`).
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : `CORS_ALLOWED_ORIGINS` dans `render.yaml` (`sync: false`), même valeur que `FRONTEND_URL`.
 - [ ] **Mode production**
   - *Raison* : avec `APP_DEBUG=true`, toute erreur affiche à n'importe quel visiteur des détails techniques (chemins, requêtes SQL, parfois des valeurs de configuration). `APP_ENV=local` active aussi des comportements de développement.
   - *Procédure* : `APP_ENV=production`, `APP_DEBUG=false` dans `.env.production`, puis `php artisan config:cache` au déploiement. Vérifier ensuite sur le serveur : `php artisan about` doit afficher `Environment … production` et `Debug Mode … OFF`. Puis provoquer une erreur serveur volontaire (ex. couper brièvement l'accès à la base) : la réponse ne doit contenir que « Server Error », sans trace, nom de fichier ni requête SQL.
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : `APP_ENV=production` et `APP_DEBUG=false` dans `render.yaml` ; `php artisan optimize` (configuration, routes, vues, événements en cache) au démarrage du conteneur. Vérification après déploiement : DEPLOIEMENT.md, étape 7.
 - [ ] **Stockage durable des fichiers**
   - *Aujourd'hui* (relevé dans `config/filesystems.php` et les services) : trois réglages, tous sur le disque local du serveur, en développement comme dans `.env.production` :
 
@@ -308,6 +349,7 @@ Mot de passe de tous les comptes seedés : **`password`** (vérifié dans `UserF
     Des disques Supabase Storage (`supabase` privé, `supabase_public` public, compatibles S3) sont déjà déclarés dans `config/filesystems.php` mais ne sont utilisés par aucun réglage.
   - *Raison* : sur un hébergement où le serveur peut être remplacé (redéploiement, changement de machine), les fichiers écrits sur son disque disparaissent. Ce sont des pièces d'identité, des preuves de litige et des factures : leur perte casse la traçabilité (CLAUDE.md §6).
   - *Procédure* : soit un volume persistant monté sur `storage/app` (avec `php artisan storage:link` si le disque public reste local), soit un stockage objet (ex. passer les trois réglages sur les disques Supabase, un bucket **privé** pour KYC et médias privés, public pour les photos) ; vérifier ensuite qu'un justificatif envoyé reste consultable après un redéploiement. Les fichiers déjà présents sont à recopier.
+  - *Préparé (2026-09-27, pilote Render — pas fait tant que l'utilisateur n'a pas déployé)* : les trois réglages sur Supabase Storage dans `render.yaml` (`KYC_DOCUMENTS_DISK`/`PRIVATE_MEDIA_DISK=supabase`, bucket privé `documents-prives` ; `PUBLIC_MEDIA_DISK=supabase_public`, bucket public `medias-publics`). Paquet `league/flysystem-aws-s3-v3` ajouté (les disques étaient inutilisables sans lui) ; test `SupabaseStorageTest` (bucket S3 simulé : envoi, téléchargement authentifié, URL publique). Buckets à créer et vérification après redémarrage : DEPLOIEMENT.md, étapes 2 et 7. Aucun fichier à recopier depuis la production actuelle (jamais déployée).
 - [ ] **Sauvegardes**
   - *Raison* : une perte de la base ou des fichiers efface dossiers, devis, factures et avis, sans recours.
   - *Procédure* : base de données : vérifier dans le tableau de bord du projet Supabase de production ce que prévoit le plan souscrit (sauvegardes automatiques, fréquence, durée de conservation, restauration à un instant donné) et le noter ici ; fichiers : sauvegarde du stockage choisi au point précédent (volume ou bucket). **Faire au moins une fois un essai de restauration** (base sur le projet de développement, quelques fichiers dans un dossier de test) et noter la date.
@@ -338,6 +380,11 @@ Toutes les versions de v0.3 à v0.25 sont citées, sans trou de numérotation, e
    - middleware `profile.complete` présent.
 
 ## 8. Derniers changements (depuis le 2026-09-20)
+
+**Lot du 2026-09-27 : préparation du déploiement gratuit (Render + Cloudflare Pages + Supabase)**
+- Détail, choix et mesures : section « Hébergement gratuit (pilote) » ci-dessus ; guide utilisateur : DEPLOIEMENT.md.
+- Code : disques Supabase utilisables (paquet S3, sommes de contrôle, erreurs journalisées), emails après la réponse (`DeferredMail`), journal des requêtes lentes (`LogSlowRequests`), option `SANCTUM_TRACK_LAST_USED_AT`, transport Resend. Tests ajoutés : `SupabaseStorageTest`, `DeferredMailTest`, `SlowRequestLogTest`, `TokenLastUsedAtTest`, `ResendMailerTest` (635 tests au total).
+- Rien n'est déployé : les cases de la liste bloquante concernées portent la mention « Préparé », pas cochées.
 
 **Lot du 2026-09-24 : limites de débit des endpoints publics et écrans de supervision admin**
 - **Sécurité** (`40d9c13`) :
