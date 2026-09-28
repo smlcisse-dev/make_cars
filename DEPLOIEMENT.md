@@ -144,6 +144,29 @@ Le code du pilote a besoin de **toutes** les migrations appliquées sur la base 
 1. **Sauvegarde d'abord (obligatoire)** : `bin/backup-db.sh prod` depuis `backend/` (section « Sauvegarde de la base »). Vous devez obtenir « Sauvegarde terminée : …dump ». Idéalement, la tester avec `bin/restore-db.sh` (base de développement) avant de migrer.
 2. Appliquer **la procédure de PASSATION.md**, case « Toutes les migrations en attente appliquées sur la base de production » : `switch-env.sh prod`, `switch-env.sh status`, `php artisan migrate:status` (noter la liste « Pending »), `php artisan migrate`, nouveau `migrate:status` (plus aucune « Pending »), puis **retour sur `dev`** (`switch-env.sh dev`).
 3. Aucune migration ne sera jamais lancée par Render.
+4. **Changer le mot de passe du compte admin** (voir ci-dessous) : il a servi à des essais avant la création de la base de développement.
+
+### Changer le mot de passe d'un compte admin
+
+Commande `php artisan admin:set-password {email}`, à lancer **à la main** depuis `backend/`. Elle remplace « Mot de passe oublié » tant que Resend n'a pas de domaine vérifié (aucun email ne partirait).
+
+- Ne modifie **que** un compte administrateur : un email inconnu ou un compte automobiliste/professionnel est refusé (code de sortie 1).
+- Le mot de passe est demandé en **saisie masquée, deux fois** ; il n'est jamais accepté en argument (il finirait dans l'historique du shell), jamais affiché, ni son hash.
+- Règles : au moins 12 caractères, majuscules et minuscules, chiffres et symboles.
+- Supprime ensuite **tous** les jetons de connexion du compte (toutes ses sessions sont déconnectées) et affiche combien ont été révoqués.
+
+Procédure sur la production :
+
+```bash
+cd backend
+bin/switch-env.sh prod
+bin/switch-env.sh status        # vérifier : DB_USERNAME=postgres.aowpgpeabffpqneflzas
+php artisan admin:set-password idanisoumailacisse@gmail.com
+bin/switch-env.sh dev
+bin/switch-env.sh status        # vérifier le retour sur la base de développement
+```
+
+Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jetons révoqués : N ». Redémarrer ensuite `php artisan serve` s'il tournait (le `.env` n'est relu qu'au démarrage). Se reconnecter sur le site avec le nouveau mot de passe.
 
 ## Étape 4 : Render, le service de l'API
 
