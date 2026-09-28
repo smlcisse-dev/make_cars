@@ -19,17 +19,34 @@ Route::get('/health', function () {
  * une tâche externe pour que le projet Supabase gratuit ne soit jamais mis en
  * pause (7 jours sans activité). `/health` reste sans requête SQL : il est
  * appelé toutes les 10 minutes pour garder le serveur éveillé.
+ *
+ * `SET LOCAL` dans une transaction, jamais un `SET` simple : derrière le
+ * pooler Supabase, un réglage de session pourrait rester sur une connexion
+ * partagée et couper d'autres requêtes du site. Le 503 ne donne jamais le
+ * message de l'exception (il peut contenir l'hôte ou l'utilisateur Supabase) :
+ * le détail ne va que dans les journaux.
  */
 Route::get('/health/db', function () {
-    try {
-        DB::select('select 1');
-    } catch (Throwable $e) {
-        Log::error('Contrôle de la base en échec', ['exception' => $e->getMessage()]);
+    $headers = ['Cache-Control' => 'no-store'];
 
-        return response()->json(['status' => 'error', 'db' => 'unavailable'], 503);
+    try {
+        DB::transaction(function ($connection) {
+            if ($connection->getDriverName() === 'pgsql') {
+                $connection->statement("set local statement_timeout = '5s'");
+            }
+
+            $connection->select('select 1');
+        });
+    } catch (Throwable $e) {
+        Log::error('Contrôle de la base en échec', [
+            'exception' => $e::class,
+            'message' => $e->getMessage(),
+        ]);
+
+        return response()->json(['status' => 'error', 'db' => 'unavailable'], 503, $headers);
     }
 
-    return response()->json(['status' => 'ok', 'db' => 'ok']);
+    return response()->json(['status' => 'ok', 'db' => 'ok'], 200, $headers);
 })->middleware('throttle:public');
 
 /**
