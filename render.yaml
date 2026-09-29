@@ -20,7 +20,13 @@ services:
     dockerContext: ./backend
     # Léger : ne touche pas la base (sert aussi à garder le serveur éveillé).
     healthCheckPath: /api/health
-    autoDeploy: true
+    # Aucun déploiement automatique : chaque commit poussé sur main (push
+    # automatique, CLAUDE.md §9) partirait sinon en production sans décision
+    # humaine, sans sauvegarde préalable, et avant la migration manuelle de
+    # la base. Mise en ligne : Render > « Manual Deploy » (DEPLOIEMENT.md,
+    # étape 4.6). `autoDeployTrigger` remplace l'ancien `autoDeploy`
+    # (déprécié ; `off` équivaut à `autoDeploy: false`).
+    autoDeployTrigger: "off"
     envVars:
       # --- Application ---
       - key: APP_NAME

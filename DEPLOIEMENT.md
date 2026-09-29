@@ -41,7 +41,7 @@ Le projet Supabase de production est sur l'offre gratuite : la page « Database 
 
 > **Règle** : une sauvegarde de la production est **obligatoire**
 > - avant **toute migration** de la base de production (étape 3, et toute migration future) ;
-> - avant **chaque mise en ligne** (chaque `git push` sur `main` qui redéploie Render, étape 4.6).
+> - avant **chaque mise en ligne** (« Manual Deploy » sur Render, étape 4.6 ; un `git push` sur `main` ne déploie rien).
 >
 > Pas de sauvegarde du jour → pas de migration, pas de mise en ligne.
 
@@ -209,7 +209,28 @@ Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jeto
    ```
    {"status":"ok","app":"Make Cars"}
    ```
-6. Chaque `git push` sur `main` redéploie automatiquement le service (`autoDeploy`). Une variable modifiée dans « Environment » redéploie aussi. **Avant chaque mise en ligne** (push sur `main`), faire une sauvegarde de la production : `bin/backup-db.sh prod`.
+6. **Aucun déploiement automatique** (`autoDeployTrigger: "off"` dans `render.yaml`) : un `git push` sur `main` ne met **rien** en production. Sans ce réglage, chaque commit (poussé automatiquement, CLAUDE.md §9) partirait en ligne sans sauvegarde préalable, et un commit contenant une migration serait déployé **avant** la migration manuelle de la base, ce qui casserait la production entre les deux. Vérifier une fois dans Render → service `makecars-api` → « Settings » → « Auto-Deploy » que la valeur est bien « Off ».
+
+   **Procédure de mise en ligne**, dans cet ordre, depuis `backend/` :
+
+   a. Sauvegarde de la production : `bin/backup-db.sh prod` (voir « Sauvegarde de la base » ; pas de fichier `.dump` du jour → pas de mise en ligne).
+
+   b. **Si le lot contient des migrations** (et seulement dans ce cas) :
+      ```bash
+      bin/switch-env.sh prod
+      bin/switch-env.sh status      # confirmer : .env.production
+      php artisan migrate:status    # noter les migrations « Pending »
+      php artisan migrate
+      php artisan migrate:status    # plus aucune « Pending »
+      bin/switch-env.sh dev
+      ```
+      Puis redémarrer `php artisan serve` s'il tournait (le `.env` n'est relu qu'au démarrage).
+
+   c. Render → service `makecars-api` → « Manual Deploy » → « Deploy latest commit ». Attendre « Your service is live » dans « Logs ».
+
+   d. Vérifier `https://makecars-api.onrender.com/api/health` (`{"status":"ok",…}`) puis `https://makecars-api.onrender.com/api/health/db` (la base répond).
+
+   **Attention** : une variable modifiée dans l'onglet « Environment » **redéploie toujours** le service, quel que soit ce réglage (comportement de Render). Le code déployé est alors le dernier commit déjà déployé ou, selon le choix proposé par Render, le dernier commit de `main` : ne modifier une variable qu'une fois les migrations du dernier commit appliquées.
 
 ## Étape 5 : Cloudflare Pages, le site web
 
