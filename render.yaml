@@ -16,8 +16,14 @@ services:
     region: frankfurt
     plan: free
     rootDir: backend
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    # Avec rootDir, Render résout dockerfilePath et dockerContext à partir
+    # de rootDir, pas de la racine du dépôt (render.com/docs/monorepo-support :
+    # « Dockerfile path, Docker build context directory » opèrent « relative
+    # to the root directory »). Écrire ./backend/... donnait backend/backend
+    # (échec du premier déploiement, DEPLOIEMENT.md). Contexte : backend/,
+    # Dockerfile : backend/Dockerfile.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     # Léger : ne touche pas la base (sert aussi à garder le serveur éveillé).
     healthCheckPath: /api/health
     # Aucun déploiement automatique : chaque commit poussé sur main (push

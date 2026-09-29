@@ -205,6 +205,11 @@ Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jeto
    NOTICE: ready to handle connections
    ==> Your service is live 🎉
    ```
+   **Si le premier déploiement a échoué en quelques secondes** avec `invalid local: resolve : lstat /opt/render/project/src/backend/backend: no such file or directory` (cas du 2026-09-29, commit `ec38dc6`) : l'ancien `render.yaml` doublait le chemin `backend`. Il est corrigé ; pour que le service existant reprenne les nouveaux chemins :
+   - Render → « Blueprints » → `makecars` : si la dernière synchronisation n'a pas repris le commit du correctif, « Manual Sync » ;
+   - puis vérifier dans le service `makecars-api` → « Settings » → « Build & Deploy » : **Root Directory** `backend`, **Dockerfile Path** `./Dockerfile`, **Docker Build Context Directory** `.` (à corriger à la main si besoin) ;
+   - enfin « Manual Deploy » → « Deploy latest commit ».
+
 5. Vérifier : ouvrir `https://makecars-api.onrender.com/api/health` dans le navigateur. Vous devez voir :
    ```
    {"status":"ok","app":"Make Cars"}
@@ -291,4 +296,5 @@ Cet hébergement sert à un **pilote** et à des démonstrations. Tant que la ca
 | Code d'inscription jamais reçu | Resend → « Emails » : l'envoi y apparaît-il ? Sans domaine vérifié, seule l'adresse du compte Resend reçoit. Render → Logs : une erreur d'envoi y est écrite. |
 | Envoi de fichier en échec | Render → Logs (erreurs de stockage journalisées) : clés S3, endpoint ou nom de bucket. |
 | Photos qui ne s'affichent pas | `SUPABASE_PUBLIC_URL` et case « Public bucket » du bucket `medias-publics`. |
+| Déploiement en échec en quelques secondes : `lstat /opt/render/project/src/backend/backend: no such file or directory` | Chemins Docker doublés. Avec `rootDir: backend`, Render résout `dockerfilePath` et `dockerContext` **à partir de `backend/`** : ils valent `./Dockerfile` et `.`, jamais `./backend/...` (étape 4.4). |
 | Tout le monde bloqué par « Trop de tentatives » | `TRUSTED_PROXIES` (étape 7, IP réelle). |
