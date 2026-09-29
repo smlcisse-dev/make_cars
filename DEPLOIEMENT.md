@@ -1,11 +1,11 @@
 # Make Cars : déploiement gratuit (pilote)
 
-Guide pas à pas pour mettre en ligne le pilote sur des hébergements gratuits :
+Guide pas à pas pour mettre en ligne le pilote sur des hébergements gratuits. **Pilote en ligne depuis le 2026-09-29** (état et vérifications : PASSATION.md, « État de la production ») ; ce guide sert désormais aux mises en ligne suivantes (étape 4.6) et à une éventuelle réinstallation.
 
 | Élément | Hébergeur | Adresse obtenue |
 |---|---|---|
-| API Laravel (`backend/`) | **Render**, offre gratuite, région **Francfort** | `https://makecars-api.onrender.com` (exemple) |
-| Site web (`frontend-web/`) | **Cloudflare Pages** | `https://makecars.pages.dev` (exemple) |
+| API Laravel (`backend/`) | **Render**, offre gratuite, région **Francfort** | `https://makecars-api.onrender.com` (service Blueprint « makecars ») |
+| Site web (`frontend-web/`) | **Cloudflare Pages** | `https://makecars.pages.dev` (projet « makecars ») |
 | Base de données et fichiers | **Supabase** (projet de production, `eu-central-1`, Francfort) | — |
 | Emails | **Resend** (par API) | — |
 
@@ -21,7 +21,7 @@ Ce guide est à suivre **dans l'ordre**. Les textes entre guillemets sont ceux q
 
 | Contrainte de Render gratuit | Conséquence | Réponse dans le code |
 |---|---|---|
-| Mise en veille après 15 minutes sans visite ; réveil en 30 à 60 s | La première visite après une pause est très lente | Tâche externe qui appelle `/api/health` toutes les 10 minutes (étape 6). Cette route ne touche pas la base. |
+| Mise en veille après 15 minutes sans visite ; réveil en 30 à 60 s | La première visite après une pause est très lente | Tâche externe qui appelle `/api/health` toutes les 5 minutes (étape 6). Cette route ne touche pas la base. |
 | Projet Supabase mis en pause après 7 jours sans activité sur la base | L'API ne peut plus lire ni écrire ; il faut restaurer le projet à la main | Seconde tâche externe qui appelle `/api/health/db` (une requête `SELECT 1`) une fois par jour (étape 6). |
 | 512 Mo de RAM, 0,1 CPU | Peu de calcul disponible | nginx + PHP-FPM, 4 processus fixes, OPcache sans vérification des fichiers, caches Laravel (`php artisan optimize`) au démarrage |
 | Disque effacé à chaque redémarrage | Fichiers envoyés perdus | Tous les fichiers sur Supabase Storage (étape 2) |
@@ -117,12 +117,13 @@ bin/restore-db.sh ~/makecars-sauvegardes/makecars-production-2026-09-27_174047.d
    - **Important** : sans domaine vérifié, Resend n'envoie qu'à **votre propre adresse** (celle du compte), depuis `onboarding@resend.dev`. Pour que de vrais professionnels reçoivent leur code d'inscription, il faut **un nom de domaine** (ex. `makecars.bj` ou un domaine acheté quelques euros par an) et le vérifier dans Resend : « Domains » → « Add Domain » → ajouter chez le gestionnaire du domaine les enregistrements DNS affichés (SPF, DKIM, et de préférence DMARC). Attendre « Verified ».
    - Créer une clé : « API Keys » → « Create API Key », permission « Sending access ». Vous voyez une valeur `re_…` **une seule fois** : copiez-la pour l'étape 4.
    - Offre gratuite : 3 000 emails par mois, 100 par jour — suffisant pour un pilote.
+   - **Réglage retenu pour le pilote (2026-09-29)** : compte Resend lié à `idanisoumailacisse@gmail.com`, qui est aussi le compte admin de la plateforme ; c'est la **seule adresse qui reçoit les emails** tant qu'aucun domaine n'est vérifié. Clé API nommée « makecars-render », permission « Sending access » seulement (jamais « Full access »).
 
 ## Étape 2 : Supabase (projet de production)
 
 1. Ouvrir https://supabase.com/dashboard et choisir le projet de **production** (identifiant `aowpgpeabffpqneflzas`, voir CLAUDE.md §4).
 2. **Vérifier qu'il est actif** : en haut de la page, aucun bandeau « Project is paused ». S'il est en pause : « Restore project ».
-   - Sur l'offre gratuite de Supabase, un projet sans aucune activité pendant 7 jours sur la base est mis en pause. La seconde tâche de l'étape 6 (`/api/health/db`, une fois par jour) l'en empêche ; la première (`/api/health`, toutes les 10 minutes) ne touche pas la base.
+   - Sur l'offre gratuite de Supabase, un projet sans aucune activité pendant 7 jours sur la base est mis en pause. La seconde tâche de l'étape 6 (`/api/health/db`, une fois par jour) l'en empêche ; la première (`/api/health`, toutes les 5 minutes) ne touche pas la base.
 3. **Vérifier la région** : « Project Settings » → « General » : « Region » doit indiquer **Central EU (Frankfurt)** / `eu-central-1`.
 4. **Créer les deux buckets** : menu « Storage » → « New bucket ».
    - `documents-prives` : **« Public bucket » décoché**. Contiendra justificatifs (registre de commerce, CIP), images du chat, photos des réclamations, pièces jointes des demandes de réactivation, PDF des devis et factures. Aucune adresse publique : ces fichiers ne sont lisibles qu'à travers l'API, après vérification des droits.
@@ -216,7 +217,11 @@ Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jeto
    ```
 6. **Aucun déploiement automatique** (`autoDeployTrigger: "off"` dans `render.yaml`) : un `git push` sur `main` ne met **rien** en production. Sans ce réglage, chaque commit (poussé automatiquement, CLAUDE.md §9) partirait en ligne sans sauvegarde préalable, et un commit contenant une migration serait déployé **avant** la migration manuelle de la base, ce qui casserait la production entre les deux. Vérifier une fois dans Render → service `makecars-api` → « Settings » → « Auto-Deploy » que la valeur est bien « Off ».
 
-   **Procédure de mise en ligne**, dans cet ordre, depuis `backend/` :
+   **Exception : un commit qui modifie `render.yaml` est déployé automatiquement.** Le Blueprint « makecars » synchronise tout changement de `render.yaml` et lance alors un déploiement (déclencheur « Blueprint » dans l'onglet « Events »), malgré `autoDeployTrigger: "off"` — constaté le 2026-09-29 avec le commit `0e12090`. Règle : **tout commit touchant `render.yaml` est une mise en ligne** : sauvegarde avant (étape a), et **jamais de migration dans le même lot** (le code serait en ligne avant la migration manuelle de la base). Un changement de `render.yaml` part dans un commit à lui seul.
+
+   **Pourquoi les migrations restent manuelles** : sur l'offre gratuite, le champ « Pre-Deploy Command » de Render est verrouillé (constaté dans « Settings » le 2026-09-29) ; aucune commande ne peut être lancée avant la mise en service d'un déploiement.
+
+   **Procédure de mise en ligne**, dans cet ordre : sauvegarde, migrations éventuelles, API, site, vérifications. Depuis `backend/` :
 
    a. Sauvegarde de la production : `bin/backup-db.sh prod` (voir « Sauvegarde de la base » ; pas de fichier `.dump` du jour → pas de mise en ligne).
 
@@ -233,17 +238,29 @@ Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jeto
 
    c. Render → service `makecars-api` → « Manual Deploy » → « Deploy latest commit ». Attendre « Your service is live » dans « Logs ».
 
-   d. Vérifier `https://makecars-api.onrender.com/api/health` (`{"status":"ok",…}`) puis `https://makecars-api.onrender.com/api/health/db` (la base répond).
+   d. **Site** (Cloudflare Pages, déploiement manuel, étape 5) : déclencher la construction par le deploy hook « mise-en-ligne ». Son adresse est rangée dans le gestionnaire de mots de passe (jamais dans le dépôt, ni dans l'historique du shell) ; elle reste consultable dans Cloudflare → projet `makecars` → « Settings » → « Deploy hooks ».
+      ```bash
+      read -r HOOK        # coller l'adresse du deploy hook, puis Entrée
+      curl -d "" "$HOOK"
+      ```
+      Réponse attendue : `"success": true`. Le déploiement apparaît dans l'onglet « Deployments », avec une icône de nuage ; attendre qu'il soit terminé. Si le lot ne touche pas `frontend-web/`, cette étape peut être sautée.
+
+   e. Vérifier `https://makecars-api.onrender.com/api/health` (`{"status":"ok",…}`), puis `https://makecars-api.onrender.com/api/health/db` (`{"status":"ok","db":"ok"}`), puis la connexion sur `https://makecars.pages.dev` et le rechargement (F5) d'une page interne.
 
    **Attention** : une variable modifiée dans l'onglet « Environment » **redéploie toujours** le service, quel que soit ce réglage (comportement de Render). Le code déployé est alors le dernier commit déjà déployé ou, selon le choix proposé par Render, le dernier commit de `main` : ne modifier une variable qu'une fois les migrations du dernier commit appliquées.
 
 ## Étape 5 : Cloudflare Pages, le site web
 
-1. Cloudflare → « Workers & Pages » → « Create » → onglet **« Pages »** → « Connect to Git » → autoriser GitHub → choisir `make_cars`.
+Le site est en **déploiement manuel**, comme l'API : un push sur `main` ne le reconstruit pas. La construction se déclenche par un deploy hook (étape 4.6 d).
+
+1. Cloudflare → « Workers & Pages » → « Create » (page « Create an app »).
+   - **Ne pas** utiliser « Connect GitHub » en haut de la page : ce parcours crée un **Worker** (adresse en `.workers.dev`), pas un projet Pages.
+   - Descendre en **bas de la page** et choisir **« Continue to Pages »** (parcours dit « legacy ») → « Connect to Git » → autoriser GitHub → choisir `make_cars`.
 2. Réglages de build :
 
    | Champ | Valeur |
    |---|---|
+   | Project name | **`makecars`** (le nom pré-rempli est `make-cars` : le corriger, il détermine l'adresse `https://makecars.pages.dev`) |
    | Production branch | `main` |
    | Framework preset | `Vue` (ou « None ») |
    | Build command | `npm run build` |
@@ -252,20 +269,29 @@ Attendu : « Mot de passe du compte administrateur … modifié. » puis « Jeto
    | Environment variables | `VITE_API_BASE_URL` = `https://makecars-api.onrender.com/api` (adresse de l'étape 4, **avec** `/api`, sans `/` final) |
 
    Node 22 est choisi par le fichier `frontend-web/.nvmrc`.
-3. « Save and Deploy ». Vous devez voir « Success! Your project is deployed » et l'adresse `https://<projet>.pages.dev`.
-4. **`VITE_API_BASE_URL` est lue au moment du build** : si elle change, relancer un déploiement (« Deployments » → « Retry deployment »).
-5. Revenir dans Render si besoin : `FRONTEND_URL` et `CORS_ALLOWED_ORIGINS` = l'adresse exacte `https://<projet>.pages.dev`.
-6. Déjà prévu dans le dépôt : `frontend-web/public/_headers` (fichiers `/assets/*` gardés un an, `index.html` jamais mis en cache) ; les adresses comme `/garage/profile` sont servies par `index.html` grâce au mode « application à page unique » de Pages (pas de fichier `404.html`, ne pas en ajouter).
+3. « Save and Deploy ». Vous devez voir « Success! Your project is deployed » et l'adresse `https://makecars.pages.dev`.
+4. **Couper le déploiement automatique** : projet `makecars` → « Settings » → « Builds & deployments » → « Branch control » :
+   - décocher **« Enable automatic production branch deployments »** ;
+   - « Preview branch » : **None**.
+   - Vérifier : l'onglet « Deployments » affiche « **Automatic deployments paused** ».
+5. **Créer le deploy hook** : « Settings » → « Deploy hooks » → « Add deploy hook » → nom `mise-en-ligne`, branche `main`. Copier l'adresse affichée dans le gestionnaire de mots de passe, **jamais dans le dépôt** : quiconque la connaît peut relancer la construction du site. Tester une fois (étape 4.6 d) : réponse `"success": true` et un déploiement avec une icône de nuage dans « Deployments » (fait avec succès le 2026-09-29).
+6. **`VITE_API_BASE_URL` est lue au moment du build** : si elle change, relancer une construction (deploy hook, ou « Deployments » → « Retry deployment »).
+7. Revenir dans Render si besoin : `FRONTEND_URL` et `CORS_ALLOWED_ORIGINS` = l'adresse exacte `https://makecars.pages.dev`.
+8. Déjà prévu dans le dépôt : `frontend-web/public/_headers` (fichiers `/assets/*` gardés un an, `index.html` jamais mis en cache) ; les adresses comme `/garage/profile` sont servies par `index.html` grâce au mode « application à page unique » de Pages (pas de fichier `404.html`, ne pas en ajouter). Vérifié le 2026-09-29 : F5 sur `/admin` recharge la page sans 404.
 
 ## Étape 6 : garder le serveur éveillé
 
+Valeurs réellement retenues le 2026-09-29.
+
 1. https://cron-job.org → créer un compte gratuit → « Create cronjob ».
-2. Title : `Make Cars - réveil API` ; URL : `https://makecars-api.onrender.com/api/health` ; Schedule : **toutes les 10 minutes** ; « Create ».
-3. Après quelques exécutions, « History » doit montrer des réponses `200 OK` en moins d'une seconde.
-4. **Seconde tâche, pour la base** : « Create cronjob » à nouveau. Title : `Make Cars - activité base` ; URL : `https://makecars-api.onrender.com/api/health/db` ; Schedule : **une fois par jour** (par exemple chaque jour à 6 h) ; « Create ».
-   - **Pourquoi deux routes distinctes** : les deux hébergeurs ne s'endorment pas pour la même raison. Render met le serveur en veille après **15 minutes** sans visite : il faut une visite fréquente, et `/api/health` ne touche volontairement pas la base (aucune requête SQL toutes les 10 minutes). Supabase met le projet en pause après **7 jours** sans activité **sur la base** : une visite de `/api/health` ne compte pas, il faut une vraie requête SQL, et une par jour suffit. `/api/health/db` exécute cette requête minimale (`SELECT 1`, interrompue au bout de 5 secondes).
+2. **Tâche de réveil** : Title `Make Cars - réveil API` ; URL `https://makecars-api.onrender.com/api/health` ; Schedule : **toutes les 5 minutes** (pas 10 : même avec deux visites manquées de suite, l'écart reste sous les 15 minutes de mise en veille de Render).
+   - Notifications : alerte par email **après 3 échecs consécutifs**, alerte **au retour à la normale**, alerte **si la tâche est désactivée**.
+   - Après quelques exécutions, « History » doit montrer des réponses `200 OK` en moins d'une seconde.
+3. **Seconde tâche, pour la base** : « Create cronjob » à nouveau. Title `Make Cars - activité base` ; URL `https://makecars-api.onrender.com/api/health/db` ; Schedule : **tous les jours à 6:00**, fuseau `Africa/Porto-Novo`.
+   - Notifications : alerte **dès le 1er échec** (une seule exécution par jour : attendre un second échec ferait perdre un jour), alerte **au retour à la normale**.
+   - **Pourquoi deux routes distinctes** : les deux hébergeurs ne s'endorment pas pour la même raison. Render met le serveur en veille après **15 minutes** sans visite : il faut une visite fréquente, et `/api/health` ne touche volontairement pas la base (aucune requête SQL toutes les 5 minutes). Supabase met le projet en pause après **7 jours** sans activité **sur la base** : une visite de `/api/health` ne compte pas, il faut une vraie requête SQL, et une par jour suffit. `/api/health/db` exécute cette requête minimale (`SELECT 1`, interrompue au bout de 5 secondes).
    - Réponse attendue : `{"status":"ok","db":"ok"}`. Un `503` (`{"status":"error","db":"unavailable"}`) signifie que la base ne répond pas : vérifier dans Supabase qu'aucun bandeau « Project is paused » n'est affiché (étape 2) et les journaux Render.
-   - Dans les réglages de la tâche, activer la notification par email en cas d'échec : c'est la seule alerte si la base tombe.
+4. **Constat du 2026-09-29** : les 3 premières exécutions de la tâche de réveil ont échoué avec « Échec (output too large) » (sortie trop grande), puis toutes ont réussi en `200`. Le « Test de fonctionnement » manuel renvoyait pourtant la bonne réponse, de 33 octets. Cause non identifiée. Si le problème revient : activer « Sauvegarder les réponses dans l'historique » dans les réglages de la tâche pour voir ce qui a été reçu.
 5. Bon à savoir : l'offre gratuite de Render donne 750 heures par mois, ce qui couvre un seul service éveillé en permanence. N'en créez pas un second éveillé de la même façon.
 
 ## Étape 7 : vérifications finales
@@ -292,6 +318,9 @@ Cet hébergement sert à un **pilote** et à des démonstrations. Tant que la ca
 | Symptôme | Piste |
 |---|---|
 | Première page très lente (30 à 60 s) | Le service dormait : vérifier la tâche cron-job.org (étape 6). |
+| cron-job.org : « Échec (output too large) » | Vu sur les 3 premières exécutions du 2026-09-29, disparu seul ensuite. S'il revient : activer « Sauvegarder les réponses dans l'historique » sur la tâche (étape 6.4). |
+| Un déploiement Render est parti sans « Manual Deploy » | Le commit modifiait `render.yaml` : le Blueprint synchronise et déploie (étape 4.6). Vérifier qu'aucune migration n'était attendue par ce code. |
+| Codes de double authentification refusés | Horloge du poste décalée : activer « Date et heure automatiques ». |
 | « Server Error » à la connexion | Render → Logs : souvent `DB_PASSWORD`/`DB_USERNAME` erronés, projet Supabase en pause, ou migrations manquantes (étape 3). |
 | Code d'inscription jamais reçu | Resend → « Emails » : l'envoi y apparaît-il ? Sans domaine vérifié, seule l'adresse du compte Resend reçoit. Render → Logs : une erreur d'envoi y est écrite. |
 | Envoi de fichier en échec | Render → Logs (erreurs de stockage journalisées) : clés S3, endpoint ou nom de bucket. |
